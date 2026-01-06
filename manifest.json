@@ -2,26 +2,36 @@
   "name": "Resonance AI Studio",
   "short_name": "Resonance",
   "description": "Premium AI Image Generator powered by Pollinations.ai",
-  "start_url": "/",
+  "start_url": ".",
   "display": "standalone",
   "background_color": "#101622",
   "theme_color": "#101622",
   "orientation": "portrait",
+  "scope": ".",
   "icons": [
     {
-      "src": "https://raw.githubusercontent.com/google/material-design-icons/master/png/image/auto_awesome/materialicons/48dp/2x/baseline_auto_awesome_white_48dp.png",
-      "sizes": "96x96",
-      "type": "image/png"
-    },
-    {
-      "src": "https://raw.githubusercontent.com/google/material-design-icons/master/png/image/auto_awesome/materialicons/48dp/2x/baseline_auto_awesome_white_48dp.png",
+      "src": "https://ui-avatars.com/api/?name=R&background=2b6cee&color=fff&size=192&font-size=0.6&rounded=true&length=1",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "https://raw.githubusercontent.com/google/material-design-icons/master/png/image/auto_awesome/materialicons/48dp/2x/baseline_auto_awesome_white_48dp.png",
+      "src": "https://ui-avatars.com/api/?name=R&background=2b6cee&color=fff&size=192&font-size=0.6&rounded=true&length=1",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "https://ui-avatars.com/api/?name=R&background=2b6cee&color=fff&size=512&font-size=0.6&rounded=true&length=1",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://ui-avatars.com/api/?name=R&background=2b6cee&color=fff&size=512&font-size=0.6&rounded=true&length=1",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
