@@ -1,32 +1,16 @@
-const CACHE_NAME = 'resonance-v2';
+const CACHE_NAME = 'resonance-v3';
 const urlsToCache = [
-  './',
-  './index.html',
-  './manifest.json'
+  '/',
+  '/index.html',
+  '/manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
-  // Perform install steps
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => {
-        return cache.addAll(urlsToCache);
-      })
+      .then((cache) => cache.addAll(urlsToCache))
   );
   self.skipWaiting();
-});
-
-self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Cache hit - return response
-        if (response) {
-          return response;
-        }
-        return fetch(event.request);
-      })
-  );
 });
 
 self.addEventListener('activate', (event) => {
@@ -43,4 +27,29 @@ self.addEventListener('activate', (event) => {
     })
   );
   self.clients.claim();
+});
+
+self.addEventListener('fetch', (event) => {
+  const request = event.request;
+
+  // Navigation Strategy: Serve index.html for page navigations
+  // This fixes 404s if the app is accessed via slightly different URLs
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      caches.match('/index.html').then((cached) => {
+        return cached || fetch(request).catch(() => caches.match('/'));
+      })
+    );
+    return;
+  }
+
+  // Cache First Strategy for assets
+  event.respondWith(
+    caches.match(request).then((cachedResponse) => {
+      return cachedResponse || fetch(request).then((response) => {
+        // Optional: Dynamic caching for new assets can be added here
+        return response;
+      });
+    })
+  );
 });
