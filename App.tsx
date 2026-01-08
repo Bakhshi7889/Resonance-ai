@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { Layout } from './components/Layout';
 import { ImageGenerator } from './components/ImageGenerator';
 import { History } from './components/History';
 import { Preferences } from './components/Preferences';
 import { CreatePreset } from './components/CreatePreset';
+import { StyleLibrary } from './components/StyleLibrary';
 import { AppSettings, AppRoute, HistoryItem } from './types';
 
 const STORAGE_KEY_SETTINGS = 'resonance_settings';
@@ -14,13 +16,15 @@ const DEFAULT_SETTINGS: AppSettings = {
   model: 'zimage',
   width: 1024,
   height: 1024,
-  enhance: true,
+  enhance: false, // Default Off
   guidance: 7.5,
-  privateMode: false,
+  privateMode: true,
   negativePrompt: '',
-  quality: 'medium', // Default to medium (not HD/Upscaled)
   imageCount: 1,
-  activeStyle: 'z-real'
+  activeStyle: 'z-real',
+  apiKey: '',
+  safe: true, // Default On
+  transparent: false // Default Off
 };
 
 const App: React.FC = () => {
@@ -38,6 +42,9 @@ const App: React.FC = () => {
             parsedSettings.model = 'flux';
             parsedSettings.activeStyle = '';
         }
+        // Force private mode to true on load
+        parsedSettings.privateMode = true;
+        
         // Merge with defaults to ensure new keys exist
         return { ...DEFAULT_SETTINGS, ...parsedSettings };
       }
@@ -101,6 +108,10 @@ const App: React.FC = () => {
     });
   };
 
+  const handleDeleteHistory = (ids: string[]) => {
+    setHistory(prev => prev.filter(item => !ids.includes(item.id)));
+  };
+
   const handleRemix = (item: HistoryItem) => {
     setRemixItem(item);
     setCurrentRoute(AppRoute.GENERATOR);
@@ -131,6 +142,7 @@ const App: React.FC = () => {
             history={history} 
             onNavigate={setCurrentRoute}
             onRemix={handleRemix}
+            onDelete={handleDeleteHistory}
           />
         );
       case AppRoute.PREFERENCES:
@@ -147,6 +159,14 @@ const App: React.FC = () => {
           <CreatePreset 
             key="create-preset"
             onNavigate={setCurrentRoute}
+          />
+        );
+      case AppRoute.STYLE_LIBRARY:
+        return (
+          <StyleLibrary 
+            key="style-library"
+            onNavigate={setCurrentRoute}
+            settings={settings}
           />
         );
       default:

@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { HistoryItem, AppRoute } from '../types';
@@ -7,6 +8,7 @@ interface HistoryProps {
   history: HistoryItem[];
   onNavigate: (route: AppRoute) => void;
   onRemix?: (item: HistoryItem) => void;
+  onDelete?: (ids: string[]) => void;
 }
 
 const swipeVariants = {
@@ -29,9 +31,16 @@ const swipeVariants = {
   })
 };
 
-export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix }) => {
+export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix, onDelete }) => {
   const [fullscreenImageIndex, setFullscreenImageIndex] = useState<number | null>(null);
   const [slideDirection, setSlideDirection] = useState(0);
+  const [showInfoPanel, setShowInfoPanel] = useState(false);
+
+  // Selection Mode State
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showCopiedToast, setShowCopiedToast] = useState(false);
 
   // Group history items by Date (Day)
   const groupedHistory = useMemo(() => {
@@ -60,24 +69,48 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix }
 
   const currentFullscreenItem = fullscreenImageIndex !== null ? history[fullscreenImageIndex] : null;
 
-  // Navigate: Next (Newer Index -> Older Index)
-  // In our list, Index 0 is newest. Index N is oldest.
-  // Next Image -> Increment Index (Go to older image)
-  // Visuals: Current image exits Left, Next image enters from Right. (Direction 1)
+  // Toggle Selection Mode
+  const toggleSelectionMode = () => {
+      if (isSelectionMode) {
+          setIsSelectionMode(false);
+          setSelectedIds([]);
+      } else {
+          setIsSelectionMode(true);
+      }
+  };
+
+  const toggleItemSelection = (id: string) => {
+      setSelectedIds(prev => {
+          if (prev.includes(id)) {
+              return prev.filter(itemId => itemId !== id);
+          } else {
+              return [...prev, id];
+          }
+      });
+  };
+
+  const handleConfirmDelete = () => {
+      if (onDelete && selectedIds.length > 0) {
+          onDelete(selectedIds);
+          setIsSelectionMode(false);
+          setSelectedIds([]);
+      }
+      setShowDeleteConfirm(false);
+  };
+
   const handleNextImage = () => {
     if (fullscreenImageIndex !== null && fullscreenImageIndex < history.length - 1) {
         setSlideDirection(1);
         setFullscreenImageIndex(fullscreenImageIndex + 1);
+        setShowInfoPanel(false);
     }
   };
 
-  // Navigate: Prev (Older Index -> Newer Index)
-  // Prev Image -> Decrement Index (Go to newer image)
-  // Visuals: Current image exits Right, Prev image enters from Left. (Direction -1)
   const handlePrevImage = () => {
     if (fullscreenImageIndex !== null && fullscreenImageIndex > 0) {
         setSlideDirection(-1);
         setFullscreenImageIndex(fullscreenImageIndex - 1);
+        setShowInfoPanel(false);
     }
   };
 
@@ -85,10 +118,8 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix }
     const swipe = Math.abs(offset.x) * velocity.x;
 
     if (swipe < -200 || offset.x < -100) {
-      // Swipe Left -> Next Image
       handleNextImage();
     } else if (swipe > 200 || offset.x > 100) {
-      // Swipe Right -> Prev Image
       handlePrevImage();
     }
   };
@@ -110,26 +141,17 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix }
     }
   };
 
-  const handleShare = async (item: HistoryItem) => {
-    if (navigator.share) {
-        try {
-            await navigator.share({
-                title: 'Resonance AI Generation',
-                text: item.prompt,
-                url: item.url
-            });
-        } catch (err) {
-            console.log("Share failed", err);
-        }
-    } else {
-        navigator.clipboard.writeText(item.url);
-        // Could show toast here
-    }
+  const handleCopyLink = () => {
+      if (currentFullscreenItem) {
+        navigator.clipboard.writeText(currentFullscreenItem.url);
+        setShowCopiedToast(true);
+        setTimeout(() => setShowCopiedToast(false), 2000);
+      }
   };
 
   return (
     <motion.div 
-      className="flex flex-col h-full bg-background-dark w-full"
+      className="flex flex-col h-full bg-background-dark w-full relative"
       initial={{ x: '100%' }}
       animate={{ x: 0 }}
       exit={{ x: '100%' }}
@@ -137,10 +159,11 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix }
     >
       <div className="w-full max-w-7xl mx-auto flex flex-col h-full">
         <Header 
-            title="History" 
-            leftIcon="arrow_back_ios_new" 
-            onLeftClick={() => onNavigate(AppRoute.GENERATOR)}
-            // rightIcon="search"
+            title={isSelectionMode ? `${selectedIds.length} Selected` : "History"} 
+            leftIcon={isSelectionMode ? "close" : "arrow_back_ios_new"}
+            onLeftClick={isSelectionMode ? toggleSelectionMode : () => onNavigate(AppRoute.GENERATOR)}
+            rightIcon={isSelectionMode ? (selectedIds.length > 0 ? "delete" : undefined) : "checklist"}
+            onRightClick={isSelectionMode ? (selectedIds.length > 0 ? () => setShowDeleteConfirm(true) : undefined) : toggleSelectionMode}
         />
 
         <div className="flex-1 overflow-y-auto no-scrollbar pb-24 px-4">
@@ -159,24 +182,29 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix }
                         </h3>
                         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 sm:gap-4">
                             {group.items.map((item) => {
-                                // Find index in global history for fullscreen
                                 const globalIndex = history.findIndex(h => h.id === item.id);
-                                
+                                const isSelected = selectedIds.includes(item.id);
                                 return (
                                     <motion.div 
                                         key={item.id}
                                         layoutId={`thumb-${item.id}`}
-                                        onClick={() => setFullscreenImageIndex(globalIndex)}
-                                        className="relative aspect-square bg-surface-dark overflow-hidden cursor-pointer group rounded-xl border border-white/5 hover:border-white/20 transition-all"
+                                        onClick={() => isSelectionMode ? toggleItemSelection(item.id) : setFullscreenImageIndex(globalIndex)}
+                                        className={`relative aspect-square bg-surface-dark overflow-hidden cursor-pointer group rounded-xl border transition-all ${isSelected ? 'border-primary ring-2 ring-primary ring-offset-2 ring-offset-background-dark' : 'border-white/5 hover:border-white/20'}`}
                                     >
-                                        <img 
+                                        <motion.img 
                                             src={item.url} 
-                                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                                            className="w-full h-full object-cover" 
                                             alt="thumbnail" 
                                             loading="lazy"
+                                            animate={isSelectionMode && isSelected ? { scale: 0.9 } : { scale: 1 }}
                                         />
-                                        {/* Selection Overlay */}
-                                        <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors" />
+                                        {isSelectionMode && (
+                                            <div className="absolute inset-0 bg-black/20 z-10 flex items-start justify-end p-2">
+                                                <div className={`size-5 rounded-full border border-white/40 flex items-center justify-center transition-colors ${isSelected ? 'bg-primary border-primary' : 'bg-black/40'}`}>
+                                                    {isSelected && <span className="material-symbols-outlined text-[14px] text-white font-bold">check</span>}
+                                                </div>
+                                            </div>
+                                        )}
                                     </motion.div>
                                 );
                             })}
@@ -187,9 +215,38 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix }
         </div>
       </div>
 
+      {/* Confirmation Modal */}
+      <AnimatePresence>
+          {showDeleteConfirm && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[150] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6"
+              >
+                  <motion.div 
+                    initial={{ scale: 0.9, y: 20 }}
+                    animate={{ scale: 1, y: 0 }}
+                    exit={{ scale: 0.9, y: 20 }}
+                    className="bg-[#192233] border border-white/10 rounded-[2rem] p-6 max-w-sm w-full shadow-2xl flex flex-col gap-4 text-center"
+                  >
+                       <div className="size-14 rounded-full bg-red-500/10 flex items-center justify-center mx-auto text-red-500">
+                          <span className="material-symbols-outlined text-[28px]">delete</span>
+                      </div>
+                      <h3 className="text-xl font-bold text-white">Delete {selectedIds.length} items?</h3>
+                      
+                      <div className="flex gap-3 mt-2">
+                          <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-3 rounded-xl bg-white/5 text-white font-medium">Cancel</button>
+                          <button onClick={handleConfirmDelete} className="flex-1 py-3 rounded-xl bg-red-500 text-white font-bold">Delete</button>
+                      </div>
+                  </motion.div>
+              </motion.div>
+          )}
+      </AnimatePresence>
+
       {/* Fullscreen Swiper Overlay */}
       <AnimatePresence>
-        {fullscreenImageIndex !== null && currentFullscreenItem && (
+        {fullscreenImageIndex !== null && currentFullscreenItem && !isSelectionMode && (
             <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -197,15 +254,11 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix }
                 className="fixed inset-0 z-[100] bg-black flex flex-col"
                 onClick={() => setFullscreenImageIndex(null)}
             >
-                 {/* Top Controls */}
-                <div className="absolute top-0 left-0 right-0 p-6 pt-8 flex justify-between items-start z-20 bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
+                 <div className="absolute top-0 left-0 right-0 p-6 pt-8 flex justify-between items-start z-20 bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
                      <div className="flex flex-col pointer-events-auto max-w-[80%]">
                         <span className="text-white/60 font-mono text-xs mb-1">
                             {new Date(currentFullscreenItem.timestamp).toLocaleString()}
                         </span>
-                        <p className="text-white text-sm font-medium line-clamp-2 leading-relaxed">
-                            {currentFullscreenItem.prompt}
-                        </p>
                     </div>
                     <button 
                         onClick={(e) => { e.stopPropagation(); setFullscreenImageIndex(null); }}
@@ -215,9 +268,7 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix }
                     </button>
                 </div>
 
-                {/* Main Swiper Area */}
                 <div className="flex-1 flex items-center justify-center relative w-full h-full overflow-hidden">
-                    {/* Image Carousel */}
                     <AnimatePresence initial={false} custom={slideDirection}>
                         <motion.div
                             key={currentFullscreenItem.id}
@@ -226,10 +277,7 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix }
                             initial="enter"
                             animate="center"
                             exit="exit"
-                            transition={{
-                                x: { type: "spring", stiffness: 300, damping: 30 },
-                                opacity: { duration: 0.2 }
-                            }}
+                            transition={{ x: { type: "spring", stiffness: 300, damping: 30 }, opacity: { duration: 0.2 } }}
                             className="absolute inset-0 flex items-center justify-center touch-pan-y"
                             onClick={(e) => e.stopPropagation()} 
                             drag="x"
@@ -237,68 +285,76 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix }
                             dragElastic={1}
                             onDragEnd={handleDragEnd}
                         >
-                            <img 
-                                src={currentFullscreenItem.url}
-                                className="max-w-full max-h-full object-contain shadow-2xl"
-                                alt="Fullscreen"
-                            />
+                            <img src={currentFullscreenItem.url} className="max-w-full max-h-full object-contain shadow-2xl" alt="Fullscreen" />
                         </motion.div>
                     </AnimatePresence>
-
-                    {/* Nav Arrows (Desktop/Access) */}
-                    {fullscreenImageIndex > 0 && (
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); handlePrevImage(); }}
-                            className="absolute left-4 z-20 p-4 rounded-full bg-black/20 text-white/50 hover:text-white hover:bg-black/50 transition-all hidden md:flex"
-                        >
-                             <span className="material-symbols-outlined text-3xl">chevron_left</span>
-                        </button>
-                    )}
-                    {fullscreenImageIndex < history.length - 1 && (
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); handleNextImage(); }}
-                            className="absolute right-4 z-20 p-4 rounded-full bg-black/20 text-white/50 hover:text-white hover:bg-black/50 transition-all hidden md:flex"
-                        >
-                             <span className="material-symbols-outlined text-3xl">chevron_right</span>
-                        </button>
-                    )}
                 </div>
 
                 {/* Bottom Actions */}
                 <div 
-                    className="p-6 pb-10 flex justify-center gap-4 z-20 bg-gradient-to-t from-black/90 to-transparent" 
+                    className="absolute bottom-0 left-0 right-0 p-6 pb-12 flex justify-center gap-6 z-20 bg-gradient-to-t from-black/90 via-black/50 to-transparent" 
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <button 
-                        onClick={() => handleDownload(currentFullscreenItem.url)}
-                        className="flex flex-col items-center gap-1 p-2 min-w-[60px] text-white/80 hover:text-white transition-colors"
-                    >
-                        <div className="size-12 rounded-full bg-white/10 flex items-center justify-center mb-1 backdrop-blur-md">
-                             <span className="material-symbols-outlined text-[20px]">download</span>
-                        </div>
+                    <button onClick={() => handleDownload(currentFullscreenItem.url)} className="flex flex-col items-center gap-1 min-w-[60px] text-white/80 hover:text-white transition-colors">
+                        <div className="size-12 rounded-full bg-white/10 flex items-center justify-center mb-1 backdrop-blur-md"><span className="material-symbols-outlined text-[20px]">download</span></div>
                         <span className="text-[10px] uppercase tracking-wide font-bold">Save</span>
                     </button>
                     
-                    <button 
-                         onClick={() => { if (onRemix) onRemix(currentFullscreenItem); }}
-                         className="flex flex-col items-center gap-1 p-2 min-w-[60px] text-white/80 hover:text-white transition-colors"
-                    >
-                        <div className="size-12 rounded-full bg-primary/20 flex items-center justify-center mb-1 backdrop-blur-md border border-primary/20">
-                            <span className="material-symbols-outlined text-[20px] text-primary">auto_fix_high</span>
-                        </div>
-                        <span className="text-[10px] uppercase tracking-wide font-bold">Remix</span>
+                    <button onClick={handleCopyLink} className="flex flex-col items-center gap-1 min-w-[60px] text-white/80 hover:text-white transition-colors">
+                        <div className="size-12 rounded-full bg-white/10 flex items-center justify-center mb-1 backdrop-blur-md"><span className="material-symbols-outlined text-[20px]">share</span></div>
+                        <span className="text-[10px] uppercase tracking-wide font-bold">{showCopiedToast ? 'Copied!' : 'Share'}</span>
                     </button>
 
-                    <button 
-                         onClick={() => handleShare(currentFullscreenItem)}
-                         className="flex flex-col items-center gap-1 p-2 min-w-[60px] text-white/80 hover:text-white transition-colors"
+                     <button 
+                        onClick={() => setShowInfoPanel(!showInfoPanel)}
+                        className={`flex flex-col items-center gap-1 min-w-[60px] transition-colors ${showInfoPanel ? 'text-primary' : 'text-white/80 hover:text-white'}`}
                     >
-                        <div className="size-12 rounded-full bg-white/10 flex items-center justify-center mb-1 backdrop-blur-md">
-                            <span className="material-symbols-outlined text-[20px]">share</span>
+                        <div className={`size-12 rounded-full flex items-center justify-center mb-1 backdrop-blur-md transition-colors ${showInfoPanel ? 'bg-primary/20 border border-primary/30' : 'bg-white/10'}`}>
+                             <span className="material-symbols-outlined text-[20px]">info</span>
                         </div>
-                        <span className="text-[10px] uppercase tracking-wide font-bold">Share</span>
+                        <span className="text-[10px] uppercase tracking-wide font-bold">Info</span>
+                    </button>
+
+                     <button onClick={() => { if (onRemix) onRemix(currentFullscreenItem); }} className="flex flex-col items-center gap-1 min-w-[60px] text-white/80 hover:text-white transition-colors">
+                        <div className="size-12 rounded-full bg-primary/20 flex items-center justify-center mb-1 backdrop-blur-md border border-primary/20"><span className="material-symbols-outlined text-[20px] text-primary">auto_fix_high</span></div>
+                        <span className="text-[10px] uppercase tracking-wide font-bold">Remix</span>
                     </button>
                 </div>
+
+                 {/* Info Panel Overlay */}
+                <AnimatePresence>
+                    {showInfoPanel && (
+                        <motion.div 
+                            initial={{ y: "100%", opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            exit={{ y: "100%", opacity: 0 }}
+                            className="absolute bottom-0 left-0 right-0 bg-[#192233] border-t border-white/10 rounded-t-[2rem] p-6 pb-28 z-30 shadow-2xl"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="w-12 h-1 bg-white/20 rounded-full mx-auto mb-6" />
+                            <div className="space-y-6">
+                                <div>
+                                    <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest mb-2">Prompt</h4>
+                                    <p className="text-sm text-white leading-relaxed font-medium bg-black/20 p-3 rounded-xl border border-white/5 max-h-32 overflow-y-auto">
+                                        {currentFullscreenItem.prompt}
+                                    </p>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                     <div>
+                                        <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest mb-1">Seed</h4>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm text-white font-mono">{currentFullscreenItem.seed}</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest mb-1">Model</h4>
+                                        <span className="px-2 py-0.5 rounded bg-white/10 text-xs font-bold text-white uppercase">{currentFullscreenItem.model}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
             </motion.div>
         )}
