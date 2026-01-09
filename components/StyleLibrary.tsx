@@ -1,89 +1,147 @@
 
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { AppRoute, MODEL_STYLES, AppSettings } from '../types';
 import { Header } from './Header';
-import { DEFAULT_KEY } from '../services/pollinations';
+import { DEFAULT_KEY, getRandomSeed } from '../services/pollinations';
 
 interface StyleLibraryProps {
   onNavigate: (route: AppRoute) => void;
   settings: AppSettings;
 }
 
+const STORAGE_KEY_STYLE_GEN = 'resonance_style_generations';
+
 export const StyleLibrary: React.FC<StyleLibraryProps> = ({ onNavigate, settings }) => {
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [visibleCount, setVisibleCount] = useState(0);
-  const [secondsLeft, setSecondsLeft] = useState(0);
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  // Staggered loading logic
-  useEffect(() => {
-    // Only run if user has started generation
-    if (!isGenerating) return;
-
-    // If all loaded, stop
-    if (visibleCount >= MODEL_STYLES.length) {
-        setIsGenerating(false);
-        return;
+  // Initialize state from local storage if available
+  const [generationStates, setGenerationStates] = useState<Record<string, { url: string, isLoading: boolean, seed: number }>>(() => {
+    try {
+        const stored = localStorage.getItem(STORAGE_KEY_STYLE_GEN);
+        return stored ? JSON.parse(stored) : {};
+    } catch (e) {
+        return {};
     }
+  });
 
-    // Logic: 2s delay normally, 10s delay after every 5 images
-    const isBatchBreak = visibleCount > 0 && visibleCount % 5 === 0;
-    
-    // Initial delay for the very first item is short
-    const delay = isBatchBreak ? 10 : 2;
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
-    setSecondsLeft(delay);
-    
-    const timer = setInterval(() => {
-        setSecondsLeft((prev) => {
-            if (prev <= 1) {
-                setVisibleCount((v) => v + 1);
-                return 0; // Reset
-            }
-            return prev - 1;
+  // Persist state changes
+  useEffect(() => {
+    try {
+        localStorage.setItem(STORAGE_KEY_STYLE_GEN, JSON.stringify(generationStates));
+    } catch (e) {
+        console.error("Failed to persist style states", e);
+    }
+  }, [generationStates]);
+
+  const getEffectiveKey = () => {
+      return (settings.apiKey && settings.apiKey.trim().length > 0) ? settings.apiKey.trim() : DEFAULT_KEY;
+  };
+
+  const generateStyle = (styleId: string, originalUrl: string) => {
+    const seed = getRandomSeed();
+    setGenerationStates(prev => ({
+        ...prev,
+        [styleId]: { ...prev[styleId], isLoading: true, seed }
+    }));
+
+    try {
+        const urlObj = new URL(originalUrl);
+        // Update params for a fresh generation
+        urlObj.searchParams.set('seed', seed.toString());
+        urlObj.searchParams.set('key', getEffectiveKey());
+        urlObj.searchParams.set('nologo', 'true');
+        // Ensure consistent quality and size for previews
+        urlObj.searchParams.set('enhance', 'true'); 
+        urlObj.searchParams.set('width', '256');
+        urlObj.searchParams.set('height', '384');
+        
+        const newUrl = urlObj.toString();
+
+        // Image preloading to ensure loading state is accurate
+        const img = new Image();
+        img.src = newUrl;
+        img.onload = () => {
+             setGenerationStates(prev => ({
+                ...prev,
+                [styleId]: { url: newUrl, isLoading: false, seed }
+            }));
+        };
+        img.onerror = () => {
+             // On error, revert to default or keep previous, but stop loading
+             console.error("Failed to load generated image");
+             setGenerationStates(prev => {
+                 const newState = { ...prev };
+                 // Keep previous URL if it existed, otherwise remove entry to show default
+                 if (newState[styleId]?.url && newState[styleId].url !== originalUrl) {
+                     newState[styleId].isLoading = false;
+                 } else {
+                     delete newState[styleId];
+                 }
+                 return newState;
+             });
+        };
+
+    } catch (e) {
+        console.error("Error generating url", e);
+        setGenerationStates(prev => {
+            const newState = { ...prev };
+            delete newState[styleId];
+            return newState;
         });
-    }, 1000);
+    }
+  };
 
-    return () => clearInterval(timer);
-  }, [visibleCount, isGenerating]);
+  const resetStyle = (styleId: string) => {
+      setGenerationStates(prev => {
+          const newState = { ...prev };
+          delete newState[styleId];
+          return newState;
+      });
+  };
 
-  const getOptimizedUrl = (url: string) => {
-      let finalUrl = url;
-      
-      // Explicitly disable expensive operations
-      finalUrl += "&enhance=false&safe=false";
+  const handleCopyUrl = (url: string, id: string) => {
+      navigator.clipboard.writeText(url);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+  };
 
-      // Use User Key or Fallback to Default Key
-      const keyToUse = (settings.apiKey && settings.apiKey.trim().length > 0) 
-        ? settings.apiKey.trim() 
-        : DEFAULT_KEY;
-
-      finalUrl += `&key=${keyToUse}`;
-      return finalUrl;
+  const handleCopyImage = async (url: string, id: string) => {
+    try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        
+        // Clipboard API requires standard MIME types
+        const item = new ClipboardItem({ [blob.type]: blob });
+        await navigator.clipboard.write([item]);
+        
+        setCopiedId(`${id}-img`);
+        setTimeout(() => setCopiedId(null), 2000);
+    } catch (e) {
+        console.error("Copy failed", e);
+        // Fallback to URL copy if image copy fails (e.g. browser restrictions)
+        handleCopyUrl(url, id);
+    }
   };
 
   const handleCopyJson = () => {
-    const exportData = MODEL_STYLES.map(style => ({
-        id: style.id,
-        model: style.model,
-        label: style.label,
-        image: style.image, // Base URL
-        suffix: style.suffix
-    }));
+    // Export the data with the CURRENTLY generated images (if any)
+    const exportData = MODEL_STYLES.map(style => {
+        const state = generationStates[style.id];
+        return {
+            id: style.id,
+            model: style.model,
+            label: style.label,
+            image: state?.url || style.image, // Use new URL if generated
+            suffix: style.suffix
+        };
+    });
 
     navigator.clipboard.writeText(JSON.stringify(exportData, null, 2));
     setCopiedId('ALL');
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleCopySingle = (url: string, id: string) => {
-      navigator.clipboard.writeText(url);
-      setCopiedId(id);
-      setTimeout(() => setCopiedId(null), 2000);
-  };
-
-  const currentKey = (settings.apiKey && settings.apiKey.trim().length > 0) ? settings.apiKey : DEFAULT_KEY;
   const isCustomKey = settings.apiKey && settings.apiKey.trim().length > 0;
 
   return (
@@ -94,101 +152,131 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = ({ onNavigate, settings
       exit={{ x: '100%' }}
       transition={{ type: "spring", damping: 25, stiffness: 200 }}
     >
-      <div className="w-full max-w-4xl mx-auto flex flex-col h-full">
+      <div className="w-full max-w-6xl mx-auto flex flex-col h-full">
         <Header 
             leftIcon="arrow_back"
             onLeftClick={() => onNavigate(AppRoute.PREFERENCES)}
-            title="Style Library"
+            title="Style Studio"
         />
 
         <div className="p-6 flex-1 overflow-y-auto no-scrollbar">
-            <div className="mb-8 bg-surface-dark border border-white/10 rounded-2xl p-6 shadow-glass">
-                <div className="flex items-start justify-between mb-4">
-                    <div>
-                        <h2 className="text-xl font-bold text-white mb-1">Asset Generator</h2>
-                        <div className="flex items-center gap-2">
-                            <span className={`size-2 rounded-full shadow-[0_0_8px] ${isCustomKey ? 'bg-purple-500 shadow-purple-500/60' : 'bg-blue-500 shadow-blue-500/60'}`}></span>
-                            <span className="text-xs font-mono text-white/60">
-                                {isCustomKey ? 'Using Personal Key' : 'Using System Pro Key'}
+            
+            {/* Control Bar */}
+            <div className="mb-8 bg-surface-dark/80 backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-glass flex flex-col md:flex-row items-center justify-between gap-6 sticky top-0 z-20">
+                <div className="flex flex-col gap-1">
+                    <h2 className="text-xl font-bold text-white tracking-tight">Asset Generator</h2>
+                    <div className="flex items-center gap-3">
+                        <div className={`flex items-center gap-2 px-2 py-0.5 rounded-full border ${isCustomKey ? 'bg-purple-500/10 border-purple-500/30' : 'bg-blue-500/10 border-blue-500/30'}`}>
+                            <span className={`size-1.5 rounded-full ${isCustomKey ? 'bg-purple-500 shadow-[0_0_5px_rgba(168,85,247,0.5)]' : 'bg-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.5)]'}`}></span>
+                            <span className={`text-[10px] font-bold uppercase tracking-wider ${isCustomKey ? 'text-purple-400' : 'text-blue-400'}`}>
+                                {isCustomKey ? 'Premium API' : 'Shared API'}
                             </span>
                         </div>
-                    </div>
-                    <div className="text-right">
-                         <span className="text-xs font-bold text-white/40 uppercase tracking-widest block">Progress</span>
-                         <span className="text-xl font-mono text-white">{visibleCount} / {MODEL_STYLES.length}</span>
+                        <span className="text-xs text-white/40 font-medium hidden md:inline-block">
+                             {Object.keys(generationStates).length} Custom Assets
+                        </span>
                     </div>
                 </div>
                 
-                <div className="w-full bg-white/5 rounded-full h-1.5 mb-6 overflow-hidden">
-                    <div 
-                        className="h-full bg-primary transition-all duration-500 ease-out" 
-                        style={{ width: `${Math.min((visibleCount / MODEL_STYLES.length) * 100, 100)}%` }}
-                    />
-                </div>
-
-                <div className="flex flex-col gap-3">
-                     <button 
-                        onClick={() => setIsGenerating(!isGenerating)}
-                        className={`w-full py-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg ${isGenerating ? 'bg-red-500/20 text-red-400 border border-red-500/50 hover:bg-red-500/30' : 'bg-primary text-white hover:bg-primary/90'}`}
-                    >
-                        <span className="material-symbols-outlined">{isGenerating ? 'pause' : 'play_arrow'}</span>
-                        {isGenerating ? `Running... (Cooldown in ${secondsLeft}s)` : (visibleCount > 0 ? 'Resume Generation' : 'Start Generation')}
-                    </button>
-
-                    <button 
-                        onClick={handleCopyJson}
-                        className="w-full py-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/80 font-medium transition-all flex items-center justify-center gap-2"
-                    >
-                        <span className="material-symbols-outlined text-[18px]">data_object</span>
-                        {copiedId === 'ALL' ? 'Copied JSON!' : 'Copy Style Data'}
-                    </button>
-                </div>
+                <button 
+                    onClick={handleCopyJson}
+                    className="w-full md:w-auto px-6 py-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white font-medium transition-all flex items-center justify-center gap-2 active:scale-95 group"
+                >
+                    <span className="material-symbols-outlined text-[20px] group-hover:text-primary transition-colors">data_object</span>
+                    {copiedId === 'ALL' ? 'Copied to Clipboard!' : 'Export All JSON'}
+                </button>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pb-12">
-                {MODEL_STYLES.map((style, index) => {
-                    const isVisible = index < visibleCount;
-                    const isNext = index === visibleCount && isGenerating;
+            {/* Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 pb-24">
+                {MODEL_STYLES.map((style) => {
+                    const state = generationStates[style.id];
+                    const currentUrl = state?.url || style.image;
+                    const isLoading = state?.isLoading || false;
+                    const hasGenerated = !!state?.url;
 
                     return (
-                        <div key={style.id} className="bg-surface-dark rounded-2xl border border-white/5 overflow-hidden group relative transition-all duration-300">
-                            <div className="aspect-[2/3] relative bg-black/20">
-                                {isVisible ? (
-                                    <img 
-                                        src={getOptimizedUrl(style.image)} 
-                                        alt={style.label} 
-                                        className="w-full h-full object-cover animate-in fade-in duration-700"
-                                        loading="lazy"
-                                    />
-                                ) : (
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-                                        {isNext ? (
-                                            <>
-                                                <div className="size-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin"></div>
-                                                <span className="text-xs font-bold text-primary tabular-nums">Generating {secondsLeft}s</span>
-                                            </>
-                                        ) : (
-                                            <span className="text-xs text-white/20 font-bold">Waiting</span>
-                                        )}
-                                    </div>
-                                )}
+                        <div key={style.id} className="bg-surface-dark rounded-3xl border border-white/5 overflow-hidden group relative transition-all duration-300 flex flex-col hover:border-white/20 hover:shadow-2xl hover:-translate-y-1">
+                            <div className="aspect-[2/3] relative bg-black/20 overflow-hidden">
+                                <img 
+                                    src={currentUrl} 
+                                    alt={style.label} 
+                                    className={`w-full h-full object-cover transition-all duration-500 ${isLoading ? 'scale-110 blur-xl opacity-40' : 'scale-100 opacity-100'}`}
+                                    loading="lazy"
+                                />
                                 
-                                {isVisible && (
-                                    <>
-                                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <AnimatePresence>
+                                    {isLoading && (
+                                        <motion.div 
+                                            initial={{ opacity: 0 }} 
+                                            animate={{ opacity: 1 }} 
+                                            exit={{ opacity: 0 }}
+                                            className="absolute inset-0 flex items-center justify-center z-10"
+                                        >
+                                             <div className="size-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin"></div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+
+                                {/* Overlay controls */}
+                                <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-3 p-4">
+                                     <div className="flex items-center gap-3">
+                                        <button 
+                                            onClick={() => generateStyle(style.id, style.image)}
+                                            className="size-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white flex items-center justify-center hover:bg-primary hover:border-primary transition-all shadow-lg active:scale-90"
+                                            title={hasGenerated ? "Regenerate (New Seed)" : "Generate"}
+                                        >
+                                            <span className="material-symbols-outlined text-[24px]">{hasGenerated ? 'refresh' : 'play_arrow'}</span>
+                                        </button>
+                                        
+                                        {hasGenerated && (
                                             <button 
-                                                onClick={() => handleCopySingle(style.image, style.id)}
-                                                className="px-4 py-2 bg-white text-black rounded-full text-xs font-bold hover:scale-105 transition-transform"
+                                                onClick={() => resetStyle(style.id)}
+                                                className="size-10 rounded-full bg-red-500/20 backdrop-blur-md border border-red-500/30 text-red-400 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-lg active:scale-90"
+                                                title="Reset to Default"
                                             >
-                                                {copiedId === style.id ? 'Copied' : 'Copy URL'}
+                                                <span className="material-symbols-outlined text-[20px]">undo</span>
                                             </button>
-                                        </div>
-                                        <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
-                                            <span className="text-white text-sm font-bold block">{style.label}</span>
-                                            <span className="text-white/50 text-[10px] uppercase font-bold tracking-wider">{style.model}</span>
-                                        </div>
-                                    </>
-                                )}
+                                        )}
+                                     </div>
+                                    
+                                    <div className="flex gap-2 w-full mt-2">
+                                         <button 
+                                            onClick={() => handleCopyUrl(currentUrl, style.id)}
+                                            className="flex-1 py-2 rounded-lg bg-white/10 backdrop-blur-md border border-white/20 text-white text-[10px] font-bold hover:bg-white hover:text-black transition-all flex items-center justify-center gap-1 active:scale-95"
+                                        >
+                                            <span className="material-symbols-outlined text-[14px]">link</span>
+                                            {copiedId === style.id ? 'Copied' : 'Link'}
+                                        </button>
+                                        <button 
+                                            onClick={() => handleCopyImage(currentUrl, style.id)}
+                                            className="flex-1 py-2 rounded-lg bg-white/10 backdrop-blur-md border border-white/20 text-white text-[10px] font-bold hover:bg-white hover:text-black transition-all flex items-center justify-center gap-1 active:scale-95"
+                                        >
+                                            <span className="material-symbols-outlined text-[14px]">image</span>
+                                            {copiedId === `${style.id}-img` ? 'Copied' : 'Img'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-4 border-t border-white/5 bg-white/[0.02]">
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <span className="text-white text-sm font-bold truncate">{style.label}</span>
+                                    <span className="text-[9px] uppercase font-bold tracking-wider text-white/30 px-1.5 py-0.5 rounded bg-white/5 border border-white/5">{style.model}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-mono text-white/40 truncate max-w-[100px]">
+                                        {state?.seed || 'Default'}
+                                    </span>
+                                    {!hasGenerated && (
+                                        <button 
+                                            onClick={() => generateStyle(style.id, style.image)}
+                                            className="text-[10px] font-bold text-primary hover:text-primary/80 uppercase tracking-wide flex items-center gap-1"
+                                        >
+                                            Generate
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     );

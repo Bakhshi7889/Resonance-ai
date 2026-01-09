@@ -89,9 +89,17 @@ export const Preferences: React.FC<PreferencesProps> = ({ settings, updateSettin
                             </div>
                          </div>
 
-                         {/* Style Selector (For Defaults) */}
+                         {/* Style Selector */}
                          <div className="space-y-3">
-                            <p className="text-xs font-bold text-white/40 uppercase tracking-widest ml-2">Default Style</p>
+                            <div className="flex items-center justify-between">
+                                <p className="text-xs font-bold text-white/40 uppercase tracking-widest ml-2">Default Style</p>
+                                <button 
+                                    onClick={() => onNavigate(AppRoute.STYLE_LIBRARY)}
+                                    className="text-xs font-bold text-primary hover:text-white transition-colors flex items-center gap-1 pr-2"
+                                >
+                                    Open Studio <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                                </button>
+                            </div>
                             <div className="flex flex-wrap gap-2">
                                 <button
                                     onClick={() => updateSettings({ activeStyle: '' })}

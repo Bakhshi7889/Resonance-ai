@@ -149,7 +149,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
     // 2. Set loading state immediately for button feedback
     setIsLoading(true);
     
-    // 3. Delay actual generation slightly to allow drawer animation to finish without lag
+    // 3. Delay actual generation to show off the premium animation
     setTimeout(() => {
         const count = localSettings.imageCount || 1;
         const newImages: string[] = [];
@@ -194,7 +194,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
         // Add new images to the START of the list
         setCurrentImages(prev => [...newImages, ...prev]);
         setIsLoading(false); 
-    }, 300); // 300ms delay for smooth UI transition
+    }, 2000); // 2 second delay for the "dreaming" animation
   };
 
   const handleDownload = async (url: string) => {
@@ -314,6 +314,8 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
       }
   };
 
+  const showResults = currentImages.length > 0 || isLoading;
+
   return (
     <motion.div 
       initial={{ opacity: 0 }}
@@ -372,15 +374,15 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
       </div>
 
       <div 
-        className={`flex-1 flex flex-col items-center gap-6 px-4 pt-20 overflow-y-auto no-scrollbar w-full max-w-7xl mx-auto ${currentImages.length > 0 ? 'justify-start pb-48' : 'justify-center pb-64 min-h-0'}`} 
+        className={`flex-1 flex flex-col items-center gap-6 px-4 pt-20 overflow-y-auto no-scrollbar w-full max-w-7xl mx-auto ${showResults ? 'justify-start pb-48' : 'justify-center pb-64 min-h-0'}`} 
       >
         {/* Main Image Display Area */}
-        <div className={`w-full relative group z-0 flex items-center justify-center ${currentImages.length > 0 ? 'min-h-[300px]' : 'flex-1'}`}>
+        <div className={`w-full relative group z-0 flex items-center justify-center ${showResults ? 'min-h-[300px]' : 'flex-1'}`}>
           
-          <div className={`absolute -inset-1 bg-gradient-to-b from-primary/40 to-purple-600/40 rounded-[2.5rem] blur-2xl transition-all duration-1000 will-change-transform ${currentImages.length > 0 ? 'opacity-50' : 'opacity-20'}`}></div>
+          <div className={`absolute -inset-1 bg-gradient-to-b from-primary/40 to-purple-600/40 rounded-[2.5rem] blur-2xl transition-all duration-1000 will-change-transform ${showResults ? 'opacity-50' : 'opacity-20'}`}></div>
           
            <AnimatePresence mode="wait">
-            {(currentImages.length === 0) && (
+            {(!showResults) && (
                <motion.div 
                  key="orb-container"
                  initial={{ opacity: 0, scale: 0.9 }} 
@@ -414,13 +416,42 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
             </AnimatePresence>
 
           {/* Result Container */}
-          {currentImages.length > 0 && (
+          {showResults && (
              <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="w-full relative z-10"
              >
                 <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory w-full pb-4 no-scrollbar items-center">
+                    
+                    {/* Animated Placeholder while generating */}
+                    {isLoading && (
+                         <motion.div 
+                            initial={{ opacity: 0, x: -50, scale: 0.9 }}
+                            animate={{ opacity: 1, x: 0, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.9, width: 0 }}
+                            className="relative shrink-0 w-[85%] md:w-auto md:h-[60vh] snap-center overflow-hidden rounded-[2rem] bg-surface-dark border border-white/10 shadow-2xl flex items-center justify-center"
+                            style={{ aspectRatio: localSettings.width / localSettings.height }}
+                        >
+                            {/* Liquid Background */}
+                            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-purple-500/10 to-blue-600/10 animate-pulse" />
+                            
+                            {/* Animated Orbs */}
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] bg-gradient-to-tr from-primary/20 to-transparent rounded-full blur-[80px] animate-spin-slow" />
+                            
+                            {/* Central Pulsing Element */}
+                            <div className="relative z-10 flex flex-col items-center gap-4">
+                                <div className="relative size-16">
+                                    <div className="absolute inset-0 bg-primary rounded-full blur-xl animate-breathing opacity-50" />
+                                    <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-white/5 rounded-full border border-white/20 backdrop-blur-md flex items-center justify-center animate-spin-slow">
+                                         <span className="material-symbols-outlined text-white/80">autorenew</span>
+                                    </div>
+                                </div>
+                                <span className="text-sm font-bold text-white/60 tracking-widest animate-pulse">DREAMING...</span>
+                            </div>
+                        </motion.div>
+                    )}
+
                     {currentImages.map((imgUrl, idx) => (
                         <div 
                             key={idx}
@@ -555,12 +586,32 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                         <div className="w-12 h-1 bg-white/20 rounded-full" />
                     </div>
 
-                    <div className="p-4 flex flex-col gap-4 pb-6">
+                    <div className="p-4 flex flex-col gap-6 pb-6">
                         
+                         {/* Image Count Selector */}
+                         <div>
+                            <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest mb-3 pl-1">Image Count</p>
+                            <div className="flex bg-white/5 p-1 rounded-2xl border border-white/5">
+                                {[1, 2, 3, 4].map((count) => (
+                                    <button
+                                        key={count}
+                                        onClick={() => updateLocalSetting('imageCount', count)}
+                                        className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${
+                                            localSettings.imageCount === count 
+                                            ? 'bg-surface-highlight text-white shadow-lg ring-1 ring-white/10' 
+                                            : 'text-white/40 hover:text-white'
+                                        }`}
+                                    >
+                                        {count}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
                          {/* Aspect Ratio Selector */}
                         <div>
-                             <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest mb-2 pl-1">Aspect Ratio</p>
-                             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                             <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest mb-3 pl-1">Ratio</p>
+                             <div className="flex justify-between items-center bg-white/5 p-2 rounded-3xl border border-white/5 overflow-x-auto no-scrollbar gap-2">
                                 {ASPECT_RATIOS.map((ratio) => {
                                     const isSelected = localSettings.width === ratio.width && localSettings.height === ratio.height;
                                     const w = ratio.width / (Math.max(ratio.width, ratio.height));
@@ -569,19 +620,22 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                                         <button
                                             key={ratio.label}
                                             onClick={() => setAspectRatio(ratio.width, ratio.height)}
-                                            className={`flex flex-col items-center gap-2 px-3 py-3 rounded-xl border transition-all shrink-0 min-w-[70px] ${isSelected ? 'bg-white/10 border-white/30' : 'bg-white/5 border-transparent hover:bg-white/10'}`}
+                                            className={`flex flex-col items-center justify-center gap-2 w-16 h-20 rounded-2xl transition-all shrink-0 ${
+                                                isSelected 
+                                                ? 'bg-surface-highlight text-white shadow-lg ring-1 ring-white/10' 
+                                                : 'text-white/40 hover:text-white hover:bg-white/5'
+                                            }`}
                                         >
-                                            <div className="size-8 flex items-center justify-center">
+                                            <div className={`flex items-center justify-center size-8`}>
                                                 <div 
-                                                    className={`border-2 transition-all ${isSelected ? 'border-primary bg-primary/20' : 'border-white/40'}`}
+                                                    className={`border-2 transition-all rounded-sm ${isSelected ? 'border-white bg-white/20' : 'border-white/40'}`}
                                                     style={{ 
-                                                        width: `${w * 24}px`, 
-                                                        height: `${h * 24}px`,
-                                                        borderRadius: '3px'
+                                                        width: `${w * 20}px`, 
+                                                        height: `${h * 20}px`
                                                     }}
                                                 />
                                             </div>
-                                            <span className={`text-[10px] font-bold ${isSelected ? 'text-white' : 'text-white/50'}`}>{ratio.label}</span>
+                                            <span className="text-[10px] font-bold">{ratio.label}</span>
                                         </button>
                                     );
                                 })}
@@ -591,7 +645,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                          {/* Visual Style Selector */}
                         {availableStyles.length > 0 && (
                             <div>
-                                <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest mb-2 pl-1">Style</p>
+                                <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest mb-3 pl-1">Style</p>
                                 <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
                                      <div 
                                         onClick={() => updateLocalSetting('activeStyle', '')}
@@ -624,7 +678,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
 
                         {/* Models & Other Settings (Simplified for cleaner drawer) */}
                         <div>
-                             <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest mb-2 pl-1">Configuration</p>
+                             <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest mb-3 pl-1">Configuration</p>
                              <div className="flex flex-col gap-3">
                                 <div className="flex gap-2 overflow-x-auto no-scrollbar">
                                     {AVAILABLE_MODELS.map(m => (

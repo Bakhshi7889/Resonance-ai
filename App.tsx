@@ -65,18 +65,9 @@ const App: React.FC = () => {
   });
 
   // Session State (Lifted from ImageGenerator)
-  // Initialize with data from history so the user doesn't lose context on refresh
-  const [sessionPrompt, setSessionPrompt] = useState(() => {
-     if (history.length > 0) {
-         return history[0].prompt;
-     }
-     return '';
-  });
-  
-  const [sessionImages, setSessionImages] = useState<string[]>(() => {
-      // Restore up to 10 recent images to the session view
-      return history.slice(0, 10).map(item => item.url);
-  });
+  // Initialize as empty for a clean slate on every launch, regardless of history
+  const [sessionPrompt, setSessionPrompt] = useState('');
+  const [sessionImages, setSessionImages] = useState<string[]>([]);
 
   // Persist settings
   useEffect(() => {

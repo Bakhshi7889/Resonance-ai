@@ -57,32 +57,145 @@ export const ASPECT_RATIOS = [
   { label: '9:16', width: 720, height: 1280 },
 ];
 
-// Helper to generate preview URLs consistently
-const getPreview = (prompt: string, model: string, suffix: string) => 
-  `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt + suffix)}?model=${model}&width=256&height=384&nologo=true&seed=42`;
-
 export const MODEL_STYLES = [
-  // Flux Styles
-  { id: 'flux-realism', model: 'flux', label: 'Realism', image: getPreview('A portrait of a woman', 'flux', ', RAW, hyper-realistic, 35mm film photography'), suffix: ', RAW, hyper-realistic, 35mm film photography, warm color temperature, soft on-camera flash, slight grain, natural imperfections, no retouching, editorial intimate snapshot' },
-  { id: 'flux-candid', model: 'flux', label: 'Candid', image: getPreview('A woman laughing with friends', 'flux', ', spontaneous pose, mixed lighting'), suffix: ', Shot by a friend with a handheld DSLR or phone, spontaneous pose with natural movement, mixed lighting from environment, visible flyaway hairs and clothing wrinkles, soft focus on background elements, realistic shadows and reflections, no airbrushing, everyday authenticity' },
-  { id: 'flux-selfie', model: 'flux', label: 'Selfie', image: getPreview('A woman taking a selfie', 'flux', ', smartphone front camera, natural skin texture'), suffix: ', Smartphone front camera aesthetic, mild barrel distortion, slightly off-center composition, natural skin texture with visible pores and freckles, casual expression, soft selfie flash mixed with ambient light, slight motion blur on edges, JPEG compression artifacts, low-res feel but sharp focus on face' },
-  { id: 'polaroid', model: 'flux', label: 'Polaroid', image: getPreview('A woman sitting in a vintage car', 'flux', ', polaroid style'), suffix: ', raw photo, dynamic contrast, polaroid style' },
-  { id: 'cinematic', model: 'flux', label: 'Cinematic', image: getPreview('A woman walking down a rainy city street at night', 'flux', ', cinematic lighting, sharp focus'), suffix: ', hyper-realistic, cinematic lighting, DSLR shot, sharp focus' },
-  { id: 'cyberpunk', model: 'flux', label: 'Cyberpunk', image: getPreview('A woman cyborg in a neon city', 'flux', ', neon outline glow, cyberpunk luxury'), suffix: ', neon outline glow, cyberpunk luxury, digital render' },
-  { id: 'ukiyo-e', model: 'flux', label: 'Ukiyo-e', image: getPreview('A woman in traditional robes watching the great wave', 'flux', ', ukiyo-e woodblock print style'), suffix: ', ukiyo-e woodblock print style, flat inked color planes, bold black linework' },
-  { id: '3d-chibi', model: 'flux', label: '3D Chibi', image: getPreview('A cute chibi woman', 'flux', ', chibi style 3d render'), suffix: ', chibi style, 3D character render' },
-
-  // Z-Image Styles
-  { id: 'z-real', model: 'zimage', label: 'Realism', image: getPreview('A portrait of a woman', 'zimage', ', hyper-realistic 35mm film'), suffix: ', RAW, hyper-realistic, 35mm film photography, warm color temperature, soft on-camera flash, slight grain, natural imperfections, no retouching, editorial intimate snapshot' },
-  { id: 'z-candid', model: 'zimage', label: 'Candid', image: getPreview('A woman walking in the street', 'zimage', ', spontaneous pose, mixed lighting'), suffix: ', Shot by a friend with a handheld DSLR or phone, spontaneous pose with natural movement, mixed lighting from environment, visible flyaway hairs and clothing wrinkles, soft focus on background elements, realistic shadows and reflections, no airbrushing, everyday authenticity' },
-  { id: 'z-selfie', model: 'zimage', label: 'Selfie', image: getPreview('A woman taking a mirror selfie', 'zimage', ', smartphone aesthetic'), suffix: ', Smartphone front camera aesthetic, mild barrel distortion, slightly off-center composition, natural skin texture with visible pores and freckles, casual expression, soft selfie flash mixed with ambient light, slight motion blur on edges, JPEG compression artifacts, low-res feel but sharp focus on face' },
-  { id: 'z-modern-phone', model: 'zimage', label: 'iPhone', image: getPreview('A woman holding a coffee cup', 'zimage', ', iphone camera photo'), suffix: ', iPhone-style rear camera photo, shallow depth of field with bokeh, natural HDR tone mapping, subtle sharpening halos around edges, dewy skin with imperfections like blemishes, soft window light illuminating face, slight vignette, 9:16 vertical aspect ratio, unfiltered social media aesthetic' },
-  { id: 'z-noir', model: 'zimage', label: 'Film Noir', image: getPreview('A woman detective in rain', 'zimage', ', film noir style black and white'), suffix: ', Cinematic contrast, soft highlight on cheekbones, glossy lips, volumetric lighting, rim light, golden hour, deep chiaroscuro, atmospheric fog' },
-  { id: 'z-vintage', model: 'zimage', label: 'Vintage', image: getPreview('A woman standing in front of an old house', 'zimage', ', vintage polaroid'), suffix: ', Overexposed grainy polaroid, cross-processed film, warm tones, soft cinematic grain, muted colors, film grain, paparazzi aesthetic' },
-  { id: 'z-night', model: 'zimage', label: 'Night Mode', image: getPreview('A woman under city lights at night', 'zimage', ', night mode photo'), suffix: ', Nighttime phone camera capture, high ISO noise speckle in dark areas, edge-aware denoising smear on skin, warm streetlight glow with color fringing, handheld shake blur, compressed shadows, realistic lens flare from lights, moody unedited vibe' },
-  { id: 'z-surreal', model: 'zimage', label: 'Surreal', image: getPreview('A woman floating among surreal islands', 'zimage', ', surreal dreamlike'), suffix: ', Dreamlike haze, floating elements, impossible geometries, ethereal glow, soft surreal distortions, muted psychedelic tones, atmospheric depth, subtle color bleed, no harsh edges' },
-  { id: 'z-neon', model: 'zimage', label: 'Neon', image: getPreview('A woman with neon face paint', 'zimage', ', neon glow dark mode'), suffix: ', Dark mode, cosmic gradient, glowing edges, motion blur, clean grid, neon blue glow, atmospheric haze, high contrast, 8K realism' },
-  { id: 'z-cyber', model: 'zimage', label: 'Cyberpunk', image: getPreview('A woman in a future city street', 'zimage', ', cyberpunk style'), suffix: ', Cyberpunk neon vibrancy, holographic projections, rain-slicked streets, high-tech gadgets, cool blue-purple tones, reflective surfaces, dynamic motion blur' },
-  { id: 'z-cartoon', model: 'zimage', label: 'Cartoon', image: getPreview('A cartoon woman', 'zimage', ', cartoon style'), suffix: ', Exquisite 3D image, lovely cartoon style, colorful ultra-minimalistic, smooth colors, symmetric, playful doodle, soft texture, simple composition, sticker style logo' },
-  { id: 'z-horror', model: 'zimage', label: 'Horror', image: getPreview('A woman standing in a dark forest', 'zimage', ', horror creepy'), suffix: ', Eerie shadows, distorted perspectives, creeping fog, desaturated tones, subtle horror elements, subtle tension' }
+  {
+    "id": "flux-realism",
+    "model": "flux",
+    "label": "Realism",
+    "image": "https://image.pollinations.ai/prompt/A%20portrait%20of%20a%20woman%2C%20RAW%2C%20hyper-realistic%2C%2035mm%20film%20photography?model=flux&width=256&height=384&nologo=true&seed=42",
+    "suffix": ", RAW, hyper-realistic, 35mm film photography, warm color temperature, soft on-camera flash, slight grain, natural imperfections, no retouching, editorial intimate snapshot"
+  },
+  {
+    "id": "flux-candid",
+    "model": "flux",
+    "label": "Candid",
+    "image": "https://image.pollinations.ai/prompt/A%20woman%20laughing%20with%20friends%2C%20spontaneous%20pose%2C%20mixed%20lighting?model=flux&width=256&height=384&nologo=true&seed=42",
+    "suffix": ", Shot by a friend with a handheld DSLR or phone, spontaneous pose with natural movement, mixed lighting from environment, visible flyaway hairs and clothing wrinkles, soft focus on background elements, realistic shadows and reflections, no airbrushing, everyday authenticity"
+  },
+  {
+    "id": "flux-selfie",
+    "model": "flux",
+    "label": "Selfie",
+    "image": "https://image.pollinations.ai/prompt/A%20woman%20taking%20a%20selfie%2C%20smartphone%20front%20camera%2C%20natural%20skin%20texture?model=flux&width=256&height=384&nologo=true&seed=301555&key=pk_BnmABucSE1VNCWRT&enhance=true",
+    "suffix": ", Smartphone front camera aesthetic, mild barrel distortion, slightly off-center composition, natural skin texture with visible pores and freckles, casual expression, soft selfie flash mixed with ambient light, slight motion blur on edges, JPEG compression artifacts, low-res feel but sharp focus on face"
+  },
+  {
+    "id": "polaroid",
+    "model": "flux",
+    "label": "Polaroid",
+    "image": "https://image.pollinations.ai/prompt/A%20woman%20sitting%20in%20a%20vintage%20car%2C%20polaroid%20style?model=flux&width=256&height=384&nologo=true&seed=42",
+    "suffix": ", raw photo, dynamic contrast, polaroid style"
+  },
+  {
+    "id": "cinematic",
+    "model": "flux",
+    "label": "Cinematic",
+    "image": "https://image.pollinations.ai/prompt/A%20woman%20walking%20down%20a%20rainy%20city%20street%20at%20night%2C%20cinematic%20lighting%2C%20sharp%20focus?model=flux&width=256&height=384&nologo=true&seed=42",
+    "suffix": ", hyper-realistic, cinematic lighting, DSLR shot, sharp focus"
+  },
+  {
+    "id": "cyberpunk",
+    "model": "flux",
+    "label": "Cyberpunk",
+    "image": "https://image.pollinations.ai/prompt/A%20woman%20cyborg%20in%20a%20neon%20city%2C%20neon%20outline%20glow%2C%20cyberpunk%20luxury?model=flux&width=256&height=384&nologo=true&seed=42",
+    "suffix": ", neon outline glow, cyberpunk luxury, digital render"
+  },
+  {
+    "id": "ukiyo-e",
+    "model": "flux",
+    "label": "Ukiyo-e",
+    "image": "https://image.pollinations.ai/prompt/A%20woman%20in%20traditional%20robes%20watching%20the%20great%20wave%2C%20ukiyo-e%20woodblock%20print%20style?model=flux&width=256&height=384&nologo=true&seed=42",
+    "suffix": ", ukiyo-e woodblock print style, flat inked color planes, bold black linework"
+  },
+  {
+    "id": "3d-chibi",
+    "model": "flux",
+    "label": "3D Chibi",
+    "image": "https://image.pollinations.ai/prompt/A%20cute%20chibi%20woman%2C%20chibi%20style%203d%20render?model=flux&width=256&height=384&nologo=true&seed=42",
+    "suffix": ", chibi style, 3D character render"
+  },
+  {
+    "id": "z-real",
+    "model": "zimage",
+    "label": "Realism",
+    "image": "https://image.pollinations.ai/prompt/A%20portrait%20of%20a%20woman%2C%20hyper-realistic%2035mm%20film?model=zimage&width=256&height=384&nologo=true&seed=42",
+    "suffix": ", RAW, hyper-realistic, 35mm film photography, warm color temperature, soft on-camera flash, slight grain, natural imperfections, no retouching, editorial intimate snapshot"
+  },
+  {
+    "id": "z-candid",
+    "model": "zimage",
+    "label": "Candid",
+    "image": "https://image.pollinations.ai/prompt/A%20woman%20walking%20in%20the%20street%2C%20spontaneous%20pose%2C%20mixed%20lighting?model=zimage&width=256&height=384&nologo=true&seed=42",
+    "suffix": ", Shot by a friend with a handheld DSLR or phone, spontaneous pose with natural movement, mixed lighting from environment, visible flyaway hairs and clothing wrinkles, soft focus on background elements, realistic shadows and reflections, no airbrushing, everyday authenticity"
+  },
+  {
+    "id": "z-selfie",
+    "model": "zimage",
+    "label": "Selfie",
+    "image": "https://image.pollinations.ai/prompt/A%20woman%20taking%20a%20mirror%20selfie%2C%20smartphone%20aesthetic?model=zimage&width=256&height=384&nologo=true&seed=478505&key=pk_BnmABucSE1VNCWRT&enhance=true",
+    "suffix": ", Smartphone front camera aesthetic, mild barrel distortion, slightly off-center composition, natural skin texture with visible pores and freckles, casual expression, soft selfie flash mixed with ambient light, slight motion blur on edges, JPEG compression artifacts, low-res feel but sharp focus on face"
+  },
+  {
+    "id": "z-modern-phone",
+    "model": "zimage",
+    "label": "iPhone",
+    "image": "https://image.pollinations.ai/prompt/A%20woman%20holding%20a%20coffee%20cup%2C%20iphone%20camera%20photo?model=zimage&width=256&height=384&nologo=true&seed=42",
+    "suffix": ", iPhone-style rear camera photo, shallow depth of field with bokeh, natural HDR tone mapping, subtle sharpening halos around edges, dewy skin with imperfections like blemishes, soft window light illuminating face, slight vignette, 9:16 vertical aspect ratio, unfiltered social media aesthetic"
+  },
+  {
+    "id": "z-noir",
+    "model": "zimage",
+    "label": "Film Noir",
+    "image": "https://image.pollinations.ai/prompt/A%20woman%20detective%20in%20rain%2C%20film%20noir%20style%20black%20and%20white?model=zimage&width=256&height=384&nologo=true&seed=42",
+    "suffix": ", Cinematic contrast, soft highlight on cheekbones, glossy lips, volumetric lighting, rim light, golden hour, deep chiaroscuro, atmospheric fog"
+  },
+  {
+    "id": "z-vintage",
+    "model": "zimage",
+    "label": "Vintage",
+    "image": "https://image.pollinations.ai/prompt/A%20woman%20standing%20in%20front%20of%20an%20old%20house%2C%20vintage%20polaroid?model=zimage&width=256&height=384&nologo=true&seed=42",
+    "suffix": ", Overexposed grainy polaroid, cross-processed film, warm tones, soft cinematic grain, muted colors, film grain, paparazzi aesthetic"
+  },
+  {
+    "id": "z-night",
+    "model": "zimage",
+    "label": "Night Mode",
+    "image": "https://image.pollinations.ai/prompt/A%20woman%20under%20city%20lights%20at%20night%2C%20night%20mode%20photo?model=zimage&width=256&height=384&nologo=true&seed=768299&key=pk_BnmABucSE1VNCWRT&enhance=true",
+    "suffix": ", Nighttime phone camera capture, high ISO noise speckle in dark areas, edge-aware denoising smear on skin, warm streetlight glow with color fringing, handheld shake blur, compressed shadows, realistic lens flare from lights, moody unedited vibe"
+  },
+  {
+    "id": "z-surreal",
+    "model": "zimage",
+    "label": "Surreal",
+    "image": "https://image.pollinations.ai/prompt/A%20woman%20floating%20among%20surreal%20islands%2C%20surreal%20dreamlike?model=zimage&width=256&height=384&nologo=true&seed=42",
+    "suffix": ", Dreamlike haze, floating elements, impossible geometries, ethereal glow, soft surreal distortions, muted psychedelic tones, atmospheric depth, subtle color bleed, no harsh edges"
+  },
+  {
+    "id": "z-neon",
+    "model": "zimage",
+    "label": "Neon",
+    "image": "https://image.pollinations.ai/prompt/A%20woman%20with%20neon%20face%20paint%2C%20neon%20glow%20dark%20mode?model=zimage&width=256&height=384&nologo=true&seed=674342&key=pk_BnmABucSE1VNCWRT&enhance=true",
+    "suffix": ", Dark mode, cosmic gradient, glowing edges, motion blur, clean grid, neon blue glow, atmospheric haze, high contrast, 8K realism"
+  },
+  {
+    "id": "z-cyber",
+    "model": "zimage",
+    "label": "Cyberpunk",
+    "image": "https://image.pollinations.ai/prompt/A%20woman%20in%20a%20future%20city%20street%2C%20cyberpunk%20style?model=zimage&width=256&height=384&nologo=true&seed=42",
+    "suffix": ", Cyberpunk neon vibrancy, holographic projections, rain-slicked streets, high-tech gadgets, cool blue-purple tones, reflective surfaces, dynamic motion blur"
+  },
+  {
+    "id": "z-cartoon",
+    "model": "zimage",
+    "label": "Cartoon",
+    "image": "https://image.pollinations.ai/prompt/A%20cartoon%20woman%2C%20cartoon%20style?model=zimage&width=256&height=384&nologo=true&seed=42",
+    "suffix": ", Exquisite 3D image, lovely cartoon style, colorful ultra-minimalistic, smooth colors, symmetric, playful doodle, soft texture, simple composition, sticker style logo"
+  },
+  {
+    "id": "z-horror",
+    "model": "zimage",
+    "label": "Horror",
+    "image": "https://image.pollinations.ai/prompt/A%20woman%20standing%20in%20a%20dark%20forest%2C%20horror%20creepy?model=zimage&width=256&height=384&nologo=true&seed=42",
+    "suffix": ", Eerie shadows, distorted perspectives, creeping fog, desaturated tones, subtle horror elements, subtle tension"
+  }
 ];
