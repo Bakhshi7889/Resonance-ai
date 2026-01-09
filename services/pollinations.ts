@@ -11,10 +11,11 @@ export const getEffectiveKey = (customKey?: string) => {
     return (customKey && customKey.trim().length > 0) ? customKey : DEFAULT_KEY;
 };
 
-export const generateImageUrl = (params: ImageGenerationParams): string => {
+export const generateImageUrl = (params: ImageGenerationParams & { guidance?: number }): string => {
   const { 
     prompt, model, width, height, seed, enhance, nologo, 
-    negativePrompt, apiKey, safe, private: privateMode, transparent 
+    negativePrompt, apiKey, safe, private: privateMode, transparent,
+    quality, guidance
   } = params;
   
   const encodedPrompt = encodeURIComponent(prompt);
@@ -30,10 +31,16 @@ export const generateImageUrl = (params: ImageGenerationParams): string => {
     key: key,
   };
 
-  // Only append if true
+  // Only append if true/exists
   if (enhance) queryObj.enhance = 'true';
   if (safe) queryObj.safe = 'true';
   if (transparent) queryObj.transparent = 'true';
+  if (quality) queryObj.quality = quality;
+  
+  // Map guidance to API parameter guidance_scale
+  if (guidance && guidance !== 7.5) { // 7.5 is usually default, only send if changed or always send
+      queryObj.guidance_scale = guidance.toString();
+  }
 
   if (negativePrompt) {
     queryObj.negative_prompt = negativePrompt;

@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { AppSettings, AVAILABLE_MODELS, MODEL_STYLES, AppRoute } from '../types';
 import { DEFAULT_KEY } from '../services/pollinations';
 
@@ -12,6 +12,8 @@ interface PreferencesProps {
 
 export const Preferences: React.FC<PreferencesProps> = ({ settings, updateSettings, onNavigate }) => {
   const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);
+  const [unlockCode, setUnlockCode] = useState('');
+  const [showUnlockSuccess, setShowUnlockSuccess] = useState(false);
 
   // Filter styles for current model
   const availableStyles = MODEL_STYLES.filter(s => s.model === settings.model);
@@ -24,6 +26,19 @@ export const Preferences: React.FC<PreferencesProps> = ({ settings, updateSettin
         : DEFAULT_KEY;
         
     return `${url}&key=${effectiveKey}`;
+  };
+
+  const handleUnlock = () => {
+      if (unlockCode === '6969') {
+          updateSettings({ isUnlocked: true });
+          setShowUnlockSuccess(true);
+          setUnlockCode('');
+          setTimeout(() => setShowUnlockSuccess(false), 3000);
+      }
+  };
+
+  const handleRelock = () => {
+      updateSettings({ isUnlocked: false, safe: true });
   };
 
   return (
@@ -134,7 +149,7 @@ export const Preferences: React.FC<PreferencesProps> = ({ settings, updateSettin
                             <span className="material-symbols-outlined text-white/50 text-[24px]">keyboard_arrow_down</span>
                         </div>
                     </summary>
-                    <div className="p-6 pt-4 space-y-4">
+                    <div className="p-6 pt-4 space-y-6">
                          {/* API Key Input */}
                          <div className="space-y-2">
                              <div className="flex justify-between items-center px-1">
@@ -162,6 +177,62 @@ export const Preferences: React.FC<PreferencesProps> = ({ settings, updateSettin
                                 <a href="https://enter.pollinations.ai" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline ml-1">Get a key</a>
                              </p>
                         </div>
+
+                         {/* Access Code Field - Visible Logic */}
+                         <div className="space-y-2 pt-2 border-t border-white/5">
+                             <div className="flex items-center justify-between">
+                                 <label className="text-xs font-bold text-white/20 uppercase tracking-widest px-1">Unlock Full Potential</label>
+                                 {settings.isUnlocked && (
+                                     <span className="text-[10px] text-green-400 font-bold bg-green-400/10 border border-green-400/20 px-2 py-0.5 rounded-full">UNLOCKED</span>
+                                 )}
+                             </div>
+                             
+                             {!settings.isUnlocked ? (
+                                 <div className="flex gap-2">
+                                     <input 
+                                        type="text" 
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
+                                        value={unlockCode}
+                                        onChange={(e) => setUnlockCode(e.target.value)}
+                                        placeholder="Enter Access Code"
+                                        className="flex-1 bg-[#101622] border border-white/10 rounded-xl py-2 px-4 text-sm text-white focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all placeholder:text-white/10"
+                                     />
+                                     <button 
+                                        onClick={handleUnlock}
+                                        className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-xs font-bold text-white/60 hover:text-white transition-all"
+                                     >
+                                        Unlock
+                                     </button>
+                                 </div>
+                             ) : (
+                                 <div className="flex items-center gap-4 bg-white/5 rounded-xl p-3 border border-white/5">
+                                     <div className="flex-1">
+                                         <p className="text-sm text-white/80 font-medium">Restrictions Removed</p>
+                                         <p className="text-[10px] text-white/40">App is running in unrestricted mode.</p>
+                                     </div>
+                                     <button 
+                                        onClick={handleRelock}
+                                        className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-lg text-xs font-bold text-red-400 transition-all"
+                                     >
+                                        Re-Lock
+                                     </button>
+                                 </div>
+                             )}
+                         </div>
+
+                         <AnimatePresence>
+                             {showUnlockSuccess && (
+                                 <motion.div 
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    className="text-center text-xs font-bold text-purple-400"
+                                 >
+                                     Full Potential Unlocked. Filters Removed.
+                                 </motion.div>
+                             )}
+                         </AnimatePresence>
                     </div>
                 </details>
             </div>

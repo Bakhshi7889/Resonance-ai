@@ -24,7 +24,10 @@ const DEFAULT_SETTINGS: AppSettings = {
   activeStyle: 'z-real',
   apiKey: '',
   safe: true, // Default On
-  transparent: false // Default Off
+  transparent: false, // Default Off
+  quality: 'medium', // Default Medium
+  upscale: false, // Default Normal Resolution
+  isUnlocked: false // Default Locked
 };
 
 const App: React.FC = () => {
@@ -37,11 +40,7 @@ const App: React.FC = () => {
       const stored = localStorage.getItem(STORAGE_KEY_SETTINGS);
       if (stored) {
         const parsedSettings = JSON.parse(stored);
-        // Migration: Remove turbo if present in old settings
-        if (parsedSettings.model === 'turbo') {
-            parsedSettings.model = 'flux';
-            parsedSettings.activeStyle = '';
-        }
+        
         // Force private mode to true on load
         parsedSettings.privateMode = true;
         

@@ -282,80 +282,129 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix, 
                             onClick={(e) => e.stopPropagation()} 
                             drag="x"
                             dragConstraints={{ left: 0, right: 0 }}
-                            dragElastic={1}
+                            dragElastic={0.5}
                             onDragEnd={handleDragEnd}
                         >
-                            <img src={currentFullscreenItem.url} className="max-w-full max-h-full object-contain shadow-2xl" alt="Fullscreen" />
+                            <img 
+                                src={currentFullscreenItem.url} 
+                                className="max-w-full max-h-full object-contain shadow-2xl"
+                                alt="fullscreen" 
+                            />
                         </motion.div>
                     </AnimatePresence>
                 </div>
 
-                {/* Bottom Actions */}
                 <div 
                     className="absolute bottom-0 left-0 right-0 p-6 pb-12 flex justify-center gap-6 z-20 bg-gradient-to-t from-black/90 via-black/50 to-transparent" 
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <button onClick={() => handleDownload(currentFullscreenItem.url)} className="flex flex-col items-center gap-1 min-w-[60px] text-white/80 hover:text-white transition-colors">
-                        <div className="size-12 rounded-full bg-white/10 flex items-center justify-center mb-1 backdrop-blur-md"><span className="material-symbols-outlined text-[20px]">download</span></div>
+                    <button 
+                        onClick={() => handleDownload(currentFullscreenItem.url)}
+                        className="flex flex-col items-center gap-1 min-w-[60px] text-white/80 hover:text-white transition-colors"
+                    >
+                        <div className="size-12 rounded-full bg-white/10 flex items-center justify-center mb-1 backdrop-blur-md border border-white/5 active:bg-white/20">
+                             <span className="material-symbols-outlined text-[20px]">download</span>
+                        </div>
                         <span className="text-[10px] uppercase tracking-wide font-bold">Save</span>
                     </button>
                     
-                    <button onClick={handleCopyLink} className="flex flex-col items-center gap-1 min-w-[60px] text-white/80 hover:text-white transition-colors">
-                        <div className="size-12 rounded-full bg-white/10 flex items-center justify-center mb-1 backdrop-blur-md"><span className="material-symbols-outlined text-[20px]">share</span></div>
-                        <span className="text-[10px] uppercase tracking-wide font-bold">{showCopiedToast ? 'Copied!' : 'Share'}</span>
+                    <button 
+                        onClick={handleCopyLink}
+                        className="flex flex-col items-center gap-1 min-w-[60px] text-white/80 hover:text-white transition-colors"
+                    >
+                        <div className="size-12 rounded-full bg-white/10 flex items-center justify-center mb-1 backdrop-blur-md border border-white/5 active:bg-white/20">
+                             <span className="material-symbols-outlined text-[20px]">link</span>
+                        </div>
+                        <span className="text-[10px] uppercase tracking-wide font-bold">Link</span>
                     </button>
 
-                     <button 
+                    {onRemix && (
+                        <button 
+                            onClick={() => onRemix(currentFullscreenItem)}
+                            className="flex flex-col items-center gap-1 min-w-[60px] text-white/80 hover:text-white transition-colors"
+                        >
+                            <div className="size-12 rounded-full bg-white/10 flex items-center justify-center mb-1 backdrop-blur-md border border-white/5 active:bg-white/20">
+                                <span className="material-symbols-outlined text-[20px]">edit</span>
+                            </div>
+                            <span className="text-[10px] uppercase tracking-wide font-bold">Remix</span>
+                        </button>
+                    )}
+
+                    <button 
                         onClick={() => setShowInfoPanel(!showInfoPanel)}
                         className={`flex flex-col items-center gap-1 min-w-[60px] transition-colors ${showInfoPanel ? 'text-primary' : 'text-white/80 hover:text-white'}`}
                     >
-                        <div className={`size-12 rounded-full flex items-center justify-center mb-1 backdrop-blur-md transition-colors ${showInfoPanel ? 'bg-primary/20 border border-primary/30' : 'bg-white/10'}`}>
+                        <div className={`size-12 rounded-full flex items-center justify-center mb-1 backdrop-blur-md transition-colors ${showInfoPanel ? 'bg-primary/20 border border-primary/30' : 'bg-white/10 border border-white/5'}`}>
                              <span className="material-symbols-outlined text-[20px]">info</span>
                         </div>
                         <span className="text-[10px] uppercase tracking-wide font-bold">Info</span>
                     </button>
-
-                     <button onClick={() => { if (onRemix) onRemix(currentFullscreenItem); }} className="flex flex-col items-center gap-1 min-w-[60px] text-white/80 hover:text-white transition-colors">
-                        <div className="size-12 rounded-full bg-primary/20 flex items-center justify-center mb-1 backdrop-blur-md border border-primary/20"><span className="material-symbols-outlined text-[20px] text-primary">auto_fix_high</span></div>
-                        <span className="text-[10px] uppercase tracking-wide font-bold">Remix</span>
-                    </button>
                 </div>
 
-                 {/* Info Panel Overlay */}
+                <AnimatePresence>
+                    {showCopiedToast && (
+                        <motion.div 
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 20 }}
+                            className="absolute bottom-32 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/80 backdrop-blur-md rounded-full border border-white/10 text-white text-xs font-bold pointer-events-none"
+                        >
+                            Link Copied
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
                 <AnimatePresence>
                     {showInfoPanel && (
                         <motion.div 
                             initial={{ y: "100%", opacity: 0 }}
                             animate={{ y: 0, opacity: 1 }}
                             exit={{ y: "100%", opacity: 0 }}
-                            className="absolute bottom-0 left-0 right-0 bg-[#192233] border-t border-white/10 rounded-t-[2rem] p-6 pb-28 z-30 shadow-2xl"
+                            className="absolute bottom-0 left-0 right-0 bg-[#192233] border-t border-white/10 rounded-t-[2rem] p-6 pb-12 z-30 shadow-2xl max-h-[70vh] flex flex-col"
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <div className="w-12 h-1 bg-white/20 rounded-full mx-auto mb-6" />
-                            <div className="space-y-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="w-12 h-1 bg-white/20 rounded-full" />
+                                <button 
+                                    onClick={() => setShowInfoPanel(false)}
+                                    className="size-8 rounded-full bg-white/10 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/20 transition-colors"
+                                >
+                                    <span className="material-symbols-outlined text-[18px]">close</span>
+                                </button>
+                            </div>
+
+                            <div className="space-y-6 overflow-y-auto">
                                 <div>
                                     <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest mb-2">Prompt</h4>
-                                    <p className="text-sm text-white leading-relaxed font-medium bg-black/20 p-3 rounded-xl border border-white/5 max-h-32 overflow-y-auto">
-                                        {currentFullscreenItem.prompt}
-                                    </p>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                     <div>
-                                        <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest mb-1">Seed</h4>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm text-white font-mono">{currentFullscreenItem.seed}</span>
-                                        </div>
+                                    <div className="text-sm text-white leading-relaxed font-medium bg-black/20 p-3 rounded-xl border border-white/5 select-text">
+                                        {decodeURIComponent(currentFullscreenItem.prompt)}
                                     </div>
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest mb-1">Model</h4>
                                         <span className="px-2 py-0.5 rounded bg-white/10 text-xs font-bold text-white uppercase">{currentFullscreenItem.model}</span>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest mb-1">Seed</h4>
+                                        <span className="text-sm text-white font-mono">{currentFullscreenItem.seed}</span>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest mb-1">Size</h4>
+                                        <span className="text-sm text-white">{currentFullscreenItem.width} x {currentFullscreenItem.height}</span>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest mb-1">Enhance</h4>
+                                        <span className={`text-sm font-bold ${currentFullscreenItem.enhance ? 'text-primary' : 'text-white/40'}`}>
+                                            {currentFullscreenItem.enhance ? 'Active' : 'Off'}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
                         </motion.div>
                     )}
                 </AnimatePresence>
-
             </motion.div>
         )}
       </AnimatePresence>

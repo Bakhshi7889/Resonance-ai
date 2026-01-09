@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppRoute, MODEL_STYLES, AppSettings } from '../types';
 import { Header } from './Header';
@@ -11,6 +11,137 @@ interface StyleLibraryProps {
 }
 
 const STORAGE_KEY_STYLE_GEN = 'resonance_style_generations';
+
+// Memoized Style Card Component for Performance
+const StyleCard = memo(({ 
+    style, 
+    state, 
+    onGenerate, 
+    onReset, 
+    onCopyUrl, 
+    onCopyImage,
+    copiedId 
+}: {
+    style: typeof MODEL_STYLES[0],
+    state: { url?: string, isLoading?: boolean, seed?: number } | undefined,
+    onGenerate: (id: string, img: string) => void,
+    onReset: (id: string) => void,
+    onCopyUrl: (url: string, id: string) => void,
+    onCopyImage: (url: string, id: string) => void,
+    copiedId: string | null
+}) => {
+    const [isImgLoaded, setIsImgLoaded] = useState(false);
+    const currentUrl = state?.url || style.image;
+    const isLoading = state?.isLoading || false;
+    const hasGenerated = !!state?.url;
+
+    useEffect(() => {
+        // Reset local load state when URL changes to trigger animation
+        // We do this check to ensure we aren't resetting if it's the exact same URL (re-render)
+        setIsImgLoaded(false); 
+    }, [currentUrl]);
+
+    return (
+        <div className="bg-surface-dark rounded-3xl border border-white/5 overflow-hidden group relative transition-all duration-300 flex flex-col hover:border-white/20 hover:shadow-2xl hover:-translate-y-1 will-change-transform">
+            {/* Image Container */}
+            <div className="aspect-[2/3] relative bg-surface-highlight/30 overflow-hidden">
+                
+                {/* Fallback Pulse (behind) */}
+                <div 
+                    className={`absolute inset-0 bg-white/5 animate-pulse z-0`} 
+                />
+
+                {/* The Image with Blur Reveal */}
+                <img 
+                    src={currentUrl} 
+                    alt={style.label} 
+                    className={`absolute inset-0 w-full h-full object-cover transition-all duration-1000 ease-out z-0 ${isImgLoaded && !isLoading ? 'opacity-100 blur-0 scale-100' : 'opacity-0 blur-xl scale-105'}`}
+                    loading="lazy"
+                    onLoad={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        if (target.src === currentUrl) {
+                            setIsImgLoaded(true);
+                        }
+                    }}
+                />
+                
+                {/* Loading Spinner for Generation Process (Overlay) */}
+                <AnimatePresence>
+                    {isLoading && (
+                        <motion.div 
+                            initial={{ opacity: 0 }} 
+                            animate={{ opacity: 1 }} 
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 flex items-center justify-center z-10 bg-black/40 backdrop-blur-sm"
+                        >
+                             <div className="size-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin"></div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* Overlay Controls */}
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-3 p-4 z-20">
+                     <div className="flex items-center gap-3">
+                        <button 
+                            onClick={() => onGenerate(style.id, style.image)}
+                            className="size-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white flex items-center justify-center hover:bg-primary hover:border-primary transition-all shadow-lg active:scale-90"
+                            title={hasGenerated ? "Regenerate (New Seed)" : "Generate"}
+                        >
+                            <span className="material-symbols-outlined text-[24px]">{hasGenerated ? 'refresh' : 'play_arrow'}</span>
+                        </button>
+                        
+                        {hasGenerated && (
+                            <button 
+                                onClick={() => onReset(style.id)}
+                                className="size-10 rounded-full bg-red-500/20 backdrop-blur-md border border-red-500/30 text-red-400 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-lg active:scale-90"
+                                title="Reset to Default"
+                            >
+                                <span className="material-symbols-outlined text-[20px]">undo</span>
+                            </button>
+                        )}
+                     </div>
+                    
+                    <div className="flex gap-2 w-full mt-2">
+                         <button 
+                            onClick={() => onCopyUrl(currentUrl, style.id)}
+                            className="flex-1 py-2 rounded-lg bg-white/10 backdrop-blur-md border border-white/20 text-white text-[10px] font-bold hover:bg-white hover:text-black transition-all flex items-center justify-center gap-1 active:scale-95"
+                        >
+                            <span className="material-symbols-outlined text-[14px]">link</span>
+                            {copiedId === style.id ? 'Copied' : 'Link'}
+                        </button>
+                        <button 
+                            onClick={() => onCopyImage(currentUrl, style.id)}
+                            className="flex-1 py-2 rounded-lg bg-white/10 backdrop-blur-md border border-white/20 text-white text-[10px] font-bold hover:bg-white hover:text-black transition-all flex items-center justify-center gap-1 active:scale-95"
+                        >
+                            <span className="material-symbols-outlined text-[14px]">image</span>
+                            {copiedId === `${style.id}-img` ? 'Copied' : 'Img'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div className="p-4 border-t border-white/5 bg-white/[0.02]">
+                <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-white text-sm font-bold truncate">{style.label}</span>
+                    <span className="text-[9px] uppercase font-bold tracking-wider text-white/30 px-1.5 py-0.5 rounded bg-white/5 border border-white/5">{style.model}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono text-white/40 truncate max-w-[100px]">
+                        {state?.seed || 'Default'}
+                    </span>
+                    {!hasGenerated && (
+                        <button 
+                            onClick={() => onGenerate(style.id, style.image)}
+                            className="text-[10px] font-bold text-primary hover:text-primary/80 uppercase tracking-wide flex items-center gap-1"
+                        >
+                            Generate
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+});
 
 export const StyleLibrary: React.FC<StyleLibraryProps> = ({ onNavigate, settings }) => {
   // Initialize state from local storage if available
@@ -38,7 +169,7 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = ({ onNavigate, settings
       return (settings.apiKey && settings.apiKey.trim().length > 0) ? settings.apiKey.trim() : DEFAULT_KEY;
   };
 
-  const generateStyle = (styleId: string, originalUrl: string) => {
+  const generateStyle = useCallback((styleId: string, originalUrl: string) => {
     const seed = getRandomSeed();
     setGenerationStates(prev => ({
         ...prev,
@@ -90,23 +221,23 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = ({ onNavigate, settings
             return newState;
         });
     }
-  };
+  }, [settings.apiKey]);
 
-  const resetStyle = (styleId: string) => {
+  const resetStyle = useCallback((styleId: string) => {
       setGenerationStates(prev => {
           const newState = { ...prev };
           delete newState[styleId];
           return newState;
       });
-  };
+  }, []);
 
-  const handleCopyUrl = (url: string, id: string) => {
+  const handleCopyUrl = useCallback((url: string, id: string) => {
       navigator.clipboard.writeText(url);
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2000);
-  };
+  }, []);
 
-  const handleCopyImage = async (url: string, id: string) => {
+  const handleCopyImage = useCallback(async (url: string, id: string) => {
     try {
         const response = await fetch(url);
         const blob = await response.blob();
@@ -122,9 +253,9 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = ({ onNavigate, settings
         // Fallback to URL copy if image copy fails (e.g. browser restrictions)
         handleCopyUrl(url, id);
     }
-  };
+  }, [handleCopyUrl]);
 
-  const handleCopyJson = () => {
+  const handleCopyJson = useCallback(() => {
     // Export the data with the CURRENTLY generated images (if any)
     const exportData = MODEL_STYLES.map(style => {
         const state = generationStates[style.id];
@@ -140,7 +271,7 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = ({ onNavigate, settings
     navigator.clipboard.writeText(JSON.stringify(exportData, null, 2));
     setCopiedId('ALL');
     setTimeout(() => setCopiedId(null), 2000);
-  };
+  }, [generationStates]);
 
   const isCustomKey = settings.apiKey && settings.apiKey.trim().length > 0;
 
@@ -189,98 +320,18 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = ({ onNavigate, settings
 
             {/* Grid */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 pb-24">
-                {MODEL_STYLES.map((style) => {
-                    const state = generationStates[style.id];
-                    const currentUrl = state?.url || style.image;
-                    const isLoading = state?.isLoading || false;
-                    const hasGenerated = !!state?.url;
-
-                    return (
-                        <div key={style.id} className="bg-surface-dark rounded-3xl border border-white/5 overflow-hidden group relative transition-all duration-300 flex flex-col hover:border-white/20 hover:shadow-2xl hover:-translate-y-1">
-                            <div className="aspect-[2/3] relative bg-black/20 overflow-hidden">
-                                <img 
-                                    src={currentUrl} 
-                                    alt={style.label} 
-                                    className={`w-full h-full object-cover transition-all duration-500 ${isLoading ? 'scale-110 blur-xl opacity-40' : 'scale-100 opacity-100'}`}
-                                    loading="lazy"
-                                />
-                                
-                                <AnimatePresence>
-                                    {isLoading && (
-                                        <motion.div 
-                                            initial={{ opacity: 0 }} 
-                                            animate={{ opacity: 1 }} 
-                                            exit={{ opacity: 0 }}
-                                            className="absolute inset-0 flex items-center justify-center z-10"
-                                        >
-                                             <div className="size-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin"></div>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-
-                                {/* Overlay controls */}
-                                <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-3 p-4">
-                                     <div className="flex items-center gap-3">
-                                        <button 
-                                            onClick={() => generateStyle(style.id, style.image)}
-                                            className="size-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white flex items-center justify-center hover:bg-primary hover:border-primary transition-all shadow-lg active:scale-90"
-                                            title={hasGenerated ? "Regenerate (New Seed)" : "Generate"}
-                                        >
-                                            <span className="material-symbols-outlined text-[24px]">{hasGenerated ? 'refresh' : 'play_arrow'}</span>
-                                        </button>
-                                        
-                                        {hasGenerated && (
-                                            <button 
-                                                onClick={() => resetStyle(style.id)}
-                                                className="size-10 rounded-full bg-red-500/20 backdrop-blur-md border border-red-500/30 text-red-400 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-lg active:scale-90"
-                                                title="Reset to Default"
-                                            >
-                                                <span className="material-symbols-outlined text-[20px]">undo</span>
-                                            </button>
-                                        )}
-                                     </div>
-                                    
-                                    <div className="flex gap-2 w-full mt-2">
-                                         <button 
-                                            onClick={() => handleCopyUrl(currentUrl, style.id)}
-                                            className="flex-1 py-2 rounded-lg bg-white/10 backdrop-blur-md border border-white/20 text-white text-[10px] font-bold hover:bg-white hover:text-black transition-all flex items-center justify-center gap-1 active:scale-95"
-                                        >
-                                            <span className="material-symbols-outlined text-[14px]">link</span>
-                                            {copiedId === style.id ? 'Copied' : 'Link'}
-                                        </button>
-                                        <button 
-                                            onClick={() => handleCopyImage(currentUrl, style.id)}
-                                            className="flex-1 py-2 rounded-lg bg-white/10 backdrop-blur-md border border-white/20 text-white text-[10px] font-bold hover:bg-white hover:text-black transition-all flex items-center justify-center gap-1 active:scale-95"
-                                        >
-                                            <span className="material-symbols-outlined text-[14px]">image</span>
-                                            {copiedId === `${style.id}-img` ? 'Copied' : 'Img'}
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="p-4 border-t border-white/5 bg-white/[0.02]">
-                                <div className="flex items-center justify-between mb-1.5">
-                                    <span className="text-white text-sm font-bold truncate">{style.label}</span>
-                                    <span className="text-[9px] uppercase font-bold tracking-wider text-white/30 px-1.5 py-0.5 rounded bg-white/5 border border-white/5">{style.model}</span>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-[10px] font-mono text-white/40 truncate max-w-[100px]">
-                                        {state?.seed || 'Default'}
-                                    </span>
-                                    {!hasGenerated && (
-                                        <button 
-                                            onClick={() => generateStyle(style.id, style.image)}
-                                            className="text-[10px] font-bold text-primary hover:text-primary/80 uppercase tracking-wide flex items-center gap-1"
-                                        >
-                                            Generate
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })}
+                {MODEL_STYLES.map((style) => (
+                    <StyleCard
+                        key={style.id}
+                        style={style}
+                        state={generationStates[style.id]}
+                        onGenerate={generateStyle}
+                        onReset={resetStyle}
+                        onCopyUrl={handleCopyUrl}
+                        onCopyImage={handleCopyImage}
+                        copiedId={copiedId}
+                    />
+                ))}
             </div>
         </div>
       </div>
