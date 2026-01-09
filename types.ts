@@ -63,21 +63,21 @@ export const MODEL_STYLES = [
     "model": "flux",
     "label": "Realism",
     "image": "https://image.pollinations.ai/prompt/A%20portrait%20of%20a%20woman%2C%20RAW%2C%20hyper-realistic%2C%2035mm%20film%20photography?model=flux&width=256&height=384&nologo=true&seed=42",
-    "suffix": ", RAW, hyper-realistic, 35mm film photography, warm color temperature, soft on-camera flash, slight grain, natural imperfections, no retouching, editorial intimate snapshot"
+    "suffix": ", RAW, hyper-realistic, 35mm film photography, warm color temperature, soft on-camera flash, slight grain, natural imperfections, no retouching, editorial aesthetic"
   },
   {
     "id": "flux-candid",
     "model": "flux",
     "label": "Candid",
     "image": "https://image.pollinations.ai/prompt/A%20woman%20laughing%20with%20friends%2C%20spontaneous%20pose%2C%20mixed%20lighting?model=flux&width=256&height=384&nologo=true&seed=42",
-    "suffix": ", Shot by a friend with a handheld DSLR or phone, spontaneous pose with natural movement, mixed lighting from environment, visible flyaway hairs and clothing wrinkles, soft focus on background elements, realistic shadows and reflections, no airbrushing, everyday authenticity"
+    "suffix": ", Shot with a handheld DSLR or phone, mixed lighting from environment, soft focus on background elements, realistic shadows and reflections, no airbrushing, everyday authenticity"
   },
   {
     "id": "flux-selfie",
     "model": "flux",
     "label": "Selfie",
     "image": "https://image.pollinations.ai/prompt/A%20woman%20taking%20a%20selfie%2C%20smartphone%20front%20camera%2C%20natural%20skin%20texture?model=flux&width=256&height=384&nologo=true&seed=301555&key=pk_BnmABucSE1VNCWRT&enhance=true",
-    "suffix": ", Smartphone front camera aesthetic, mild barrel distortion, slightly off-center composition, natural skin texture with visible pores and freckles, casual expression, soft selfie flash mixed with ambient light, slight motion blur on edges, JPEG compression artifacts, low-res feel but sharp focus on face"
+    "suffix": ", Smartphone front camera aesthetic, mild barrel distortion, slightly off-center composition, soft flash mixed with ambient light, slight motion blur on edges, JPEG compression artifacts, low-res feel"
   },
   {
     "id": "polaroid",
@@ -112,56 +112,56 @@ export const MODEL_STYLES = [
     "model": "flux",
     "label": "3D Chibi",
     "image": "https://image.pollinations.ai/prompt/A%20cute%20chibi%20woman%2C%20chibi%20style%203d%20render?model=flux&width=256&height=384&nologo=true&seed=42",
-    "suffix": ", chibi style, 3D character render"
+    "suffix": ", chibi style, 3D render, cute proportions"
   },
   {
     "id": "z-real",
     "model": "zimage",
     "label": "Realism",
     "image": "https://image.pollinations.ai/prompt/A%20portrait%20of%20a%20woman%2C%20hyper-realistic%2035mm%20film?model=zimage&width=256&height=384&nologo=true&seed=42",
-    "suffix": ", RAW, hyper-realistic, 35mm film photography, warm color temperature, soft on-camera flash, slight grain, natural imperfections, no retouching, editorial intimate snapshot"
+    "suffix": ", RAW, hyper-realistic, 35mm film photography, warm color temperature, soft on-camera flash, slight grain, natural imperfections, no retouching, editorial aesthetic"
   },
   {
     "id": "z-candid",
     "model": "zimage",
     "label": "Candid",
     "image": "https://image.pollinations.ai/prompt/A%20woman%20walking%20in%20the%20street%2C%20spontaneous%20pose%2C%20mixed%20lighting?model=zimage&width=256&height=384&nologo=true&seed=42",
-    "suffix": ", Shot by a friend with a handheld DSLR or phone, spontaneous pose with natural movement, mixed lighting from environment, visible flyaway hairs and clothing wrinkles, soft focus on background elements, realistic shadows and reflections, no airbrushing, everyday authenticity"
+    "suffix": ", Shot with a handheld DSLR or phone, mixed lighting from environment, soft focus on background elements, realistic shadows and reflections, no airbrushing, everyday authenticity"
   },
   {
     "id": "z-selfie",
     "model": "zimage",
     "label": "Selfie",
     "image": "https://image.pollinations.ai/prompt/A%20woman%20taking%20a%20mirror%20selfie%2C%20smartphone%20aesthetic?model=zimage&width=256&height=384&nologo=true&seed=478505&key=pk_BnmABucSE1VNCWRT&enhance=true",
-    "suffix": ", Smartphone front camera aesthetic, mild barrel distortion, slightly off-center composition, natural skin texture with visible pores and freckles, casual expression, soft selfie flash mixed with ambient light, slight motion blur on edges, JPEG compression artifacts, low-res feel but sharp focus on face"
+    "suffix": ", Smartphone front camera aesthetic, mild barrel distortion, slightly off-center composition, soft flash mixed with ambient light, slight motion blur on edges, JPEG compression artifacts, low-res feel"
   },
   {
     "id": "z-modern-phone",
     "model": "zimage",
     "label": "iPhone",
     "image": "https://image.pollinations.ai/prompt/A%20woman%20holding%20a%20coffee%20cup%2C%20iphone%20camera%20photo?model=zimage&width=256&height=384&nologo=true&seed=42",
-    "suffix": ", iPhone-style rear camera photo, shallow depth of field with bokeh, natural HDR tone mapping, subtle sharpening halos around edges, dewy skin with imperfections like blemishes, soft window light illuminating face, slight vignette, 9:16 vertical aspect ratio, unfiltered social media aesthetic"
+    "suffix": ", iPhone-style rear camera photo, shallow depth of field with bokeh, natural HDR tone mapping, subtle sharpening halos around edges, soft window light, slight vignette, 9:16 vertical aspect ratio, unfiltered social media aesthetic"
   },
   {
     "id": "z-noir",
     "model": "zimage",
     "label": "Film Noir",
     "image": "https://image.pollinations.ai/prompt/A%20woman%20detective%20in%20rain%2C%20film%20noir%20style%20black%20and%20white?model=zimage&width=256&height=384&nologo=true&seed=42",
-    "suffix": ", Cinematic contrast, soft highlight on cheekbones, glossy lips, volumetric lighting, rim light, golden hour, deep chiaroscuro, atmospheric fog"
+    "suffix": ", Cinematic contrast, volumetric lighting, rim light, golden hour, deep chiaroscuro, atmospheric fog, black and white photography"
   },
   {
     "id": "z-vintage",
     "model": "zimage",
     "label": "Vintage",
     "image": "https://image.pollinations.ai/prompt/A%20woman%20standing%20in%20front%20of%20an%20old%20house%2C%20vintage%20polaroid?model=zimage&width=256&height=384&nologo=true&seed=42",
-    "suffix": ", Overexposed grainy polaroid, cross-processed film, warm tones, soft cinematic grain, muted colors, film grain, paparazzi aesthetic"
+    "suffix": ", Overexposed grainy polaroid, cross-processed film, warm tones, soft cinematic grain, muted colors, film grain, vintage aesthetic"
   },
   {
     "id": "z-night",
     "model": "zimage",
     "label": "Night Mode",
     "image": "https://image.pollinations.ai/prompt/A%20woman%20under%20city%20lights%20at%20night%2C%20night%20mode%20photo?model=zimage&width=256&height=384&nologo=true&seed=768299&key=pk_BnmABucSE1VNCWRT&enhance=true",
-    "suffix": ", Nighttime phone camera capture, high ISO noise speckle in dark areas, edge-aware denoising smear on skin, warm streetlight glow with color fringing, handheld shake blur, compressed shadows, realistic lens flare from lights, moody unedited vibe"
+    "suffix": ", Nighttime phone camera capture, high ISO noise speckle in dark areas, edge-aware denoising smear on details, warm streetlight glow with color fringing, handheld shake blur, compressed shadows, realistic lens flare from lights, moody unedited vibe"
   },
   {
     "id": "z-surreal",
