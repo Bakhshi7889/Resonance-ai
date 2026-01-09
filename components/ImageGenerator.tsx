@@ -582,21 +582,23 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                     onDragEnd={handleSettingsDragEnd}
                     className="border-t border-white/5 bg-black/20 touch-pan-x"
                 >
+                    {/* Handle */}
                     <div className="w-full flex justify-center pt-2 pb-1 cursor-grab active:cursor-grabbing">
                         <div className="w-12 h-1 bg-white/20 rounded-full" />
                     </div>
 
-                    <div className="p-4 flex flex-col gap-6 pb-6">
+                    {/* Scrollable Content Area */}
+                    <div className="px-4 pb-4 flex flex-col gap-4 max-h-[60vh] overflow-y-auto no-scrollbar">
                         
                          {/* Image Count Selector */}
-                         <div>
-                            <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest mb-3 pl-1">Image Count</p>
-                            <div className="flex bg-white/5 p-1 rounded-2xl border border-white/5">
+                         <div className="pt-2">
+                            <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest mb-2 pl-1">Image Count</p>
+                            <div className="flex bg-white/5 p-1 rounded-xl border border-white/5">
                                 {[1, 2, 3, 4].map((count) => (
                                     <button
                                         key={count}
                                         onClick={() => updateLocalSetting('imageCount', count)}
-                                        className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${
+                                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
                                             localSettings.imageCount === count 
                                             ? 'bg-surface-highlight text-white shadow-lg ring-1 ring-white/10' 
                                             : 'text-white/40 hover:text-white'
@@ -610,8 +612,8 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
 
                          {/* Aspect Ratio Selector */}
                         <div>
-                             <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest mb-3 pl-1">Ratio</p>
-                             <div className="flex justify-between items-center bg-white/5 p-2 rounded-3xl border border-white/5 overflow-x-auto no-scrollbar gap-2">
+                             <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest mb-2 pl-1">Ratio</p>
+                             <div className="flex justify-between items-center bg-white/5 p-1.5 rounded-2xl border border-white/5 overflow-x-auto no-scrollbar gap-2">
                                 {ASPECT_RATIOS.map((ratio) => {
                                     const isSelected = localSettings.width === ratio.width && localSettings.height === ratio.height;
                                     const w = ratio.width / (Math.max(ratio.width, ratio.height));
@@ -620,22 +622,22 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                                         <button
                                             key={ratio.label}
                                             onClick={() => setAspectRatio(ratio.width, ratio.height)}
-                                            className={`flex flex-col items-center justify-center gap-2 w-16 h-20 rounded-2xl transition-all shrink-0 ${
+                                            className={`flex flex-col items-center justify-center gap-1.5 w-14 h-16 rounded-xl transition-all shrink-0 ${
                                                 isSelected 
                                                 ? 'bg-surface-highlight text-white shadow-lg ring-1 ring-white/10' 
                                                 : 'text-white/40 hover:text-white hover:bg-white/5'
                                             }`}
                                         >
-                                            <div className={`flex items-center justify-center size-8`}>
+                                            <div className={`flex items-center justify-center size-6`}>
                                                 <div 
-                                                    className={`border-2 transition-all rounded-sm ${isSelected ? 'border-white bg-white/20' : 'border-white/40'}`}
+                                                    className={`border-[1.5px] transition-all rounded-sm ${isSelected ? 'border-white bg-white/20' : 'border-white/40'}`}
                                                     style={{ 
-                                                        width: `${w * 20}px`, 
-                                                        height: `${h * 20}px`
+                                                        width: `${w * 16}px`, 
+                                                        height: `${h * 16}px`
                                                     }}
                                                 />
                                             </div>
-                                            <span className="text-[10px] font-bold">{ratio.label}</span>
+                                            <span className="text-[9px] font-bold">{ratio.label}</span>
                                         </button>
                                     );
                                 })}
@@ -645,17 +647,17 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                          {/* Visual Style Selector */}
                         {availableStyles.length > 0 && (
                             <div>
-                                <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest mb-3 pl-1">Style</p>
-                                <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+                                <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest mb-2 pl-1">Style</p>
+                                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                                      <div 
                                         onClick={() => updateLocalSetting('activeStyle', '')}
-                                        className={`relative shrink-0 w-24 h-32 rounded-xl overflow-hidden cursor-pointer border-2 transition-all group ${localSettings.activeStyle === '' ? 'border-primary ring-2 ring-primary/20' : 'border-white/10 hover:border-white/30'}`}
+                                        className={`relative shrink-0 w-20 h-28 rounded-lg overflow-hidden cursor-pointer border transition-all group ${localSettings.activeStyle === '' ? 'border-primary ring-2 ring-primary/20' : 'border-white/10 hover:border-white/30'}`}
                                     >
                                         <div className="absolute inset-0 bg-white/5 group-hover:bg-white/10 transition-colors flex items-center justify-center">
-                                            <span className="material-symbols-outlined text-white/30 text-3xl">block</span>
+                                            <span className="material-symbols-outlined text-white/30 text-2xl">block</span>
                                         </div>
-                                        <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent">
-                                            <span className={`text-xs font-bold block text-center ${localSettings.activeStyle === '' ? 'text-primary' : 'text-white/60'}`}>None</span>
+                                        <div className="absolute bottom-0 left-0 right-0 p-1.5 bg-gradient-to-t from-black/80 to-transparent">
+                                            <span className={`text-[10px] font-bold block text-center ${localSettings.activeStyle === '' ? 'text-primary' : 'text-white/60'}`}>None</span>
                                         </div>
                                     </div>
 
@@ -663,12 +665,12 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                                         <div 
                                             key={style.id}
                                             onClick={() => updateLocalSetting('activeStyle', style.id)}
-                                            className={`relative shrink-0 w-24 h-32 rounded-xl overflow-hidden cursor-pointer border-2 transition-all group ${localSettings.activeStyle === style.id ? 'border-primary ring-2 ring-primary/20' : 'border-white/10 hover:border-white/30'}`}
+                                            className={`relative shrink-0 w-20 h-28 rounded-lg overflow-hidden cursor-pointer border transition-all group ${localSettings.activeStyle === style.id ? 'border-primary ring-2 ring-primary/20' : 'border-white/10 hover:border-white/30'}`}
                                         >
                                             <img src={style.image} alt={style.label} className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${localSettings.activeStyle === style.id ? 'opacity-100' : 'opacity-60 group-hover:opacity-80'}`} loading="lazy" />
                                             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-80" />
-                                            <div className="absolute bottom-0 left-0 right-0 p-2">
-                                                <span className={`text-xs font-bold block text-center truncate ${localSettings.activeStyle === style.id ? 'text-white' : 'text-white/80'}`}>{style.label}</span>
+                                            <div className="absolute bottom-0 left-0 right-0 p-1.5">
+                                                <span className={`text-[10px] font-bold block text-center truncate ${localSettings.activeStyle === style.id ? 'text-white' : 'text-white/80'}`}>{style.label}</span>
                                             </div>
                                         </div>
                                     ))}
@@ -678,8 +680,8 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
 
                         {/* Models & Other Settings (Simplified for cleaner drawer) */}
                         <div>
-                             <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest mb-3 pl-1">Configuration</p>
-                             <div className="flex flex-col gap-3">
+                             <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest mb-2 pl-1">Configuration</p>
+                             <div className="flex flex-col gap-2">
                                 <div className="flex gap-2 overflow-x-auto no-scrollbar">
                                     {AVAILABLE_MODELS.map(m => (
                                         <button
@@ -688,29 +690,29 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                                                 updateLocalSetting('model', m.id);
                                                 updateLocalSetting('activeStyle', '');
                                             }}
-                                            className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all shrink-0 ${localSettings.model === m.id ? 'bg-primary/20 border-primary text-white' : 'bg-white/5 border-transparent text-white/60 hover:bg-white/10'}`}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all shrink-0 ${localSettings.model === m.id ? 'bg-primary/20 border-primary text-white' : 'bg-white/5 border-transparent text-white/60 hover:bg-white/10'}`}
                                         >
-                                            <span className="text-xs font-medium">{m.name}</span>
+                                            <span className="text-[10px] font-medium">{m.name}</span>
                                         </button>
                                     ))}
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">
                                     <div 
                                         onClick={() => updateLocalSetting('enhance', !localSettings.enhance)}
-                                        className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 active:bg-white/10 transition-colors cursor-pointer"
+                                        className="flex items-center justify-between p-2.5 rounded-lg bg-white/5 border border-white/5 active:bg-white/10 transition-colors cursor-pointer"
                                     >
-                                        <span className="text-xs font-medium text-white">Enhance</span>
-                                        <div className={`w-8 h-4 rounded-full relative transition-colors ${localSettings.enhance ? 'bg-primary' : 'bg-white/10'}`}>
-                                            <div className={`absolute top-0.5 left-0.5 size-3 bg-white rounded-full transition-transform ${localSettings.enhance ? 'translate-x-4' : 'translate-x-0'}`} />
+                                        <span className="text-[10px] font-medium text-white">Enhance</span>
+                                        <div className={`w-7 h-3.5 rounded-full relative transition-colors ${localSettings.enhance ? 'bg-primary' : 'bg-white/10'}`}>
+                                            <div className={`absolute top-0.5 left-0.5 size-2.5 bg-white rounded-full transition-transform ${localSettings.enhance ? 'translate-x-3.5' : 'translate-x-0'}`} />
                                         </div>
                                     </div>
                                     <div 
                                         onClick={() => updateLocalSetting('safe', !localSettings.safe)}
-                                        className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 active:bg-white/10 transition-colors cursor-pointer"
+                                        className="flex items-center justify-between p-2.5 rounded-lg bg-white/5 border border-white/5 active:bg-white/10 transition-colors cursor-pointer"
                                     >
-                                        <span className="text-xs font-medium text-white">Safe</span>
-                                        <div className={`w-8 h-4 rounded-full relative transition-colors ${localSettings.safe ? 'bg-primary' : 'bg-white/10'}`}>
-                                            <div className={`absolute top-0.5 left-0.5 size-3 bg-white rounded-full transition-transform ${localSettings.safe ? 'translate-x-4' : 'translate-x-0'}`} />
+                                        <span className="text-[10px] font-medium text-white">Safe</span>
+                                        <div className={`w-7 h-3.5 rounded-full relative transition-colors ${localSettings.safe ? 'bg-primary' : 'bg-white/10'}`}>
+                                            <div className={`absolute top-0.5 left-0.5 size-2.5 bg-white rounded-full transition-transform ${localSettings.safe ? 'translate-x-3.5' : 'translate-x-0'}`} />
                                         </div>
                                     </div>
                                 </div>
