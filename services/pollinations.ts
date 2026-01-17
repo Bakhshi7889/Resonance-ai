@@ -1,11 +1,11 @@
 
-import { ImageGenerationParams } from '../types';
+import { ImageGenerationParams, AccountState } from '../types';
 
-const BASE_URL = 'https://gen.pollinations.ai/image';
-const USAGE_URL = 'https://enter.pollinations.ai/api/usage';
-export const DEFAULT_KEY = 'pk_BnmABucSE1VNCWRT';
-const DAILY_LIMIT = 3.0;
-const IMAGE_COST = 0.0002;
+const BASE_URL = 'https://gen.pollinations.ai';
+export const DEFAULT_KEY = 'pk_3GSNVfV62GUnxKBe';
+
+// Updated cost per image based on new pricing (0.0002 pollen/image)
+const ESTIMATED_IMAGE_COST = 0.0002; 
 
 export const getEffectiveKey = (customKey?: string) => {
     return (customKey && customKey.trim().length > 0) ? customKey : DEFAULT_KEY;
@@ -37,8 +37,7 @@ export const generateImageUrl = (params: ImageGenerationParams & { guidance?: nu
   if (transparent) queryObj.transparent = 'true';
   if (quality) queryObj.quality = quality;
   
-  // Map guidance to API parameter guidance_scale
-  if (guidance && guidance !== 7.5) { // 7.5 is usually default, only send if changed or always send
+  if (guidance && guidance !== 7.5) { 
       queryObj.guidance_scale = guidance.toString();
   }
 
@@ -48,91 +47,64 @@ export const generateImageUrl = (params: ImageGenerationParams & { guidance?: nu
 
   const queryParams = new URLSearchParams(queryObj);
 
-  return `${BASE_URL}/${encodedPrompt}?${queryParams.toString()}`;
+  return `${BASE_URL}/image/${encodedPrompt}?${queryParams.toString()}`;
 };
 
 export const getRandomSeed = () => Math.floor(Math.random() * 1000000);
 
-// Usage Calculation Logic
-export const getUsageStats = async (customKey?: string) => {
+export const getAccountDetails = async (customKey?: string): Promise<AccountState> => {
     const apiKey = getEffectiveKey(customKey);
-    const logs: string[] = [];
     
-    logs.push(`[Init] Key prefix: ${apiKey.substring(0, 5)}...`);
-
-    // Default fallback state (Optimistic Free Tier)
-    const fallbackStats = {
-        remaining: DAILY_LIMIT,
-        spent: 0,
-        imagesLeft: Math.floor(DAILY_LIMIT / IMAGE_COST),
-        resetTime: new Date(),
-        isDefaultKey: apiKey === DEFAULT_KEY,
-        logs
-    };
-
     try {
-        logs.push(`[Fetch] GET ${USAGE_URL}`);
-        const response = await fetch(USAGE_URL, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json'
-            }
-        });
+        const headers = {
+            'Authorization': `Bearer ${apiKey}`
+        };
 
-        logs.push(`[Response] Status: ${response.status}`);
+        // Fetch Profile
+        const profileReq = fetch(`${BASE_URL}/account/profile`, { headers });
+        // Fetch Balance
+        const balanceReq = fetch(`${BASE_URL}/account/balance`, { headers });
 
-        if (!response.ok) {
-            const errText = await response.text();
-            logs.push(`[Error] ${errText.substring(0, 100)}`);
-            // Even on error, we return fallback but attached logs so user can see
-            return fallbackStats;
+        const [profileRes, balanceRes] = await Promise.all([profileReq, balanceReq]);
+
+        if (!profileRes.ok || !balanceRes.ok) {
+            throw new Error('Failed to fetch account data');
         }
 
-        const usageData = await response.json();
-        logs.push(`[Data] Received ${Array.isArray(usageData) ? `Array(${usageData.length})` : typeof usageData}`);
-        
-        // Calculate reset time (3:32 AM today or yesterday)
-        const now = new Date();
-        const resetTime = new Date(now);
-        resetTime.setHours(3, 32, 0, 0);
-        
-        // If current time is before 3:32 AM, the reset happened yesterday
-        if (now < resetTime) {
-            resetTime.setDate(resetTime.getDate() - 1);
-        }
-
-        let spent = 0;
-        
-        if (Array.isArray(usageData)) {
-            spent = usageData.reduce((acc: number, item: any) => {
-                const itemDate = new Date(item.created || item.date || item.timestamp);
-                // Check if the item is after the last reset
-                if (itemDate > resetTime) {
-                    return acc + (Number(item.cost) || 0);
-                }
-                return acc;
-            }, 0);
-        } else {
-            logs.push(`[Warn] Expected array, got ${typeof usageData}`);
-        }
-        
-        logs.push(`[Calc] Spent: ${spent.toFixed(4)}`);
-
-        const remaining = Math.max(0, DAILY_LIMIT - spent);
-        const imagesLeft = Math.floor(remaining / IMAGE_COST);
+        const profile = await profileRes.json();
+        const balanceData = await balanceRes.json();
 
         return {
-            remaining,
-            spent,
-            imagesLeft,
-            resetTime,
-            isDefaultKey: apiKey === DEFAULT_KEY,
-            logs
+            profile: profile,
+            balance: balanceData.balance,
+            isLoading: false,
+            error: null
         };
 
     } catch (error: any) {
-        logs.push(`[Exception] ${error.message || error}`);
-        return fallbackStats;
+        return {
+            profile: null,
+            balance: null,
+            isLoading: false,
+            error: error.message || 'Unknown error'
+        };
     }
+};
+
+export const getEstimatedImagesLeft = (balance: number | null): string => {
+    if (balance === null || balance === undefined) return '...';
+    // If balance is huge (e.g., unlimited or effectively infinite for display purposes)
+    if (balance > 100000000) return 'Unlimited';
+    
+    const count = Math.floor(balance / ESTIMATED_IMAGE_COST);
+    
+    // Format large numbers (e.g. 50k, 1.2M)
+    if (count >= 1000000) {
+        return `${(count / 1000000).toFixed(1)}M`;
+    }
+    if (count >= 1000) {
+        return `${(count / 1000).toFixed(0)}k`;
+    }
+    
+    return count.toString();
 };

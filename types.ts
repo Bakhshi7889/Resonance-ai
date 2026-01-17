@@ -14,6 +14,9 @@ export interface ImageGenerationParams {
   transparent: boolean;
   quality?: string; // 'medium' | 'hd'
   upscale?: boolean; // If true, double the resolution
+  styleId?: string; // Track which style was used
+  styleLabel?: string; // Track style name
+  styleSuffix?: string; // Track the actual prompt suffix added
 }
 
 export interface HistoryItem extends ImageGenerationParams {
@@ -38,7 +41,26 @@ export interface AppSettings {
   transparent: boolean;
   quality: string;
   upscale: boolean;
-  isUnlocked: boolean; // Tracks if the user has entered the cheat code
+  isUnlocked: boolean; 
+  infiniteMode: boolean; // New: Toggles vertical infinite scroll layout
+}
+
+export interface AccountProfile {
+  name?: string;
+  email?: string;
+  tier?: 'anonymous' | 'seed' | 'flower' | 'nectar';
+  createdAt?: string;
+}
+
+export interface AccountBalance {
+  balance: number; // Pollen count
+}
+
+export interface AccountState {
+  profile: AccountProfile | null;
+  balance: number | null;
+  isLoading: boolean;
+  error: string | null;
 }
 
 export enum AppRoute {
@@ -205,8 +227,8 @@ export const MODEL_STYLES = [
   }
 ];
 
-// Universal Styles (Restricted/Unlocked)
 export const NSFW_STYLES = [
+  // ... (Same as before, omitted for brevity but presumed present)
   // Realism Enhancers
   {
     "id": "nsfw-realism",
@@ -215,7 +237,7 @@ export const NSFW_STYLES = [
     "image": "https://image.pollinations.ai/prompt/extreme%20close%20up%20photo%20of%20a%20person%2C%20highly%20detailed%20skin%20pores?model=flux&width=128&height=192&nologo=true&private=true",
     "suffix": ", highly detailed skin pores, realistic sweat sheen, subtle freckles and veins, natural body hair, soft subsurface scattering, ultra-realistic epidermis with minor imperfections like stretch marks or cellulite for authenticity, cinematic volumetric lighting, soft golden hour glow casting realistic shadows on curves, high dynamic range with subtle rim light highlighting contours, natural ambient occlusion in intimate areas, accurate human proportions with gravity-affected breasts and hips, soft tissue deformation from movement, realistic muscle tension and relaxed folds, detailed genital anatomy with natural variations in shape and texture"
   },
-  // Position Styles
+  // ... (Rest of NSFW_STYLES)
   {
     "id": "nsfw-doggy",
     "model": "any",
@@ -279,7 +301,6 @@ export const NSFW_STYLES = [
     "image": "https://image.pollinations.ai/prompt/tangled%20limbs%20of%20three%20people%20in%20bed?model=flux&width=128&height=192&nologo=true&private=true",
     "suffix": ", entwined with two partners, alternating positions like spooning and facing, fluid body interactions with overlapping limbs, natural asymmetry in expressions"
   },
-  // POV Styles
   {
     "id": "nsfw-pov-shower",
     "model": "any",
@@ -315,7 +336,6 @@ export const NSFW_STYLES = [
     "image": "https://image.pollinations.ai/prompt/pov%20holding%20wrists%2C%20dominant?model=flux&width=128&height=192&nologo=true&private=true",
     "suffix": ", first-person POV holding wrists above head, feigned struggle with intense eye contact, torn clothing remnants and grip marks on skin, dramatic tension in body language, low-angle view emphasizing power dynamic in fictional scenario"
   },
-  // Soft/Teasing
   {
     "id": "nsfw-teasing",
     "model": "any",

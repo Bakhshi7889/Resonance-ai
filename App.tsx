@@ -10,7 +10,7 @@ import { AppSettings, AppRoute, HistoryItem } from './types';
 
 const STORAGE_KEY_SETTINGS = 'resonance_settings';
 const STORAGE_KEY_HISTORY = 'resonance_history';
-const MAX_HISTORY_ITEMS = 100;
+const MAX_HISTORY_ITEMS = 1000;
 
 const DEFAULT_SETTINGS: AppSettings = {
   model: 'zimage',
@@ -27,7 +27,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   transparent: false, // Default Off
   quality: 'medium', // Default Medium
   upscale: false, // Default Normal Resolution
-  isUnlocked: false // Default Locked
+  isUnlocked: false, // Default Locked
+  infiniteMode: false // Default Off
 };
 
 const App: React.FC = () => {
@@ -66,7 +67,8 @@ const App: React.FC = () => {
   // Session State (Lifted from ImageGenerator)
   // Initialize as empty for a clean slate on every launch, regardless of history
   const [sessionPrompt, setSessionPrompt] = useState('');
-  const [sessionImages, setSessionImages] = useState<string[]>([]);
+  // CHANGED: Use HistoryItem[] to store metadata (prompt, style) with current images
+  const [sessionImages, setSessionImages] = useState<HistoryItem[]>([]);
 
   // Persist settings
   useEffect(() => {

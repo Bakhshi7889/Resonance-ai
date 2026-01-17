@@ -1,8 +1,10 @@
+
 const CACHE_NAME = 'resonance-v3';
 const urlsToCache = [
   '/',
   '/index.html',
-  '/manifest.json'
+  '/manifest.json',
+  'https://cdn.tailwindcss.com?plugins=forms,container-queries'
 ];
 
 self.addEventListener('install', (event) => {

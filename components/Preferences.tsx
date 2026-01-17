@@ -1,8 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AppSettings, AVAILABLE_MODELS, MODEL_STYLES, AppRoute } from '../types';
-import { DEFAULT_KEY } from '../services/pollinations';
+import { AppSettings, AVAILABLE_MODELS, MODEL_STYLES, AppRoute, AccountState } from '../types';
+import { DEFAULT_KEY, getAccountDetails, getEstimatedImagesLeft } from '../services/pollinations';
 
 interface PreferencesProps {
   settings: AppSettings;
@@ -14,6 +14,22 @@ export const Preferences: React.FC<PreferencesProps> = ({ settings, updateSettin
   const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);
   const [unlockCode, setUnlockCode] = useState('');
   const [showUnlockSuccess, setShowUnlockSuccess] = useState(false);
+  const [accountState, setAccountState] = useState<AccountState>({
+      profile: null,
+      balance: null,
+      isLoading: false,
+      error: null
+  });
+
+  useEffect(() => {
+      fetchAccountData();
+  }, [settings.apiKey]);
+
+  const fetchAccountData = async () => {
+      setAccountState(prev => ({ ...prev, isLoading: true }));
+      const data = await getAccountDetails(settings.apiKey);
+      setAccountState(data);
+  };
 
   // Filter styles for current model
   const availableStyles = MODEL_STYLES.filter(s => s.model === settings.model);
@@ -143,23 +159,87 @@ export const Preferences: React.FC<PreferencesProps> = ({ settings, updateSettin
                             <div className="flex items-center justify-center size-10 rounded-full bg-emerald-500/20 text-emerald-400">
                                 <span className="material-symbols-outlined text-[20px]">key</span>
                             </div>
-                            <span className="text-base font-medium text-white/90">API Configuration</span>
+                            <div className="flex flex-col">
+                                <span className="text-base font-medium text-white/90">API Account</span>
+                                {accountState.balance !== null && (
+                                    <span className="text-[10px] text-emerald-400 font-bold tracking-wider">
+                                        {Math.floor(accountState.balance).toLocaleString()} POLLEN
+                                    </span>
+                                )}
+                            </div>
                         </div>
                         <div className="size-10 rounded-full bg-white/5 flex items-center justify-center group-open:rotate-180 transition-transform duration-300">
                             <span className="material-symbols-outlined text-white/50 text-[24px]">keyboard_arrow_down</span>
                         </div>
                     </summary>
                     <div className="p-6 pt-4 space-y-6">
+                         
+                         {/* Account Card */}
+                         {accountState.profile ? (
+                             <div className="bg-gradient-to-br from-[#1c1c24] to-[#13131a] rounded-xl border border-white/10 p-4 relative overflow-hidden group">
+                                 {/* Decorative Glow */}
+                                 <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
+                                 
+                                 <div className="flex items-start justify-between relative z-10">
+                                     <div className="flex flex-col">
+                                         <span className="text-xs text-white/40 font-bold uppercase tracking-wider mb-1">Tier</span>
+                                         <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md border ${
+                                             accountState.profile.tier === 'nectar' ? 'bg-amber-500/20 border-amber-500/30 text-amber-400' :
+                                             accountState.profile.tier === 'flower' ? 'bg-pink-500/20 border-pink-500/30 text-pink-400' :
+                                             'bg-blue-500/20 border-blue-500/30 text-blue-400'
+                                         }`}>
+                                            <span className="material-symbols-outlined text-[14px]">
+                                                {accountState.profile.tier === 'nectar' ? 'diamond' : 'local_florist'}
+                                            </span>
+                                            <span className="text-xs font-bold capitalize">{accountState.profile.tier || 'Seed'}</span>
+                                         </div>
+                                     </div>
+                                     <button 
+                                        onClick={fetchAccountData}
+                                        className="size-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all"
+                                     >
+                                        <span className={`material-symbols-outlined text-[16px] ${accountState.isLoading ? 'animate-spin' : ''}`}>refresh</span>
+                                     </button>
+                                 </div>
+
+                                 <div className="mt-6 flex flex-col gap-1">
+                                      <span className="text-3xl font-bold text-white font-mono tracking-tight">
+                                          {accountState.balance?.toLocaleString() ?? '...'}
+                                      </span>
+                                      <span className="text-xs text-white/40 font-medium">Available Pollen</span>
+                                 </div>
+
+                                 <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
+                                      <div className="flex flex-col">
+                                           <span className="text-[10px] text-white/30 uppercase tracking-widest">Est. Images Left</span>
+                                           <span className="text-sm font-bold text-white">~{getEstimatedImagesLeft(accountState.balance)}</span>
+                                      </div>
+                                      <a 
+                                        href="https://enter.pollinations.ai" 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="text-xs font-bold text-primary hover:text-white transition-colors"
+                                      >
+                                          Manage Account
+                                      </a>
+                                 </div>
+                             </div>
+                         ) : (
+                             <div className="text-center py-4 text-white/40 text-xs">
+                                 {accountState.isLoading ? 'Loading Account...' : 'Enter a key below to see account details.'}
+                             </div>
+                         )}
+
                          {/* API Key Input */}
                          <div className="space-y-2">
                              <div className="flex justify-between items-center px-1">
-                                <label className="text-xs font-bold text-white/40 uppercase tracking-widest">Pollinations API Key</label>
+                                <label className="text-xs font-bold text-white/40 uppercase tracking-widest">API Key</label>
                              </div>
                              <div className="relative group">
                                  <input 
                                     type={isApiKeyVisible ? "text" : "password"}
                                     value={settings.apiKey} 
-                                    placeholder="••••••••••••••••"
+                                    placeholder="pk_..."
                                     onChange={(e) => updateSettings({ apiKey: e.target.value })}
                                     className="w-full bg-[#101622] border border-white/10 rounded-xl py-3 pl-4 pr-10 text-sm text-white focus:ring-1 focus:ring-primary focus:border-primary transition-all font-mono placeholder:text-white/20"
                                  />
@@ -173,8 +253,7 @@ export const Preferences: React.FC<PreferencesProps> = ({ settings, updateSettin
                                  </button>
                              </div>
                              <p className="text-[10px] text-white/30 px-1">
-                                Leave empty to use free tier.
-                                <a href="https://enter.pollinations.ai" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline ml-1">Get a key</a>
+                                Supports Pollinations.ai publishable (pk_) and secret (sk_) keys.
                              </p>
                         </div>
 

@@ -89,6 +89,21 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix, 
       });
   };
 
+  const toggleGroupSelection = (items: HistoryItem[]) => {
+      const allIds = items.map(i => i.id);
+      const allSelected = allIds.every(id => selectedIds.includes(id));
+
+      if (allSelected) {
+          // Deselect all in group
+          setSelectedIds(prev => prev.filter(id => !allIds.includes(id)));
+      } else {
+          // Select all in group (unique)
+          setSelectedIds(prev => [...new Set([...prev, ...allIds])]);
+      }
+      
+      if (!isSelectionMode) setIsSelectionMode(true);
+  };
+
   const handleConfirmDelete = () => {
       if (onDelete && selectedIds.length > 0) {
           onDelete(selectedIds);
@@ -175,11 +190,23 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix, 
             )}
 
             <div className="flex flex-col gap-8 py-4">
-                {groupedHistory.map((group) => (
+                {groupedHistory.map((group) => {
+                    const allInGroupSelected = group.items.every(i => selectedIds.includes(i.id));
+                    return (
                     <div key={group.title} className="flex flex-col gap-4">
-                        <h3 className="text-white/50 text-xs font-bold uppercase tracking-widest sticky top-0 bg-background-dark/95 backdrop-blur-md py-3 z-10 border-b border-white/5">
-                            {group.title}
-                        </h3>
+                        <div className="sticky top-0 bg-background-dark/95 backdrop-blur-md py-3 z-10 border-b border-white/5 flex items-center justify-between">
+                            <h3 className="text-white/50 text-xs font-bold uppercase tracking-widest">
+                                {group.title}
+                            </h3>
+                            {(isSelectionMode || selectedIds.length > 0) && (
+                                <button 
+                                    onClick={() => toggleGroupSelection(group.items)}
+                                    className={`px-3 py-1 rounded-full text-[10px] font-bold border transition-colors ${allInGroupSelected ? 'bg-primary border-primary text-white' : 'bg-white/5 border-white/10 text-white/60'}`}
+                                >
+                                    {allInGroupSelected ? 'Deselect Day' : 'Select Day'}
+                                </button>
+                            )}
+                        </div>
                         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 sm:gap-4">
                             {group.items.map((item) => {
                                 const globalIndex = history.findIndex(h => h.id === item.id);
@@ -210,7 +237,7 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix, 
                             })}
                         </div>
                     </div>
-                ))}
+                )})}
             </div>
         </div>
       </div>
@@ -380,12 +407,27 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix, 
                                         {decodeURIComponent(currentFullscreenItem.prompt)}
                                     </div>
                                 </div>
+
+                                {currentFullscreenItem.styleSuffix && (
+                                    <div>
+                                        <h4 className="text-xs font-bold text-purple-400/60 uppercase tracking-widest mb-2">Spice (Added)</h4>
+                                        <div className="text-xs text-white/80 leading-relaxed font-mono bg-purple-500/10 p-3 rounded-xl border border-purple-500/20 select-text">
+                                            {currentFullscreenItem.styleSuffix}
+                                        </div>
+                                    </div>
+                                )}
                                 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest mb-1">Model</h4>
                                         <span className="px-2 py-0.5 rounded bg-white/10 text-xs font-bold text-white uppercase">{currentFullscreenItem.model}</span>
                                     </div>
+                                    {currentFullscreenItem.styleLabel && (
+                                         <div>
+                                            <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest mb-1">Style</h4>
+                                            <span className="px-2 py-0.5 rounded bg-primary/20 text-xs font-bold text-primary border border-primary/20">{currentFullscreenItem.styleLabel}</span>
+                                        </div>
+                                    )}
                                     <div>
                                         <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest mb-1">Seed</h4>
                                         <span className="text-sm text-white font-mono">{currentFullscreenItem.seed}</span>
@@ -393,12 +435,6 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix, 
                                     <div>
                                         <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest mb-1">Size</h4>
                                         <span className="text-sm text-white">{currentFullscreenItem.width} x {currentFullscreenItem.height}</span>
-                                    </div>
-                                    <div>
-                                        <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest mb-1">Enhance</h4>
-                                        <span className={`text-sm font-bold ${currentFullscreenItem.enhance ? 'text-primary' : 'text-white/40'}`}>
-                                            {currentFullscreenItem.enhance ? 'Active' : 'Off'}
-                                        </span>
                                     </div>
                                 </div>
                             </div>
