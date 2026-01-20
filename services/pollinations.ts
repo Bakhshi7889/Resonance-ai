@@ -1,25 +1,29 @@
-
-import { ImageGenerationParams, AccountState } from '../types';
+import { ImageGenerationParams, AccountState, UsageRecord } from '../types';
 
 const BASE_URL = 'https://gen.pollinations.ai';
-export const DEFAULT_KEY = 'pk_3GSNVfV62GUnxKBe';
-
-// Updated cost per image based on new pricing (0.0002 pollen/image)
 const ESTIMATED_IMAGE_COST = 0.0002; 
 
-export const getEffectiveKey = (customKey?: string) => {
-    return (customKey && customKey.trim().length > 0) ? customKey : DEFAULT_KEY;
+// The system core key used for out-of-the-box functionality
+export const HIDDEN_DEFAULT_KEY = 'pk_3GSNVfV62GUnxKBe';
+
+/**
+ * Resolves the active API key with strict fallback.
+ */
+export const getEffectiveKey = (userKey?: string) => {
+    const trimmed = userKey?.trim();
+    if (trimmed && trimmed.length > 5) return trimmed;
+    return HIDDEN_DEFAULT_KEY;
 };
 
-export const generateImageUrl = (params: ImageGenerationParams & { guidance?: number }): string => {
+export const generateImageUrl = (params: ImageGenerationParams): string => {
   const { 
     prompt, model, width, height, seed, enhance, nologo, 
-    negativePrompt, apiKey, safe, private: privateMode, transparent,
-    quality, guidance
+    negative_prompt, private: privateMode,
+    quality, apiKey: userKey
   } = params;
   
   const encodedPrompt = encodeURIComponent(prompt);
-  const key = getEffectiveKey(apiKey);
+  const key = getEffectiveKey(userKey);
   
   const queryObj: any = {
     model,
@@ -29,82 +33,68 @@ export const generateImageUrl = (params: ImageGenerationParams & { guidance?: nu
     nologo: nologo.toString(),
     private: privateMode.toString(),
     key: key,
+    safe: 'true'
   };
 
-  // Only append if true/exists
   if (enhance) queryObj.enhance = 'true';
-  if (safe) queryObj.safe = 'true';
-  if (transparent) queryObj.transparent = 'true';
   if (quality) queryObj.quality = quality;
   
-  if (guidance && guidance !== 7.5) { 
-      queryObj.guidance_scale = guidance.toString();
-  }
-
-  if (negativePrompt) {
-    queryObj.negative_prompt = negativePrompt;
+  if (negative_prompt) {
+    queryObj.negative_prompt = negative_prompt;
   }
 
   const queryParams = new URLSearchParams(queryObj);
-
   return `${BASE_URL}/image/${encodedPrompt}?${queryParams.toString()}`;
 };
 
-export const getRandomSeed = () => Math.floor(Math.random() * 1000000);
+export const getRandomSeed = () => Math.floor(Math.random() * 2147483647);
 
-export const getAccountDetails = async (customKey?: string): Promise<AccountState> => {
-    const apiKey = getEffectiveKey(customKey);
-    
+export const getAccountDetails = async (userKey?: string): Promise<AccountState> => {
+    const apiKey = getEffectiveKey(userKey);
     try {
-        const headers = {
-            'Authorization': `Bearer ${apiKey}`
+        const queryParams = `?key=${apiKey}`;
+        
+        const [profileRes, balanceRes, usageRes] = await Promise.all([
+            fetch(`${BASE_URL}/account/profile${queryParams}`),
+            fetch(`${BASE_URL}/account/balance${queryParams}`),
+            fetch(`${BASE_URL}/account/usage${queryParams}&limit=10`)
+        ]);
+        
+        const profile = profileRes.ok ? await profileRes.json() : null;
+        const balanceData = balanceRes.ok ? await balanceRes.json() : { balance: 0 };
+        const usageData = usageRes.ok ? await usageRes.json() : { usage: [] };
+
+        return { 
+            profile, 
+            balance: balanceData.balance, 
+            usage: Array.isArray(usageData.usage) ? usageData.usage : [],
+            isLoading: false, 
+            error: null 
         };
-
-        // Fetch Profile
-        const profileReq = fetch(`${BASE_URL}/account/profile`, { headers });
-        // Fetch Balance
-        const balanceReq = fetch(`${BASE_URL}/account/balance`, { headers });
-
-        const [profileRes, balanceRes] = await Promise.all([profileReq, balanceReq]);
-
-        if (!profileRes.ok || !balanceRes.ok) {
-            throw new Error('Failed to fetch account data');
-        }
-
-        const profile = await profileRes.json();
-        const balanceData = await balanceRes.json();
-
-        return {
-            profile: profile,
-            balance: balanceData.balance,
-            isLoading: false,
-            error: null
-        };
-
     } catch (error: any) {
-        return {
-            profile: null,
-            balance: null,
-            isLoading: false,
-            error: error.message || 'Unknown error'
+        return { 
+            profile: null, 
+            balance: null, 
+            usage: [],
+            isLoading: false, 
+            error: error.message || 'Sync Error' 
         };
     }
 };
 
 export const getEstimatedImagesLeft = (balance: number | null): string => {
-    if (balance === null || balance === undefined) return '...';
-    // If balance is huge (e.g., unlimited or effectively infinite for display purposes)
-    if (balance > 100000000) return 'Unlimited';
-    
+    if (balance === null || balance === undefined || balance === 0) return '0';
     const count = Math.floor(balance / ESTIMATED_IMAGE_COST);
-    
-    // Format large numbers (e.g. 50k, 1.2M)
-    if (count >= 1000000) {
-        return `${(count / 1000000).toFixed(1)}M`;
-    }
-    if (count >= 1000) {
-        return `${(count / 1000).toFixed(0)}k`;
-    }
-    
+    if (count >= 1000) return `${(count / 1000).toFixed(0)}k`;
     return count.toString();
+};
+
+export const getAuthUrl = (redirectUrl: string) => {
+    const params = new URLSearchParams({
+        redirect_url: redirectUrl,
+        permissions: 'profile,balance,usage',
+        models: 'zimage',
+        expiry: '30'
+    });
+    return `https://enter.pollinations.ai/authorize?${params.toString()}`;
 };

@@ -1,8 +1,7 @@
-
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { AppSettings, AVAILABLE_MODELS, MODEL_STYLES, AppRoute, AccountState } from '../types';
-import { DEFAULT_KEY, getAccountDetails, getEstimatedImagesLeft } from '../services/pollinations';
+import React, { useState, useEffect, useCallback } from 'react';
+import { motion } from 'framer-motion';
+import { AppSettings, AppRoute, AccountState } from '../types';
+import { getAccountDetails, getEstimatedImagesLeft, getAuthUrl, HIDDEN_DEFAULT_KEY } from '../services/pollinations';
 
 interface PreferencesProps {
   settings: AppSettings;
@@ -11,359 +10,140 @@ interface PreferencesProps {
 }
 
 export const Preferences: React.FC<PreferencesProps> = ({ settings, updateSettings, onNavigate }) => {
-  const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);
-  const [unlockCode, setUnlockCode] = useState('');
-  const [showUnlockSuccess, setShowUnlockSuccess] = useState(false);
-  const [accountState, setAccountState] = useState<AccountState>({
-      profile: null,
-      balance: null,
-      isLoading: false,
-      error: null
-  });
+  const [accountState, setAccountState] = useState<AccountState>({ profile: null, balance: null, usage: [], isLoading: false, error: null });
 
-  useEffect(() => {
-      fetchAccountData();
+  const fetchDetails = useCallback(async () => {
+    setAccountState(prev => ({ ...prev, isLoading: true }));
+    const data = await getAccountDetails(settings.apiKey);
+    setAccountState(data);
   }, [settings.apiKey]);
 
-  const fetchAccountData = async () => {
-      setAccountState(prev => ({ ...prev, isLoading: true }));
-      const data = await getAccountDetails(settings.apiKey);
-      setAccountState(data);
+  useEffect(() => {
+    fetchDetails();
+    const timer = setTimeout(fetchDetails, 600);
+    return () => clearTimeout(timer);
+  }, [fetchDetails]);
+
+  const handleConnectExternal = () => {
+      // User authorization via Pollinations
+      window.location.href = getAuthUrl(window.location.origin + window.location.pathname);
   };
 
-  // Filter styles for current model
-  const availableStyles = MODEL_STYLES.filter(s => s.model === settings.model);
-
-  // Helper to append key to model preview images to avoid rate limits
-  const getModelImage = (url: string) => {
-    // Use user key or fallback to default key
-    const effectiveKey = (settings.apiKey && settings.apiKey.trim().length > 0) 
-        ? settings.apiKey.trim() 
-        : DEFAULT_KEY;
-        
-    return `${url}&key=${effectiveKey}`;
+  const handleOpenPollinations = () => {
+      window.open('https://enter.pollinations.ai', '_blank');
   };
 
-  const handleUnlock = () => {
-      if (unlockCode === '6969') {
-          updateSettings({ isUnlocked: true });
-          setShowUnlockSuccess(true);
-          setUnlockCode('');
-          setTimeout(() => setShowUnlockSuccess(false), 3000);
-      }
-  };
-
-  const handleRelock = () => {
-      updateSettings({ isUnlocked: false, safe: true });
-  };
+  const isManual = settings.apiKey && settings.apiKey.trim().length > 5;
 
   return (
-    <motion.div 
-      className="flex flex-col h-full bg-[#05050A] text-white w-full"
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ type: "spring", damping: 25, stiffness: 200 }}
-    >
-      <div className="relative z-10 flex flex-col h-full w-full pb-24 max-w-3xl mx-auto">
-        {/* Top App Bar */}
-        <header className="flex items-center justify-between px-6 pt-8 pb-4">
-            <button 
-                onClick={() => onNavigate(AppRoute.GENERATOR)}
-                className="flex items-center justify-center size-10 rounded-full bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/10 transition-colors"
-            >
-                <span className="material-symbols-outlined text-white text-[20px]">arrow_back</span>
+    <div className="flex flex-col h-full bg-black text-white w-full overflow-y-auto no-scrollbar">
+      <div className="max-w-2xl mx-auto w-full px-8 pt-12 pb-32 space-y-12">
+        <header className="flex items-center justify-between">
+            <button onClick={() => onNavigate(AppRoute.GENERATOR)} className="size-11 rounded-full bg-white/5 backdrop-blur-[40px] border-[0.5px] border-white/12 flex items-center justify-center text-white/50 active:scale-95 transition-all">
+              <span className="material-symbols-outlined">arrow_back</span>
             </button>
-            <h1 className="text-lg font-bold tracking-wide text-white/90">Settings</h1>
-            <div className="size-10" /> 
+            <h1 className="text-xl font-black uppercase tracking-tighter logo-text">Resonance</h1>
+            <div className="size-11" />
         </header>
 
-        {/* Scrollable Area */}
-        <div className="flex-1 overflow-y-auto no-scrollbar px-6 space-y-6 pt-2">
-            
-            {/* Fluid Settings Accordions */}
-            <div className="space-y-4">
-                
-                {/* Section 1: Default Configuration */}
-                <details className="group open:bg-white/[0.03] open:ring-1 open:ring-white/10 transition-all duration-300 rounded-[2rem]" open>
-                    <summary className="flex items-center justify-between w-full p-1 pl-6 pr-2 cursor-pointer bg-glass-surface backdrop-blur-lg border border-white/10 rounded-full h-16 hover:bg-white/10 transition-colors list-none select-none">
-                        <div className="flex items-center gap-4">
-                            <div className="flex items-center justify-center size-10 rounded-full bg-primary/20 text-primary">
-                                <span className="material-symbols-outlined text-[20px]">tune</span>
-                            </div>
-                            <span className="text-base font-medium text-white/90">Global Defaults</span>
-                        </div>
-                        <div className="size-10 rounded-full bg-white/5 flex items-center justify-center group-open:rotate-180 transition-transform duration-300">
-                            <span className="material-symbols-outlined text-white/50 text-[24px]">keyboard_arrow_down</span>
-                        </div>
-                    </summary>
-                    <div className="p-6 pt-2 space-y-6">
-                         
-                         {/* Model Selector */}
-                         <div className="space-y-3">
-                            <p className="text-xs font-bold text-white/40 uppercase tracking-widest ml-2">Default Model</p>
-                            <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
-                                {AVAILABLE_MODELS.map((model) => (
-                                    <div 
-                                        key={model.id}
-                                        onClick={() => {
-                                            updateSettings({ model: model.id, activeStyle: '' });
-                                        }}
-                                        className={`shrink-0 flex flex-col gap-2 w-20 cursor-pointer ${settings.model === model.id ? 'opacity-100' : 'opacity-50 hover:opacity-100'}`}
-                                    >
-                                        <div className={`aspect-square rounded-2xl overflow-hidden border-2 transition-all ${settings.model === model.id ? 'border-primary shadow-glow' : 'border-white/10'}`}>
-                                            <img src={getModelImage(model.image)} className="w-full h-full object-cover" alt={model.name} />
-                                        </div>
-                                        <p className="text-[10px] text-center font-bold truncate">{model.name.split(' ')[0]}</p>
-                                    </div>
-                                ))}
-                            </div>
-                         </div>
-
-                         {/* Style Selector */}
-                         <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <p className="text-xs font-bold text-white/40 uppercase tracking-widest ml-2">Default Style</p>
-                                <button 
-                                    onClick={() => onNavigate(AppRoute.STYLE_LIBRARY)}
-                                    className="text-xs font-bold text-primary hover:text-white transition-colors flex items-center gap-1 pr-2"
-                                >
-                                    Open Studio <span className="material-symbols-outlined text-[14px]">open_in_new</span>
-                                </button>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                <button
-                                    onClick={() => updateSettings({ activeStyle: '' })}
-                                    className={`px-3 py-1.5 rounded-full border text-xs font-bold transition-all ${settings.activeStyle === '' ? 'bg-white text-black border-white' : 'bg-transparent border-white/20 text-white/60 hover:border-white/40'}`}
-                                >
-                                    None
-                                </button>
-                                {availableStyles.map((style) => (
-                                    <button
-                                        key={style.id}
-                                        onClick={() => updateSettings({ activeStyle: style.id })}
-                                        className={`px-3 py-1.5 rounded-full border text-xs font-bold transition-all ${settings.activeStyle === style.id ? 'bg-primary border-primary text-white shadow-glow' : 'bg-transparent border-white/20 text-white/60 hover:border-white/40'}`}
-                                    >
-                                        {style.label}
-                                    </button>
-                                ))}
-                            </div>
-                         </div>
-                    </div>
-                </details>
-
-                {/* Section 2: Subscription & API */}
-                <details className="group open:bg-white/[0.03] open:ring-1 open:ring-white/10 transition-all duration-300 rounded-[2rem]" open>
-                    <summary className="flex items-center justify-between w-full p-1 pl-6 pr-2 cursor-pointer bg-glass-surface backdrop-blur-lg border border-white/10 rounded-full h-16 hover:bg-white/10 transition-colors list-none select-none">
-                        <div className="flex items-center gap-4">
-                            <div className="flex items-center justify-center size-10 rounded-full bg-emerald-500/20 text-emerald-400">
-                                <span className="material-symbols-outlined text-[20px]">key</span>
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-base font-medium text-white/90">API Account</span>
-                                {accountState.balance !== null && (
-                                    <span className="text-[10px] text-emerald-400 font-bold tracking-wider">
-                                        {Math.floor(accountState.balance).toLocaleString()} POLLEN
-                                    </span>
+        <section className="space-y-4">
+            <p className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-2">BYOP • Access Core</p>
+            <div className="bg-white/[0.03] backdrop-blur-[40px] rounded-[3rem] p-8 border-[0.5px] border-white/15 space-y-8">
+                <div className="flex flex-col gap-4">
+                    <div className="flex justify-between items-center px-1">
+                        <div className="flex flex-col">
+                            <label className="text-[10px] text-white/30 uppercase font-black tracking-widest">Synthetic Key</label>
+                            <div className="mt-1.5">
+                                {!isManual ? (
+                                    <span className="px-2 py-0.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-[8px] font-black uppercase tracking-widest text-blue-400">CORE ACTIVE</span>
+                                ) : (
+                                    <span className="px-2 py-0.5 rounded-lg bg-primary/10 border border-primary/20 text-[8px] font-black uppercase tracking-widest text-primary">MANUAL OVERRIDE</span>
                                 )}
                             </div>
                         </div>
-                        <div className="size-10 rounded-full bg-white/5 flex items-center justify-center group-open:rotate-180 transition-transform duration-300">
-                            <span className="material-symbols-outlined text-white/50 text-[24px]">keyboard_arrow_down</span>
-                        </div>
-                    </summary>
-                    <div className="p-6 pt-4 space-y-6">
-                         
-                         {/* Account Card */}
-                         {accountState.profile ? (
-                             <div className="bg-gradient-to-br from-[#1c1c24] to-[#13131a] rounded-xl border border-white/10 p-4 relative overflow-hidden group">
-                                 {/* Decorative Glow */}
-                                 <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
-                                 
-                                 <div className="flex items-start justify-between relative z-10">
-                                     <div className="flex flex-col">
-                                         <span className="text-xs text-white/40 font-bold uppercase tracking-wider mb-1">Tier</span>
-                                         <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md border ${
-                                             accountState.profile.tier === 'nectar' ? 'bg-amber-500/20 border-amber-500/30 text-amber-400' :
-                                             accountState.profile.tier === 'flower' ? 'bg-pink-500/20 border-pink-500/30 text-pink-400' :
-                                             'bg-blue-500/20 border-blue-500/30 text-blue-400'
-                                         }`}>
-                                            <span className="material-symbols-outlined text-[14px]">
-                                                {accountState.profile.tier === 'nectar' ? 'diamond' : 'local_florist'}
-                                            </span>
-                                            <span className="text-xs font-bold capitalize">{accountState.profile.tier || 'Seed'}</span>
-                                         </div>
-                                     </div>
-                                     <button 
-                                        onClick={fetchAccountData}
-                                        className="size-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all"
-                                     >
-                                        <span className={`material-symbols-outlined text-[16px] ${accountState.isLoading ? 'animate-spin' : ''}`}>refresh</span>
-                                     </button>
-                                 </div>
-
-                                 <div className="mt-6 flex flex-col gap-1">
-                                      <span className="text-3xl font-bold text-white font-mono tracking-tight">
-                                          {accountState.balance?.toLocaleString() ?? '...'}
-                                      </span>
-                                      <span className="text-xs text-white/40 font-medium">Available Pollen</span>
-                                 </div>
-
-                                 <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
-                                      <div className="flex flex-col">
-                                           <span className="text-[10px] text-white/30 uppercase tracking-widest">Est. Images Left</span>
-                                           <span className="text-sm font-bold text-white">~{getEstimatedImagesLeft(accountState.balance)}</span>
-                                      </div>
-                                      <a 
-                                        href="https://enter.pollinations.ai" 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="text-xs font-bold text-primary hover:text-white transition-colors"
-                                      >
-                                          Manage Account
-                                      </a>
-                                 </div>
-                             </div>
-                         ) : (
-                             <div className="text-center py-4 text-white/40 text-xs">
-                                 {accountState.isLoading ? 'Loading Account...' : 'Enter a key below to see account details.'}
-                             </div>
-                         )}
-
-                         {/* API Key Input */}
-                         <div className="space-y-2">
-                             <div className="flex justify-between items-center px-1">
-                                <label className="text-xs font-bold text-white/40 uppercase tracking-widest">API Key</label>
-                             </div>
-                             <div className="relative group">
-                                 <input 
-                                    type={isApiKeyVisible ? "text" : "password"}
-                                    value={settings.apiKey} 
-                                    placeholder="pk_..."
-                                    onChange={(e) => updateSettings({ apiKey: e.target.value })}
-                                    className="w-full bg-[#101622] border border-white/10 rounded-xl py-3 pl-4 pr-10 text-sm text-white focus:ring-1 focus:ring-primary focus:border-primary transition-all font-mono placeholder:text-white/20"
-                                 />
-                                 <button 
-                                    onClick={() => setIsApiKeyVisible(!isApiKeyVisible)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white transition-colors"
-                                 >
-                                     <span className="material-symbols-outlined text-[18px]">
-                                         {isApiKeyVisible ? 'visibility_off' : 'visibility'}
-                                     </span>
-                                 </button>
-                             </div>
-                             <p className="text-[10px] text-white/30 px-1">
-                                Supports Pollinations.ai publishable (pk_) and secret (sk_) keys.
-                             </p>
-                        </div>
-
-                         {/* Access Code Field - Visible Logic */}
-                         <div className="space-y-2 pt-2 border-t border-white/5">
-                             <div className="flex items-center justify-between">
-                                 <label className="text-xs font-bold text-white/20 uppercase tracking-widest px-1">Unlock Full Potential</label>
-                                 {settings.isUnlocked && (
-                                     <span className="text-[10px] text-green-400 font-bold bg-green-400/10 border border-green-400/20 px-2 py-0.5 rounded-full">UNLOCKED</span>
-                                 )}
-                             </div>
-                             
-                             {!settings.isUnlocked ? (
-                                 <div className="flex gap-2">
-                                     <input 
-                                        type="text" 
-                                        inputMode="numeric"
-                                        pattern="[0-9]*"
-                                        value={unlockCode}
-                                        onChange={(e) => setUnlockCode(e.target.value)}
-                                        placeholder="Enter Access Code"
-                                        className="flex-1 bg-[#101622] border border-white/10 rounded-xl py-2 px-4 text-sm text-white focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all placeholder:text-white/10"
-                                     />
-                                     <button 
-                                        onClick={handleUnlock}
-                                        className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-xs font-bold text-white/60 hover:text-white transition-all"
-                                     >
-                                        Unlock
-                                     </button>
-                                 </div>
-                             ) : (
-                                 <div className="flex items-center gap-4 bg-white/5 rounded-xl p-3 border border-white/5">
-                                     <div className="flex-1">
-                                         <p className="text-sm text-white/80 font-medium">Restrictions Removed</p>
-                                         <p className="text-[10px] text-white/40">App is running in unrestricted mode.</p>
-                                     </div>
-                                     <button 
-                                        onClick={handleRelock}
-                                        className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-lg text-xs font-bold text-red-400 transition-all"
-                                     >
-                                        Re-Lock
-                                     </button>
-                                 </div>
-                             )}
-                         </div>
-
-                         <AnimatePresence>
-                             {showUnlockSuccess && (
-                                 <motion.div 
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: 'auto' }}
-                                    exit={{ opacity: 0, height: 0 }}
-                                    className="text-center text-xs font-bold text-purple-400"
-                                 >
-                                     Full Potential Unlocked. Filters Removed.
-                                 </motion.div>
-                             )}
-                         </AnimatePresence>
+                        <button 
+                            onClick={handleOpenPollinations}
+                            className="text-[9px] text-primary font-black uppercase tracking-widest flex items-center gap-1.5 hover:underline"
+                        >
+                            GET KEY <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                        </button>
                     </div>
-                </details>
-            </div>
-
-            {/* Sign Out */}
-            <button 
-                onClick={() => onNavigate(AppRoute.GENERATOR)}
-                className="w-full mt-8 p-1 pl-6 pr-2 flex items-center justify-between bg-red-500/10 border border-red-500/20 rounded-full h-16 hover:bg-red-500/20 transition-colors group"
-            >
-                <span className="text-red-400 font-medium ml-2 group-hover:ml-4 transition-all">Back to Studio</span>
-                <div className="size-10 rounded-full bg-red-500/20 flex items-center justify-center text-red-400">
-                    <span className="material-symbols-outlined text-[20px]">logout</span>
+                    <div className="relative">
+                        <input 
+                            type="password"
+                            value={settings.apiKey}
+                            onChange={(e) => updateSettings({ apiKey: e.target.value })}
+                            placeholder={!isManual ? "pk_3GSNVF... (System Active)" : "Synthetic Token (pk_...)"}
+                            className="w-full bg-white/[0.03] border border-white/10 rounded-2xl px-6 py-4 text-sm font-mono text-white focus:ring-1 focus:ring-primary/40 focus:border-primary/40 transition-all placeholder:text-white/10"
+                        />
+                    </div>
                 </div>
-            </button>
 
-            {/* Powered By */}
-            <div className="flex flex-col items-center justify-center gap-2 pb-32 pt-6 opacity-60 hover:opacity-100 transition-opacity">
-                 <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest">Powered by</p>
-                 <a 
-                    href="https://enter.pollinations.ai" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 transition-all group"
-                >
-                    <span className="text-xs font-bold text-white group-hover:text-primary transition-colors">pollinations.ai</span>
-                    <span className="material-symbols-outlined text-[12px] text-white/50 group-hover:text-primary transition-colors">open_in_new</span>
-                 </a>
+                <div className="flex flex-col gap-8 pt-8 border-t border-white/5">
+                    <div className="flex justify-between items-end px-1">
+                        <div className="flex flex-col">
+                          <span className="text-4xl font-black font-mono tracking-tighter text-blue-400">
+                            ${accountState.balance?.toFixed(4) || '0.0000'}
+                          </span>
+                          <span className="text-[9px] text-white/30 uppercase font-black tracking-[0.2em] mt-2">Available Credits</span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                          <span className="text-xl font-black text-white tracking-tighter">~{getEstimatedImagesLeft(accountState.balance)}</span>
+                          <span className="text-[9px] text-white/30 uppercase font-black tracking-widest mt-1">Render Potential</span>
+                        </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                        <button 
+                            onClick={handleConnectExternal}
+                            className="py-4 rounded-2xl bg-white text-black text-[10px] font-black uppercase tracking-[0.2em] shadow-liquid active:scale-95 transition-all"
+                        >
+                            BYOP SYNC
+                        </button>
+                        <button 
+                            onClick={fetchDetails}
+                            className="py-4 rounded-2xl bg-white/10 text-white text-[10px] font-black uppercase tracking-[0.2em] border border-white/10 active:scale-95 transition-all"
+                        >
+                            FORCE SYNC
+                        </button>
+                    </div>
+                </div>
             </div>
-        </div>
+        </section>
 
-        {/* Floating Glass Dock - Matches Design */}
-        <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full px-2 py-2 flex gap-1 shadow-2xl z-50">
-            <button 
-                onClick={() => onNavigate(AppRoute.GENERATOR)}
-                className="p-3 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-all"
-            >
-                <span className="material-symbols-outlined block text-[24px]">home</span>
-            </button>
-            <button 
-                onClick={() => onNavigate(AppRoute.HISTORY)}
-                className="p-3 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-all"
-            >
-                <span className="material-symbols-outlined block text-[24px]">grid_view</span>
-            </button>
-            <div className="w-px h-6 bg-white/10 my-auto mx-1"></div>
-            <button 
-                className="p-3 rounded-full bg-primary/20 text-primary shadow-[0_0_15px_rgba(43,108,238,0.3)] border border-primary/30 transition-all"
-            >
-                <span className="material-symbols-outlined block text-[24px]">settings</span>
-            </button>
-        </nav>
+        <section className="space-y-4">
+            <p className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-2">Platform Matrix</p>
+            <div className="bg-white/[0.03] backdrop-blur-[40px] rounded-[2.5rem] p-6 border-[0.5px] border-white/12 space-y-4">
+                <div className="flex items-center justify-between px-2">
+                    <div className="flex flex-col">
+                        <span className="text-sm font-bold text-white">Style Studio</span>
+                        <span className="text-[9px] text-white/30 uppercase font-black tracking-widest">Generate Custom Presets</span>
+                    </div>
+                    <button 
+                        onClick={() => updateSettings({ enhance: !settings.enhance })}
+                        className="text-[10px] font-black text-primary uppercase tracking-widest bg-primary/10 px-4 py-2 rounded-xl border border-primary/20"
+                    >
+                        Active
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <section className="space-y-4">
+            <p className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-2">Execution Stream</p>
+            <div className="bg-white/[0.03] backdrop-blur-[40px] rounded-[2.5rem] p-6 border-[0.5px] border-white/12 space-y-3">
+                {accountState.usage && accountState.usage.length > 0 ? accountState.usage.map((entry, i) => (
+                    <div key={i} className="flex items-center justify-between py-3.5 px-3 border-b border-white/5 last:border-0 hover:bg-white/[0.04] rounded-2xl transition-all">
+                      <div className="flex flex-col">
+                        <span className="text-xs font-black text-white/80 uppercase tracking-tighter">{entry.model || 'Synthetic'}</span>
+                        <span className="text-[9px] text-white/20 uppercase font-black tracking-tighter mt-1">{new Date(entry.timestamp).toLocaleTimeString()}</span>
+                      </div>
+                      <span className="text-xs font-mono font-black text-red-500/80">-${entry.cost_usd.toFixed(4)}</span>
+                    </div>
+                )) : <p className="text-[10px] text-white/10 text-center py-10 uppercase font-black tracking-[0.4em]">No Telemetry Logs</p>}
+            </div>
+        </section>
       </div>
-    </motion.div>
+    </div>
   );
 };

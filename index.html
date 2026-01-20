@@ -7,10 +7,10 @@
     
     <!-- PWA Settings -->
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#101622" />
+    <meta name="theme-color" content="#000000" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <link rel="apple-touch-icon" href="https://ui-avatars.com/api/?name=R&background=2b6cee&color=fff&size=192&font-size=0.6&rounded=true&length=1">
+    <link rel="apple-touch-icon" href="https://ui-avatars.com/api/?name=R&background=000&color=fff&size=192&font-size=0.6&rounded=true&length=1">
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -26,48 +26,33 @@
         theme: {
           extend: {
             colors: {
-              primary: "#2b6cee",
-              "background-light": "#f6f6f8",
-              "background-dark": "#101622",
-              "surface-dark": "#192233",
-              "surface-highlight": "#2a3449",
+              primary: "#3b82f6",
+              "background-pure": "#000000",
+              "liquid-glass": "rgba(255, 255, 255, 0.05)",
+              "liquid-border": "rgba(255, 255, 255, 0.12)",
             },
             fontFamily: {
               display: ["Space Grotesk", "sans-serif"],
             },
-            borderRadius: {
-              DEFAULT: "1rem",
-              lg: "1.5rem",
-              xl: "2rem",
-              "2xl": "2.5rem",
-              "3xl": "3rem",
-            },
             boxShadow: {
-              glow: "0 0 20px -5px rgba(43, 108, 238, 0.4)",
-              glass: "0 8px 32px 0 rgba(31, 38, 135, 0.37)",
-              liquid: "0 10px 40px -10px rgba(0,0,0,0.5)",
-              "inner-glow": "inset 0 0 20px rgba(255, 255, 255, 0.05)",
-            },
-            backgroundImage: {
-              "glass-gradient": "linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%)",
-              "glass-gradient-active": "linear-gradient(180deg, rgba(43, 108, 238, 0.15) 0%, rgba(43, 108, 238, 0.05) 100%)",
-              "glass-surface": "linear-gradient(145deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.00) 100%)",
-              "glow-radial": "radial-gradient(circle at center, rgba(43, 108, 238, 0.15) 0%, transparent 70%)",
+              glow: "0 0 20px -5px rgba(59, 130, 246, 0.3)",
+              glass: "0 8px 32px 0 rgba(0, 0, 0, 0.8)",
+              liquid: "0 10px 40px -10px rgba(0,0,0,0.8)",
             },
             animation: {
                 'spin-slow': 'spin 3s linear infinite',
                 'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                 'float': 'float 6s ease-in-out infinite',
-                'breathing': 'breathing 4s ease-in-out infinite',
+                'border-spin': 'border-spin 4s linear infinite',
             },
             keyframes: {
                 float: {
                     '0%, 100%': { transform: 'translateY(0)' },
                     '50%': { transform: 'translateY(-10px)' },
                 },
-                breathing: {
-                    '0%, 100%': { transform: 'scale(1)', opacity: '0.3' },
-                    '50%': { transform: 'scale(1.1)', opacity: '0.6' },
+                'border-spin': {
+                    '0%': { transform: 'rotate(0deg)' },
+                    '100%': { transform: 'rotate(360deg)' }
                 }
             }
           },
@@ -76,11 +61,11 @@
     </script>
     <style>
       body {
-        background-color: #101622;
+        background-color: #000000;
         color: white;
         -webkit-tap-highlight-color: transparent;
+        overflow-x: hidden;
       }
-      /* Hide scrollbar */
       .no-scrollbar::-webkit-scrollbar {
         display: none;
       }
@@ -89,57 +74,55 @@
         scrollbar-width: none;
       }
       .glass-panel {
-        background: rgba(25, 34, 51, 0.6);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.06);
+        backdrop-filter: blur(40px);
+        -webkit-backdrop-filter: blur(40px);
+        border: 0.5px solid rgba(255, 255, 255, 0.15);
+        box-shadow: inset 0 0.5px 1px rgba(255, 255, 255, 0.1);
       }
-      /* Material Symbols Setup */
       .material-symbols-outlined {
-        font-family: 'Material Symbols Outlined'; /* Essential for rendering */
+        font-family: 'Material Symbols Outlined';
         font-weight: normal;
-        font-style: normal;
-        font-size: 24px;
-        line-height: 1;
-        letter-spacing: normal;
-        text-transform: none;
-        display: inline-block;
-        white-space: nowrap;
-        word-wrap: normal;
-        direction: ltr;
-        -webkit-font-feature-settings: 'liga';
-        -webkit-font-smoothing: antialiased;
-        font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        font-variation-settings: 'FILL' 1, 'wght' 200, 'GRAD' 0, 'opsz' 24;
       }
-      input[type="range"] {
-        -webkit-appearance: none;
-        width: 100%;
-        background: transparent;
+      .logo-text {
+        letter-spacing: -0.05em;
       }
-      input[type="range"]::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        height: 20px;
-        width: 20px;
-        border-radius: 50%;
-        background: #ffffff;
-        cursor: pointer;
-        margin-top: -8px;
-        box-shadow: 0 0 10px rgba(0,0,0,0.5);
-      }
-      input[type="range"]::-webkit-slider-runnable-track {
-        width: 100%;
-        height: 4px;
-        cursor: pointer;
-        background: rgba(255,255,255,0.2);
-        border-radius: 999px;
+      ::placeholder {
+        color: rgba(255, 255, 255, 0.25) !important;
       }
       
-      /* Summary marker removal */
-      details > summary {
-          list-style: none;
+      /* Liquid border for Island */
+      .processing-border {
+        position: relative;
+        z-index: 0;
+        overflow: hidden;
       }
-      details > summary::-webkit-details-marker {
-          display: none;
+      .processing-border::before {
+        content: '';
+        position: absolute;
+        z-index: -1;
+        left: -50%;
+        top: -50%;
+        width: 200%;
+        height: 200%;
+        background-color: transparent;
+        background-repeat: no-repeat;
+        background-size: 50% 50%, 50% 50%;
+        background-position: 0 0, 100% 0, 100% 100%, 0 100%;
+        background-image: conic-gradient(from 0deg, transparent, #3b82f6, transparent);
+        animation: border-spin 4s linear infinite;
+      }
+      .processing-border::after {
+        content: '';
+        position: absolute;
+        z-index: -1;
+        left: 2px;
+        top: 2px;
+        width: calc(100% - 4px);
+        height: calc(100% - 4px);
+        background: #000;
+        border-radius: inherit;
       }
     </style>
   <script type="importmap">

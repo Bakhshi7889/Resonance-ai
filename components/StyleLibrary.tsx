@@ -3,7 +3,8 @@ import React, { useState, useEffect, memo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppRoute, MODEL_STYLES, AppSettings } from '../types';
 import { Header } from './Header';
-import { DEFAULT_KEY, getRandomSeed } from '../services/pollinations';
+// Fix: Removed non-existent DEFAULT_KEY and imported getEffectiveKey
+import { getRandomSeed, getEffectiveKey as getServiceKey } from '../services/pollinations';
 
 interface StyleLibraryProps {
   onNavigate: (route: AppRoute) => void;
@@ -37,7 +38,6 @@ const StyleCard = memo(({
 
     useEffect(() => {
         // Reset local load state when URL changes to trigger animation
-        // We do this check to ensure we aren't resetting if it's the exact same URL (re-render)
         setIsImgLoaded(false); 
     }, [currentUrl]);
 
@@ -123,7 +123,7 @@ const StyleCard = memo(({
             <div className="p-4 border-t border-white/5 bg-white/[0.02]">
                 <div className="flex items-center justify-between mb-1.5">
                     <span className="text-white text-sm font-bold truncate">{style.label}</span>
-                    <span className="text-[9px] uppercase font-bold tracking-wider text-white/30 px-1.5 py-0.5 rounded bg-white/5 border border-white/5">{style.model}</span>
+                    <span className="text-[9px] uppercase font-bold tracking-wider text-white/30 px-1.5 py-0.5 rounded bg-white/5 border border-white/5">{style.category}</span>
                 </div>
                 <div className="flex items-center justify-between">
                     <span className="text-[10px] font-mono text-white/40 truncate max-w-[100px]">
@@ -165,8 +165,9 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = ({ onNavigate, settings
     }
   }, [generationStates]);
 
+  // Fix: Use imported getServiceKey instead of non-existent DEFAULT_KEY
   const getEffectiveKey = () => {
-      return (settings.apiKey && settings.apiKey.trim().length > 0) ? settings.apiKey.trim() : DEFAULT_KEY;
+      return (settings.apiKey && settings.apiKey.trim().length > 0) ? settings.apiKey.trim() : getServiceKey();
   };
 
   const generateStyle = useCallback((styleId: string, originalUrl: string) => {
@@ -242,15 +243,36 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = ({ onNavigate, settings
         const response = await fetch(url);
         const blob = await response.blob();
         
-        // Clipboard API requires standard MIME types
-        const item = new ClipboardItem({ [blob.type]: blob });
+        // Convert to PNG via Canvas to bypass Clipboard API restriction on JPEG
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.src = URL.createObjectURL(blob);
+        
+        await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+        });
+
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error("Canvas failure");
+        ctx.drawImage(img, 0, 0);
+        
+        const pngBlob = await new Promise<Blob>((resolve, reject) => {
+            canvas.toBlob(b => b ? resolve(b) : reject("PNG conversion failed"), 'image/png');
+        });
+
+        const item = new ClipboardItem({ [pngBlob.type]: pngBlob });
         await navigator.clipboard.write([item]);
+        URL.revokeObjectURL(img.src);
         
         setCopiedId(`${id}-img`);
         setTimeout(() => setCopiedId(null), 2000);
     } catch (e) {
         console.error("Copy failed", e);
-        // Fallback to URL copy if image copy fails (e.g. browser restrictions)
+        // Fallback to URL copy
         handleCopyUrl(url, id);
     }
   }, [handleCopyUrl]);
@@ -261,7 +283,7 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = ({ onNavigate, settings
         const state = generationStates[style.id];
         return {
             id: style.id,
-            model: style.model,
+            category: style.category,
             label: style.label,
             image: state?.url || style.image, // Use new URL if generated
             suffix: style.suffix

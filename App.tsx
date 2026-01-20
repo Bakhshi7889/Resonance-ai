@@ -1,55 +1,40 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Layout } from './components/Layout';
-import { ImageGenerator } from './components/ImageGenerator';
+import ImageGenerator from './components/ImageGenerator';
 import { History } from './components/History';
 import { Preferences } from './components/Preferences';
-import { CreatePreset } from './components/CreatePreset';
-import { StyleLibrary } from './components/StyleLibrary';
 import { AppSettings, AppRoute, HistoryItem } from './types';
 
-const STORAGE_KEY_SETTINGS = 'resonance_settings';
-const STORAGE_KEY_HISTORY = 'resonance_history';
-const MAX_HISTORY_ITEMS = 1000;
+const STORAGE_KEY_SETTINGS = 'resonance_v4_settings';
+const STORAGE_KEY_HISTORY = 'resonance_v4_history';
+const STORAGE_KEY_SESSION_PROMPT = 'resonance_v4_session_prompt';
+const STORAGE_KEY_SESSION_IMAGES = 'resonance_v4_session_images';
 
 const DEFAULT_SETTINGS: AppSettings = {
   model: 'zimage',
   width: 1024,
   height: 1024,
-  enhance: false, // Default Off
-  guidance: 7.5,
+  enhance: true,
   privateMode: true,
   negativePrompt: '',
   imageCount: 1,
-  activeStyle: 'z-real',
+  activeStyles: ['none'],
   apiKey: '',
-  safe: true, // Default On
-  transparent: false, // Default Off
-  quality: 'medium', // Default Medium
-  upscale: false, // Default Normal Resolution
-  isUnlocked: false, // Default Locked
-  infiniteMode: false // Default Off
+  quality: 'hd',
+  infiniteMode: false,
+  seed: 0,
+  visualSafety: true
 };
 
 const App: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<AppRoute>(AppRoute.GENERATOR);
-  const [remixItem, setRemixItem] = useState<HistoryItem | null>(null);
-
-  // Initialize State from LocalStorage
+  
   const [settings, setSettings] = useState<AppSettings>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY_SETTINGS);
-      if (stored) {
-        const parsedSettings = JSON.parse(stored);
-        
-        // Force private mode to true on load
-        parsedSettings.privateMode = true;
-        
-        // Merge with defaults to ensure new keys exist
-        return { ...DEFAULT_SETTINGS, ...parsedSettings };
-      }
-      return DEFAULT_SETTINGS;
-    } catch {
+      return stored ? { ...DEFAULT_SETTINGS, ...JSON.parse(stored) } : DEFAULT_SETTINGS;
+    } catch (e) {
       return DEFAULT_SETTINGS;
     }
   });
@@ -59,106 +44,111 @@ const App: React.FC = () => {
       const stored = localStorage.getItem(STORAGE_KEY_HISTORY);
       return stored ? JSON.parse(stored) : [];
     } catch (e) {
-      console.error("Failed to load history", e);
       return [];
     }
   });
 
-  // Session State (Lifted from ImageGenerator)
-  // Initialize as empty for a clean slate on every launch, regardless of history
-  const [sessionPrompt, setSessionPrompt] = useState('');
-  // CHANGED: Use HistoryItem[] to store metadata (prompt, style) with current images
-  const [sessionImages, setSessionImages] = useState<HistoryItem[]>([]);
+  const [sessionPrompt, setSessionPrompt] = useState(() => {
+    return localStorage.getItem(STORAGE_KEY_SESSION_PROMPT) || '';
+  });
 
-  // Persist settings
-  useEffect(() => {
+  const [sessionImages, setSessionImages] = useState<HistoryItem[]>(() => {
     try {
-        localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(settings));
+      const stored = localStorage.getItem(STORAGE_KEY_SESSION_IMAGES);
+      return stored ? JSON.parse(stored) : [];
     } catch (e) {
-        console.error("Failed to save settings", e);
+      return [];
     }
-  }, [settings]);
+  });
 
-  // Persist history
+  // Cross-tab synchronization
   useEffect(() => {
-    try {
-        localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(history));
-    } catch (e) {
-        console.error("Failed to save history", e);
-    }
-  }, [history]);
+    const handleStorageChange = (e: StorageEvent) => {
+      if (!e.newValue) return;
+      try {
+        if (e.key === STORAGE_KEY_SETTINGS) setSettings(JSON.parse(e.newValue));
+        if (e.key === STORAGE_KEY_HISTORY) setHistory(JSON.parse(e.newValue));
+        if (e.key === STORAGE_KEY_SESSION_PROMPT) setSessionPrompt(e.newValue);
+        if (e.key === STORAGE_KEY_SESSION_IMAGES) setSessionImages(JSON.parse(e.newValue));
+      } catch (err) {
+        console.error("Resonance: Sync Error", err);
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
-  const handleUpdateSettings = (newSettings: Partial<AppSettings>) => {
-    setSettings(prev => ({ ...prev, ...newSettings }));
-  };
-
-  const handleAddToHistory = (item: HistoryItem) => {
-    setHistory(prev => {
-        const newHistory = [item, ...prev];
-        // Enforce limit to prevent localStorage quota issues
-        return newHistory.slice(0, MAX_HISTORY_ITEMS);
+  // Strong Persistence Atomic Wrappers
+  const handleUpdateSettings = useCallback((newSettings: Partial<AppSettings>) => {
+    setSettings(prev => {
+      const updated = { ...prev, ...newSettings };
+      localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(updated));
+      return updated;
     });
-  };
+  }, []);
 
-  const handleDeleteHistory = (ids: string[]) => {
-    setHistory(prev => prev.filter(item => !ids.includes(item.id)));
-  };
+  const handleSetSessionPrompt = useCallback((prompt: string) => {
+    setSessionPrompt(prompt);
+    localStorage.setItem(STORAGE_KEY_SESSION_PROMPT, prompt);
+  }, []);
 
-  const handleRemix = (item: HistoryItem) => {
-    setRemixItem(item);
-    setCurrentRoute(AppRoute.GENERATOR);
-  };
+  const handleAddToHistory = useCallback((item: HistoryItem) => {
+    setHistory(prev => {
+      const updated = [item, ...prev].slice(0, 500);
+      localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const handleDeleteHistory = useCallback((ids: string[]) => {
+    setHistory(prev => {
+      const updated = prev.filter(item => !ids.includes(item.id));
+      localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const handleSetSessionImages = useCallback((update: React.SetStateAction<HistoryItem[]>) => {
+    setSessionImages(prev => {
+      const next = typeof update === 'function' ? update(prev) : update;
+      localStorage.setItem(STORAGE_KEY_SESSION_IMAGES, JSON.stringify(next));
+      return next;
+    });
+  }, []);
 
   const renderScreen = () => {
     switch (currentRoute) {
       case AppRoute.GENERATOR:
         return (
           <ImageGenerator 
-            key="generator"
             settings={settings} 
             updateSettings={handleUpdateSettings}
             onNavigate={setCurrentRoute}
             onAddToHistory={handleAddToHistory}
-            remixItem={remixItem}
-            onClearRemix={() => setRemixItem(null)}
             sessionPrompt={sessionPrompt}
-            setSessionPrompt={setSessionPrompt}
+            setSessionPrompt={handleSetSessionPrompt}
             sessionImages={sessionImages}
-            setSessionImages={setSessionImages}
+            setSessionImages={handleSetSessionImages}
           />
         );
       case AppRoute.HISTORY:
         return (
           <History 
-            key="history"
             history={history} 
             onNavigate={setCurrentRoute}
-            onRemix={handleRemix}
+            onRemix={(item) => {
+                handleSetSessionPrompt(item.prompt);
+                setCurrentRoute(AppRoute.GENERATOR);
+            }}
             onDelete={handleDeleteHistory}
           />
         );
       case AppRoute.PREFERENCES:
         return (
           <Preferences 
-            key="preferences"
             settings={settings} 
             updateSettings={handleUpdateSettings} 
             onNavigate={setCurrentRoute}
-          />
-        );
-      case AppRoute.CREATE_PRESET:
-        return (
-          <CreatePreset 
-            key="create-preset"
-            onNavigate={setCurrentRoute}
-          />
-        );
-      case AppRoute.STYLE_LIBRARY:
-        return (
-          <StyleLibrary 
-            key="style-library"
-            onNavigate={setCurrentRoute}
-            settings={settings}
           />
         );
       default:
