@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Layout } from './components/Layout';
 import ImageGenerator from './components/ImageGenerator';
 import { History } from './components/History';
@@ -29,6 +28,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 const App: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<AppRoute>(AppRoute.GENERATOR);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   
   const [settings, setSettings] = useState<AppSettings>(() => {
     try {
@@ -61,6 +61,24 @@ const App: React.FC = () => {
     }
   });
 
+  // PWA Install Logic
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') setDeferredPrompt(null);
+    }
+  };
+
   // Cross-tab synchronization
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
@@ -78,7 +96,6 @@ const App: React.FC = () => {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  // Strong Persistence Atomic Wrappers
   const handleUpdateSettings = useCallback((newSettings: Partial<AppSettings>) => {
     setSettings(prev => {
       const updated = { ...prev, ...newSettings };
@@ -149,6 +166,8 @@ const App: React.FC = () => {
             settings={settings} 
             updateSettings={handleUpdateSettings} 
             onNavigate={setCurrentRoute}
+            installAvailable={!!deferredPrompt}
+            onInstall={handleInstallApp}
           />
         );
       default:
