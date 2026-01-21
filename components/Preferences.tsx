@@ -8,11 +8,9 @@ interface PreferencesProps {
   settings: AppSettings;
   updateSettings: (newSettings: Partial<AppSettings>) => void;
   onNavigate: (route: AppRoute) => void;
-  installAvailable?: boolean;
-  onInstall?: () => void;
 }
 
-export const Preferences: React.FC<PreferencesProps> = ({ settings, updateSettings, onNavigate, installAvailable, onInstall }) => {
+export const Preferences: React.FC<PreferencesProps> = ({ settings, updateSettings, onNavigate }) => {
   const [accountState, setAccountState] = useState<AccountState>({ profile: null, balance: null, usage: [], isLoading: false, error: null });
 
   const fetchDetails = useCallback(async () => {
@@ -34,7 +32,6 @@ export const Preferences: React.FC<PreferencesProps> = ({ settings, updateSettin
   };
 
   const isManual = settings.apiKey && settings.apiKey.trim().length > 5;
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
 
   return (
     <div className="flex flex-col h-full bg-black text-white w-full overflow-y-auto no-scrollbar">
@@ -46,29 +43,6 @@ export const Preferences: React.FC<PreferencesProps> = ({ settings, updateSettin
             <h1 className="text-xl font-black uppercase tracking-tighter logo-text">Resonance</h1>
             <div className="size-11" />
         </header>
-
-        {/* PWA Installation Section */}
-        {(!isStandalone || installAvailable) && (
-          <section className="space-y-4">
-              <p className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-2">App Experience</p>
-              <div className="bg-primary/10 backdrop-blur-[40px] rounded-[2.5rem] p-6 border-[0.5px] border-primary/20 space-y-4">
-                  <div className="flex items-center justify-between px-2">
-                      <div className="flex flex-col">
-                          <span className="text-sm font-bold text-white">Native Integration</span>
-                          <span className="text-[9px] text-primary/60 uppercase font-black tracking-widest">Install for Full Immersion</span>
-                      </div>
-                      <button 
-                          onClick={onInstall}
-                          disabled={!installAvailable && isStandalone}
-                          className={`text-[10px] font-black uppercase tracking-widest px-5 py-3 rounded-2xl flex items-center gap-2 transition-all active:scale-95 ${!installAvailable && isStandalone ? 'bg-white/5 text-white/20' : 'bg-primary text-white shadow-glow'}`}
-                      >
-                          <Download size={14} />
-                          {isStandalone ? 'Installed' : 'Install App'}
-                      </button>
-                  </div>
-              </div>
-          </section>
-        )}
 
         <section className="space-y-4">
             <p className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-2">BYOP • Access Core</p>

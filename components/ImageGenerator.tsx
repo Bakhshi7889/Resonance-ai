@@ -72,7 +72,7 @@ interface ImageGeneratorProps {
 const PromptHeader = memo(({ prompt, onClearBatch, batchId }: { prompt: string, onClearBatch: (id: string) => void, batchId: string }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     return (
-        <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="w-full flex flex-col gap-3 px-2 mb-4 group max-w-2xl mx-auto">
+        <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="w-full flex flex-col gap-3 px-2 mb-4 group max-w-3xl mx-auto">
             <div className="flex items-center gap-3">
                 <div 
                     onClick={() => setIsExpanded(!isExpanded)}
@@ -128,7 +128,7 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady }: { item
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay: index * 0.05, type: "spring", ...SPRING_CONFIG }}
-      className="relative shrink-0 overflow-hidden bg-white/[0.02] border-[0.5px] border-white/10 shadow-liquid rounded-[2.5rem] flex items-center justify-center group/card w-full max-w-2xl"
+      className="relative shrink-0 overflow-hidden bg-white/[0.02] border-[0.5px] border-white/10 shadow-liquid rounded-[2.5rem] flex items-center justify-center group/card w-full max-w-3xl"
       style={{ rotateX, rotateY, transformStyle: 'preserve-3d', aspectRatio: `${item.width}/${item.height}` }}
     >
       <img 
@@ -513,8 +513,10 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
       return groups;
   }, [sessionImages]);
 
-  // FIX: Adaptive Island sizing based on screen width
-  const islandWidth = isIslandExpanded ? "min(calc(100vw - 48px), 600px)" : (isActuallyRendering ? 280 : 200);
+  // FIX: Adaptive Island sizing. Use a percentage of screen on mobile (wider) and max-width on desktop.
+  // calc(100vw - 32px) ensures it spans the width with small padding on mobile.
+  // min(..., 600px) ensures it doesn't get ridiculously wide on desktop.
+  const islandWidth = isIslandExpanded ? "min(calc(100vw - 32px), 600px)" : (isActuallyRendering ? 280 : 200);
   const islandHeight = isIslandExpanded ? "auto" : 44;
   const islandRadius = isIslandExpanded ? 40 : 22;
 
@@ -533,7 +535,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
           )}
       </AnimatePresence>
 
-      <div className="fixed top-8 left-0 right-0 z-[200] flex flex-col items-center pointer-events-none px-6">
+      <div className="fixed top-8 left-0 right-0 z-[200] flex flex-col items-center pointer-events-none px-4">
           <motion.div 
             layout 
             animate={{ 
@@ -697,8 +699,8 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
           </div>
       </div>
 
-      <div className="fixed bottom-10 left-0 right-0 px-6 z-50 pointer-events-none flex justify-center">
-          <div className="w-full max-w-2xl pointer-events-auto">
+      <div className="fixed bottom-10 left-0 right-0 px-2 sm:px-4 z-50 pointer-events-none flex justify-center">
+          <div className="w-full max-w-3xl pointer-events-auto">
               <motion.div 
                   layout 
                   transition={{ type: "spring", ...SPRING_CONFIG }} 
