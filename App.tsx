@@ -28,7 +28,6 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 const App: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<AppRoute>(AppRoute.GENERATOR);
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   
   const [settings, setSettings] = useState<AppSettings>(() => {
     try {
@@ -60,36 +59,6 @@ const App: React.FC = () => {
       return [];
     }
   });
-
-  // PWA Install Logic
-  useEffect(() => {
-    const handler = (e: any) => {
-      // Prevent the mini-infobar from appearing on mobile
-      e.preventDefault();
-      // Stash the event so it can be triggered later.
-      setDeferredPrompt(e);
-      console.log('Resonance: PWA Install Prompt Captured');
-    };
-    window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, []);
-
-  const handleInstallApp = async () => {
-    if (!deferredPrompt) {
-        console.warn('Resonance: Install prompt not available yet');
-        return;
-    }
-    
-    // Show the native install prompt
-    deferredPrompt.prompt();
-    
-    // Wait for the user to respond to the prompt
-    const { outcome } = await deferredPrompt.userChoice;
-    console.log(`Resonance: User response to install: ${outcome}`);
-    
-    // We've used the prompt, and can't use it again, throw it away
-    setDeferredPrompt(null);
-  };
 
   // Cross-tab synchronization
   useEffect(() => {
@@ -158,8 +127,6 @@ const App: React.FC = () => {
             setSessionPrompt={handleSetSessionPrompt}
             sessionImages={sessionImages}
             setSessionImages={handleSetSessionImages}
-            installAvailable={!!deferredPrompt}
-            onInstall={handleInstallApp}
           />
         );
       case AppRoute.HISTORY:
@@ -180,8 +147,6 @@ const App: React.FC = () => {
             settings={settings} 
             updateSettings={handleUpdateSettings} 
             onNavigate={setCurrentRoute}
-            installAvailable={!!deferredPrompt}
-            onInstall={handleInstallApp}
           />
         );
       default:

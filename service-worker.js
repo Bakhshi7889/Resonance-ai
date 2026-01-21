@@ -1,8 +1,8 @@
-const CACHE_NAME = 'resonance-v4-cache-root';
+const CACHE_NAME = 'resonance-v4-cache-rel';
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/manifest.json'
+  './',
+  './index.html',
+  './manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
@@ -35,7 +35,7 @@ self.addEventListener('fetch', (event) => {
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request).catch(() => {
-        return caches.match('/index.html') || caches.match('/');
+        return caches.match('./index.html') || caches.match('./');
       })
     );
     return;

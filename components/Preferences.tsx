@@ -8,13 +8,10 @@ interface PreferencesProps {
   settings: AppSettings;
   updateSettings: (newSettings: Partial<AppSettings>) => void;
   onNavigate: (route: AppRoute) => void;
-  installAvailable?: boolean;
-  onInstall?: () => void;
 }
 
-export const Preferences: React.FC<PreferencesProps> = ({ settings, updateSettings, onNavigate, installAvailable, onInstall }) => {
+export const Preferences: React.FC<PreferencesProps> = ({ settings, updateSettings, onNavigate }) => {
   const [accountState, setAccountState] = useState<AccountState>({ profile: null, balance: null, usage: [], isLoading: false, error: null });
-  const [showInstallGuide, setShowInstallGuide] = useState(false);
 
   const fetchDetails = useCallback(async () => {
     setAccountState(prev => ({ ...prev, isLoading: true }));
@@ -35,8 +32,6 @@ export const Preferences: React.FC<PreferencesProps> = ({ settings, updateSettin
   };
 
   const isManual = settings.apiKey && settings.apiKey.trim().length > 5;
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
 
   return (
     <div className="flex flex-col h-full bg-black text-white w-full overflow-y-auto no-scrollbar">
@@ -48,61 +43,6 @@ export const Preferences: React.FC<PreferencesProps> = ({ settings, updateSettin
             <h1 className="text-xl font-black uppercase tracking-tighter logo-text">Resonance</h1>
             <div className="size-11" />
         </header>
-
-        {/* PWA INSTALL SECTION */}
-        {!isStandalone && (
-          <section className="space-y-4">
-              <p className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-2">Native Integration</p>
-              <div className="bg-white/[0.03] backdrop-blur-[40px] rounded-[2.5rem] p-6 border-[0.5px] border-white/12 space-y-4 overflow-hidden relative">
-                  <div className="flex items-center justify-between gap-4">
-                      <div className="flex-1">
-                          <h3 className="text-sm font-bold text-white">Full Screen Studio</h3>
-                          <p className="text-[9px] text-white/30 uppercase font-black tracking-widest mt-1">Install Resonance to your device</p>
-                      </div>
-                      {installAvailable ? (
-                        <button 
-                          onClick={onInstall}
-                          className="size-12 rounded-2xl bg-primary flex items-center justify-center text-white shadow-glow active:scale-95 transition-all"
-                        >
-                          <DownloadCloud size={20} />
-                        </button>
-                      ) : isIOS ? (
-                        <button 
-                          onClick={() => setShowInstallGuide(!showInstallGuide)}
-                          className="px-5 h-12 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-white/10 active:scale-95 transition-all"
-                        >
-                          <Smartphone size={16} />
-                          {showInstallGuide ? 'Close' : 'Setup'}
-                        </button>
-                      ) : null}
-                  </div>
-
-                  <AnimatePresence>
-                    {showInstallGuide && isIOS && (
-                      <motion.div 
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="pt-4 space-y-4 border-t border-white/5 mt-4"
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="size-8 rounded-full bg-white/5 flex items-center justify-center shrink-0">
-                            <Share size={14} className="text-primary" />
-                          </div>
-                          <p className="text-[11px] text-white/60 leading-relaxed pt-1">Tap the <span className="text-white font-bold">Share</span> button in Safari's bottom toolbar.</p>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <div className="size-8 rounded-full bg-white/5 flex items-center justify-center shrink-0">
-                            <PlusSquare size={14} className="text-primary" />
-                          </div>
-                          <p className="text-[11px] text-white/60 leading-relaxed pt-1">Scroll down and select <span className="text-white font-bold">"Add to Home Screen"</span>.</p>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-              </div>
-          </section>
-        )}
 
         <section className="space-y-4">
             <p className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-2">BYOP • Access Core</p>
