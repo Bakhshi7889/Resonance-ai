@@ -72,7 +72,7 @@ interface ImageGeneratorProps {
 const PromptHeader = memo(({ prompt, onClearBatch, batchId }: { prompt: string, onClearBatch: (id: string) => void, batchId: string }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     return (
-        <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="w-full flex flex-col gap-3 px-2 mb-4 group">
+        <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="w-full flex flex-col gap-3 px-2 mb-4 group max-w-2xl mx-auto">
             <div className="flex items-center gap-3">
                 <div 
                     onClick={() => setIsExpanded(!isExpanded)}
@@ -128,8 +128,8 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady }: { item
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay: index * 0.05, type: "spring", ...SPRING_CONFIG }}
-      className="relative shrink-0 overflow-hidden bg-white/[0.02] border-[0.5px] border-white/10 shadow-liquid rounded-[2.5rem] flex items-center justify-center group/card"
-      style={{ rotateX, rotateY, transformStyle: 'preserve-3d', aspectRatio: `${item.width}/${item.height}`, width: '100%', maxWidth: '600px' }}
+      className="relative shrink-0 overflow-hidden bg-white/[0.02] border-[0.5px] border-white/10 shadow-liquid rounded-[2.5rem] flex items-center justify-center group/card w-full max-w-2xl"
+      style={{ rotateX, rotateY, transformStyle: 'preserve-3d', aspectRatio: `${item.width}/${item.height}` }}
     >
       <img 
         src={item.url} 
@@ -513,13 +513,10 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
       return groups;
   }, [sessionImages]);
 
-  const islandWidth = isIslandExpanded ? 400 : (isActuallyRendering ? 280 : 200);
-  const islandHeight = isIslandExpanded ? 420 : 44;
+  // FIX: Adaptive Island sizing based on screen width
+  const islandWidth = isIslandExpanded ? "min(calc(100vw - 48px), 600px)" : (isActuallyRendering ? 280 : 200);
+  const islandHeight = isIslandExpanded ? "auto" : 44;
   const islandRadius = isIslandExpanded ? 40 : 22;
-
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-  const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
 
   return (
     <div className="flex flex-col h-full relative overflow-hidden bg-black font-display">
@@ -530,7 +527,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                 initial={{ opacity: 0 }} 
                 animate={{ opacity: 1 }} 
                 exit={{ opacity: 0 }} 
-                className="fixed inset-0 z-[199]" 
+                className="fixed inset-0 z-[199] bg-black/40 backdrop-blur-sm" 
                 onClick={() => setIsIslandExpanded(false)} 
               />
           )}
@@ -576,7 +573,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                 )}
               </AnimatePresence>
 
-              <div className="relative z-10 w-full h-full flex flex-col items-center">
+              <div className="relative z-10 w-full flex flex-col items-center">
                 {!isIslandExpanded ? (
                     <div className="flex items-center justify-center w-full h-[44px] px-6 gap-3">
                         {isActuallyRendering ? (
@@ -613,10 +610,21 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                             <Zap size={14} className="text-white/20" />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-white/5 rounded-3xl p-5 border border-white/5 flex flex-col items-center"><p className="text-[9px] font-bold text-white/20 uppercase tracking-widest mb-1">Credits</p><p className="text-sm font-mono font-bold text-primary">{formatPollen(accountState.balance)}</p></div>
-                            <div className="bg-white/5 rounded-3xl p-5 border border-white/5 flex flex-col items-center"><p className="text-[9px] font-bold text-white/20 uppercase tracking-widest mb-1">Status</p><p className="text-sm font-mono font-bold text-white/80">Active</p></div>
+                            <div className="bg-white/5 rounded-3xl p-5 border border-white/5 flex flex-col items-center">
+                                <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest mb-1">Credits</p>
+                                <p className="text-sm font-mono font-bold text-primary">{formatPollen(accountState.balance)}</p>
+                            </div>
+                            <div className="bg-white/5 rounded-3xl p-5 border border-white/5 flex flex-col items-center">
+                                <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest mb-1">Status</p>
+                                <p className="text-sm font-mono font-bold text-white/80">Active</p>
+                            </div>
                         </div>
-                        <button onClick={(e) => { e.stopPropagation(); setSessionImages([]); setIsIslandExpanded(false); showToast("Feed Purged"); }} className="w-full h-14 rounded-[1.5rem] bg-white/5 border border-white/10 text-white text-[10px] font-black uppercase tracking-[0.3em] active:scale-95 transition-all">Clear Session Feed</button>
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); setSessionImages([]); setIsIslandExpanded(false); showToast("Feed Purged"); }} 
+                            className="w-full h-14 rounded-[1.5rem] bg-white/5 border border-white/10 text-white text-[10px] font-black uppercase tracking-[0.3em] active:scale-95 transition-all"
+                        >
+                            Clear Session Feed
+                        </button>
                     </div>
                 )}
               </div>
@@ -633,7 +641,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto no-scrollbar relative px-6 pb-[32vh] pt-44">
-          <div className="max-w-4xl mx-auto flex flex-col items-center gap-20">
+          <div className="flex flex-col items-center gap-20">
               {groupedImages.length === 0 && !isActuallyRendering ? (
                   <motion.div 
                     initial={{ opacity: 0, scale: 0.9, rotateX: 20 }} 
@@ -667,7 +675,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                       </motion.p>
                   </motion.div>
               ) : (
-                  <div className="w-full flex flex-col gap-28">
+                  <div className="w-full flex flex-col items-center gap-28">
                       {groupedImages.map((group) => (
                           <div key={group.batchId} className="w-full flex flex-col items-center gap-10">
                               <PromptHeader prompt={group.prompt} batchId={group.batchId} onClearBatch={handleClearBatch} />
@@ -689,9 +697,13 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
           </div>
       </div>
 
-      <div className="fixed bottom-10 left-0 right-0 px-6 z-50 pointer-events-none">
-          <div className="max-w-2xl mx-auto w-full pointer-events-auto">
-              <motion.div layout transition={{ type: "spring", ...SPRING_CONFIG }} className={`glass-panel overflow-hidden shadow-liquid ${showSettings ? 'rounded-[3rem]' : 'rounded-[2rem]'}`}>
+      <div className="fixed bottom-10 left-0 right-0 px-6 z-50 pointer-events-none flex justify-center">
+          <div className="w-full max-w-2xl pointer-events-auto">
+              <motion.div 
+                  layout 
+                  transition={{ type: "spring", ...SPRING_CONFIG }} 
+                  className={`glass-panel overflow-hidden shadow-liquid w-full ${showSettings ? 'rounded-[3rem]' : 'rounded-[2rem]'}`}
+              >
                   <div className="flex flex-col">
                       <div className="flex items-end gap-3 p-3">
                           <button onClick={() => setShowSettings(!showSettings)} className={`size-12 rounded-[1.2rem] flex items-center justify-center transition-all shrink-0 ${showSettings ? 'bg-white text-black' : 'text-white/20 hover:bg-white/5'}`}>
@@ -718,7 +730,22 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                               </button>
                           </div>
                       </div>
-                      <AnimatePresence>{showSettings && <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="border-t-[0.5px] border-white/10 bg-black/40"><SettingsPill localSettings={localSettings} updateLocalSetting={updateLocalSetting} setAspectRatio={(w, h) => { updateLocalSetting('width', w); updateLocalSetting('height', h); }} /></motion.div>}</AnimatePresence>
+                      <AnimatePresence>
+                          {showSettings && (
+                              <motion.div 
+                                  initial={{ height: 0, opacity: 0 }} 
+                                  animate={{ height: 'auto', opacity: 1 }} 
+                                  exit={{ height: 0, opacity: 0 }} 
+                                  className="border-t-[0.5px] border-white/10 bg-black/40 overflow-hidden"
+                              >
+                                  <SettingsPill 
+                                      localSettings={localSettings} 
+                                      updateLocalSetting={updateLocalSetting} 
+                                      setAspectRatio={(w, h) => { updateLocalSetting('width', w); updateLocalSetting('height', h); }} 
+                                  />
+                              </motion.div>
+                          )}
+                      </AnimatePresence>
                   </div>
               </motion.div>
           </div>

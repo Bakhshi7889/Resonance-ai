@@ -28,6 +28,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 const App: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<AppRoute>(AppRoute.GENERATOR);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   
   const [settings, setSettings] = useState<AppSettings>(() => {
     try {
@@ -59,6 +60,30 @@ const App: React.FC = () => {
       return [];
     }
   });
+
+  // Capture PWA Install Prompt
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      console.log('Resonance: Install prompt captured');
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (!deferredPrompt) {
+      console.log("Resonance: Install prompt not available. Already installed or browser restriction.");
+      return;
+    }
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
+  };
 
   // Cross-tab synchronization
   useEffect(() => {
@@ -147,6 +172,8 @@ const App: React.FC = () => {
             settings={settings} 
             updateSettings={handleUpdateSettings} 
             onNavigate={setCurrentRoute}
+            installAvailable={!!deferredPrompt}
+            onInstall={handleInstallApp}
           />
         );
       default:
