@@ -1,37 +1,52 @@
-const CACHE_NAME = 'resonance-v4-cache';
+const CACHE_NAME = 'resonance-v4.1-cache';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json'
 ];
 
+// Install Event: Cache core assets and force activation
 self.addEventListener('install', (event) => {
+  self.skipWaiting(); // Immediate activation
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS_TO_CACHE);
     })
   );
-  self.skipWaiting();
 });
 
+// Activate Event: Clean up old caches and claim clients
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
+    Promise.all([
+      self.clients.claim(), // Take control of all clients immediately
+      caches.keys().then((cacheNames) => {
+        return Promise.all(
+          cacheNames.map((cacheName) => {
+            if (cacheName !== CACHE_NAME) {
+              return caches.delete(cacheName);
+            }
+          })
+        );
+      })
+    ])
   );
-  return self.clients.claim();
 });
 
+// Fetch Event: Network-first with offline fallback for navigation
 self.addEventListener('fetch', (event) => {
-  // PWA requirement: A fetch event listener must exist.
-  // We use a network-first strategy for basic offline support.
+  // Navigation requests (HTML)
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .catch(() => {
+          return caches.match('/index.html') || caches.match('/');
+        })
+    );
+    return;
+  }
+
+  // Asset requests
   event.respondWith(
     fetch(event.request).catch(() => {
       return caches.match(event.request);

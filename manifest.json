@@ -2,13 +2,15 @@
   "name": "Resonance Neural Architecture",
   "short_name": "Resonance",
   "description": "Architect your reality with premium AI generation.",
+  "id": "resonance-ai-pwa-v4",
+  "lang": "en",
   "start_url": ".",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#000000",
   "theme_color": "#000000",
   "scope": ".",
-  "categories": ["productivity", "graphics & design"],
+  "categories": ["productivity", "graphics & design", "utilities"],
   "icons": [
     {
       "src": "/icon-192.png",
