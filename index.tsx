@@ -1,4 +1,4 @@
-import React, { Component, ReactNode } from 'react';
+import React, { ReactNode } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 
@@ -15,7 +15,7 @@ interface ErrorBoundaryState {
 }
 
 // Simple Error Boundary to catch render crashes
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   
   public state: ErrorBoundaryState = { hasError: false, error: null };
 
@@ -58,7 +58,8 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
         </div>
       );
     }
-    return this.props.children;
+    // Fix: Explicitly cast props to handle potential TS issue with React.Component inheritance
+    return (this.props as any).children;
   }
 }
 
@@ -77,9 +78,18 @@ root.render(
   </React.StrictMode>
 );
 
-// Robust Service Worker Registration for PWA
+// SERVICE WORKER LOGIC
+// We first unregister any existing service workers to clear potential stale caches/redirects to /assets/
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
+  // Unregister all first to ensure clean state if there's a bad cache
+  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+    for(let registration of registrations) {
+        // Optional: Only unregister if it's NOT the current one, but for fixing the infinite loop/assets issue, let's just unregister.
+        // The subsequent register call will re-install the correct one.
+        registration.unregister();
+    }
+  }).then(() => {
+    // Register the new one
     navigator.serviceWorker.register('/sw.js', { scope: '/' })
       .then((registration) => {
         console.log('Resonance: SW registered: ', registration.scope);
