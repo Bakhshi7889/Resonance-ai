@@ -3,7 +3,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform, useSpring, useAn
 import { 
     Settings, LayoutGrid, Shuffle, Eraser, Maximize2, Minimize2, 
     Trash2, EyeOff, Wand2, Zap, ArrowUp, ChevronDown, 
-    Check, ShieldCheck, XCircle, Info, Hash, Clock
+    Check, ShieldCheck, XCircle, Info, Hash, Clock, DownloadCloud, Smartphone, Share, PlusSquare
 } from 'lucide-react';
 import { generateImageUrl, getRandomSeed, getAccountDetails, getEstimatedImagesLeft } from '../services/pollinations';
 import { AppRoute, AppSettings, HistoryItem, MODEL_STYLES, ASPECT_RATIOS, AccountState } from '../types';
@@ -67,6 +67,8 @@ interface ImageGeneratorProps {
   setSessionPrompt: (prompt: string) => void;
   sessionImages: HistoryItem[];
   setSessionImages: React.Dispatch<React.SetStateAction<HistoryItem[]>>;
+  installAvailable?: boolean;
+  onInstall?: () => void;
 }
 
 const PromptHeader = memo(({ prompt, onClearBatch, batchId }: { prompt: string, onClearBatch: (id: string) => void, batchId: string }) => {
@@ -358,7 +360,7 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
 });
 
 export const ImageGenerator: React.FC<ImageGeneratorProps> = ({ 
-    settings: globalSettings, onNavigate, onAddToHistory, updateSettings, sessionPrompt, setSessionPrompt, sessionImages, setSessionImages
+    settings: globalSettings, onNavigate, onAddToHistory, updateSettings, sessionPrompt, setSessionPrompt, sessionImages, setSessionImages, installAvailable, onInstall
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [localSettings, setLocalSettings] = useState({ ...globalSettings });
@@ -368,6 +370,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
   const [renderTime, setRenderTime] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [pendingImages, setPendingImages] = useState<Set<string>>(new Set());
+  const [showIOSGuide, setShowIOSGuide] = useState(false);
 
   const [telemetry, setTelemetry] = useState<{ avgDuration: number; count: number }>(() => {
     try {
@@ -523,6 +526,9 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
   const islandHeight = isIslandExpanded ? 420 : 44;
   const islandRadius = isIslandExpanded ? 40 : 22;
 
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+
   return (
     <div className="flex flex-col h-full relative overflow-hidden bg-black font-display">
       
@@ -538,7 +544,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
           )}
       </AnimatePresence>
 
-      <div className="fixed top-8 left-0 right-0 z-[200] flex justify-center pointer-events-none px-6">
+      <div className="fixed top-8 left-0 right-0 z-[200] flex flex-col items-center pointer-events-none px-6">
           <motion.div 
             layout 
             animate={{ 
@@ -547,7 +553,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                 borderRadius: islandRadius
             }} 
             transition={{ type: "spring", ...SPRING_CONFIG }} 
-            className="relative pointer-events-auto bg-black/85 backdrop-blur-[60px] border-[0.5px] border-white/20 shadow-liquid overflow-hidden cursor-pointer flex flex-col items-center" 
+            className="relative pointer-events-auto bg-black/85 backdrop-blur-[60px] border-[0.5px] border-white/20 shadow-liquid overflow-hidden cursor-pointer flex flex-col items-center mb-4" 
             onClick={() => !isActuallyRendering && setIsIslandExpanded(!isIslandExpanded)}
           >
               <AnimatePresence>
@@ -623,6 +629,47 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                 )}
               </div>
           </motion.div>
+
+          {/* Liquid PWA Install Pill */}
+          {!isStandalone && (installAvailable || isIOS) && (
+            <motion.div 
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="pointer-events-auto flex flex-col items-center"
+            >
+              <button 
+                onClick={() => {
+                  if (installAvailable && onInstall) onInstall();
+                  else if (isIOS) setShowIOSGuide(!showIOSGuide);
+                }}
+                className="px-6 h-10 rounded-full bg-white/5 border border-white/10 backdrop-blur-3xl flex items-center gap-3 text-white/60 hover:text-white hover:bg-white/10 transition-all active:scale-95 shadow-liquid"
+              >
+                <DownloadCloud size={14} className="text-primary" />
+                <span className="text-[9px] font-black uppercase tracking-widest">Install Studio</span>
+              </button>
+
+              <AnimatePresence>
+                {showIOSGuide && (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                    className="mt-2 p-6 rounded-[2rem] bg-black/80 backdrop-blur-3xl border border-white/10 shadow-2xl w-[260px] space-y-4"
+                  >
+                    <div className="flex items-start gap-4">
+                      <Share size={16} className="text-primary shrink-0 mt-1" />
+                      <p className="text-[10px] text-white/60 leading-relaxed font-bold">Tap the <span className="text-white uppercase">Share</span> button in Safari</p>
+                    </div>
+                    <div className="flex items-start gap-4">
+                      <PlusSquare size={16} className="text-primary shrink-0 mt-1" />
+                      <p className="text-[10px] text-white/60 leading-relaxed font-bold">Select <span className="text-white uppercase">"Add to Home Screen"</span></p>
+                    </div>
+                    <button onClick={() => setShowIOSGuide(false)} className="w-full h-10 rounded-xl bg-white/5 text-[9px] font-black uppercase tracking-widest border border-white/5">Got it</button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          )}
       </div>
 
       <div className="fixed top-8 left-0 right-0 px-6 z-[100] flex justify-between pointer-events-none">
@@ -634,7 +681,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
           </button>
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto no-scrollbar relative px-6 pb-[32vh] pt-32">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto no-scrollbar relative px-6 pb-[32vh] pt-44">
           <div className="max-w-4xl mx-auto flex flex-col items-center gap-20">
               {groupedImages.length === 0 && !isActuallyRendering ? (
                   <motion.div 

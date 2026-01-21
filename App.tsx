@@ -146,6 +146,8 @@ const App: React.FC = () => {
             setSessionPrompt={handleSetSessionPrompt}
             sessionImages={sessionImages}
             setSessionImages={handleSetSessionImages}
+            installAvailable={!!deferredPrompt}
+            onInstall={handleInstallApp}
           />
         );
       case AppRoute.HISTORY:
