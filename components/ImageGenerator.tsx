@@ -3,7 +3,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform, useSpring, useAn
 import { 
     Settings, LayoutGrid, Shuffle, Eraser, Maximize2, Minimize2, 
     Trash2, EyeOff, Wand2, Zap, ArrowUp, ChevronDown, 
-    Check, ShieldCheck, XCircle, Info, Hash, Clock, DownloadCloud, Smartphone, Share, PlusSquare
+    Check, ShieldCheck, XCircle, Info, Hash, Clock, DownloadCloud, Smartphone, Share, PlusSquare, MoreVertical
 } from 'lucide-react';
 import { generateImageUrl, getRandomSeed, getAccountDetails, getEstimatedImagesLeft } from '../services/pollinations';
 import { AppRoute, AppSettings, HistoryItem, MODEL_STYLES, ASPECT_RATIOS, AccountState } from '../types';
@@ -173,7 +173,6 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
         }
     };
 
-    // Centered Neural Circuit Logic
     const selectedIndices = useMemo(() => {
         const indices = MODEL_STYLES
             .map((s, i) => (localSettings.activeStyles.includes(s.id) && s.id !== 'none') ? i : -1)
@@ -265,7 +264,6 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
                             );
                         })}
                         
-                        {/* Synapse Path Overlay (Circuit Lines Only) */}
                         <AnimatePresence>
                             {meshData && (
                                 <motion.div 
@@ -287,8 +285,6 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
                                                 <feComposite in="SourceGraphic" in2="blur" operator="over" />
                                             </filter>
                                         </defs>
-
-                                        {/* Main horizontal Path connecting ALL selected centers */}
                                         <motion.line
                                             initial={{ x1: meshData.minX, x2: meshData.minX }}
                                             animate={{ 
@@ -303,8 +299,6 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
                                             filter="url(#mesh-glow)"
                                             transition={{ type: "spring", ...SPRING_CONFIG }}
                                         />
-
-                                        {/* Vertical Connection Stems (Dots removed as requested) */}
                                         {meshData.points.map((x, i) => (
                                             <g key={`neural-path-${i}`}>
                                                 <motion.line
@@ -370,7 +364,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
   const [renderTime, setRenderTime] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [pendingImages, setPendingImages] = useState<Set<string>>(new Set());
-  const [showIOSGuide, setShowIOSGuide] = useState(false);
+  const [showInstallGuide, setShowInstallGuide] = useState(false);
 
   const [telemetry, setTelemetry] = useState<{ avgDuration: number; count: number }>(() => {
     try {
@@ -528,6 +522,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
 
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+  const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
 
   return (
     <div className="flex flex-col h-full relative overflow-hidden bg-black font-display">
@@ -630,8 +625,8 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
               </div>
           </motion.div>
 
-          {/* Liquid PWA Install Pill */}
-          {!isStandalone && (installAvailable || isIOS) && (
+          {/* Liquid PWA Install Pill - Always show if not standalone */}
+          {!isStandalone && (
             <motion.div 
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -640,31 +635,53 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
               <button 
                 onClick={() => {
                   if (installAvailable && onInstall) onInstall();
-                  else if (isIOS) setShowIOSGuide(!showIOSGuide);
+                  else setShowInstallGuide(!showInstallGuide);
                 }}
-                className="px-6 h-10 rounded-full bg-white/5 border border-white/10 backdrop-blur-3xl flex items-center gap-3 text-white/60 hover:text-white hover:bg-white/10 transition-all active:scale-95 shadow-liquid"
+                className="px-6 h-10 rounded-full bg-white/5 border border-white/10 backdrop-blur-3xl flex items-center gap-3 text-white/60 hover:text-white hover:bg-white/10 transition-all active:scale-95 shadow-liquid group"
               >
-                <DownloadCloud size={14} className="text-primary" />
+                <DownloadCloud size={14} className="text-primary group-hover:animate-bounce" />
                 <span className="text-[9px] font-black uppercase tracking-widest">Install Studio</span>
               </button>
 
               <AnimatePresence>
-                {showIOSGuide && (
+                {showInstallGuide && (
                   <motion.div 
                     initial={{ opacity: 0, scale: 0.9, y: 10 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                    className="mt-2 p-6 rounded-[2rem] bg-black/80 backdrop-blur-3xl border border-white/10 shadow-2xl w-[260px] space-y-4"
+                    className="mt-2 p-6 rounded-[2rem] bg-black/90 backdrop-blur-3xl border border-white/10 shadow-2xl w-[280px] space-y-4"
                   >
-                    <div className="flex items-start gap-4">
-                      <Share size={16} className="text-primary shrink-0 mt-1" />
-                      <p className="text-[10px] text-white/60 leading-relaxed font-bold">Tap the <span className="text-white uppercase">Share</span> button in Safari</p>
+                    <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                        <span className="text-[10px] font-black uppercase text-primary tracking-widest">Manual Setup</span>
+                        <button onClick={() => setShowInstallGuide(false)} className="text-white/20 hover:text-white transition-colors">
+                            <XCircle size={14} />
+                        </button>
                     </div>
-                    <div className="flex items-start gap-4">
-                      <PlusSquare size={16} className="text-primary shrink-0 mt-1" />
-                      <p className="text-[10px] text-white/60 leading-relaxed font-bold">Select <span className="text-white uppercase">"Add to Home Screen"</span></p>
-                    </div>
-                    <button onClick={() => setShowIOSGuide(false)} className="w-full h-10 rounded-xl bg-white/5 text-[9px] font-black uppercase tracking-widest border border-white/5">Got it</button>
+
+                    {isIOS ? (
+                        <div className="space-y-4">
+                            <div className="flex items-start gap-4">
+                                <Share size={16} className="text-primary shrink-0 mt-1" />
+                                <p className="text-[10px] text-white/60 leading-relaxed font-bold">Tap the <span className="text-white uppercase">Share</span> button in Safari</p>
+                            </div>
+                            <div className="flex items-start gap-4">
+                                <PlusSquare size={16} className="text-primary shrink-0 mt-1" />
+                                <p className="text-[10px] text-white/60 leading-relaxed font-bold">Select <span className="text-white uppercase">"Add to Home Screen"</span></p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                             <div className="flex items-start gap-4">
+                                <MoreVertical size={16} className="text-primary shrink-0 mt-1" />
+                                <p className="text-[10px] text-white/60 leading-relaxed font-bold">Tap the <span className="text-white uppercase">3-dots menu</span> in your browser</p>
+                            </div>
+                            <div className="flex items-start gap-4">
+                                <Smartphone size={16} className="text-primary shrink-0 mt-1" />
+                                <p className="text-[10px] text-white/60 leading-relaxed font-bold">Select <span className="text-white uppercase">"Install app"</span> or <span className="text-white uppercase">"Add to Home screen"</span></p>
+                            </div>
+                        </div>
+                    )}
+                    <button onClick={() => setShowInstallGuide(false)} className="w-full h-10 rounded-xl bg-white/5 text-[9px] font-black uppercase tracking-widest border border-white/5 hover:bg-white/10 transition-all">Got it</button>
                   </motion.div>
                 )}
               </AnimatePresence>

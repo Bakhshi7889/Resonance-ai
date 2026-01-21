@@ -1,27 +1,27 @@
-
-const CACHE_NAME = 'resonance-v3';
+const CACHE_NAME = 'resonance-v4-cache-root';
 const urlsToCache = [
   '/',
   '/index.html',
-  '/manifest.json',
-  'https://cdn.tailwindcss.com?plugins=forms,container-queries'
+  '/manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(urlsToCache))
+      .then((cache) => {
+        console.log('Resonance: Pre-caching core assets');
+        return cache.addAll(urlsToCache);
+      })
   );
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
+          if (cacheName !== CACHE_NAME) {
             return caches.delete(cacheName);
           }
         })
@@ -32,26 +32,18 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  const request = event.request;
-
-  // Navigation Strategy: Serve index.html for page navigations
-  // This fixes 404s if the app is accessed via slightly different URLs
-  if (request.mode === 'navigate') {
+  if (event.request.mode === 'navigate') {
     event.respondWith(
-      caches.match('/index.html').then((cached) => {
-        return cached || fetch(request).catch(() => caches.match('/'));
+      fetch(event.request).catch(() => {
+        return caches.match('/index.html') || caches.match('/');
       })
     );
     return;
   }
 
-  // Cache First Strategy for assets
   event.respondWith(
-    caches.match(request).then((cachedResponse) => {
-      return cachedResponse || fetch(request).then((response) => {
-        // Optional: Dynamic caching for new assets can be added here
-        return response;
-      });
+    caches.match(event.request).then((response) => {
+      return response || fetch(event.request);
     })
   );
 });
