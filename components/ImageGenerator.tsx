@@ -519,7 +519,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
   const islandRadius = isIslandExpanded ? 40 : 22;
 
   return (
-    <div className="flex flex-col h-full relative overflow-hidden bg-black font-display">
+    <div className="flex flex-col h-full relative overflow-hidden bg-black font-display px-safe">
       
       <AnimatePresence>
           {isIslandExpanded && (
