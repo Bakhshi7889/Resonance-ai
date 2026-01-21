@@ -17,13 +17,13 @@ root.render(
 // Register Service Worker for PWA
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    // Use absolute path for PWA at root domain
-    navigator.serviceWorker.register('/service-worker.js')
+    // Use relative path for PWA registration
+    navigator.serviceWorker.register('./service-worker.js')
       .then((registration) => {
-        console.log('SW registered: ', registration);
+        console.log('Resonance: SW registered: ', registration);
       })
       .catch((registrationError) => {
-        console.log('SW registration failed: ', registrationError);
+        console.error('Resonance: SW registration failed: ', registrationError);
       });
   });
 }
