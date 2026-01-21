@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DownloadCloud, Smartphone, Share, PlusSquare, ArrowLeft, ExternalLink, RefreshCw, Layers, Download } from 'lucide-react';
+import { DownloadCloud, Smartphone, Share, PlusSquare, ArrowLeft, ExternalLink, RefreshCw, Layers, Download, PlusCircle } from 'lucide-react';
 import { AppSettings, AppRoute, AccountState } from '../types';
 import { getAccountDetails, getEstimatedImagesLeft, getAuthUrl } from '../services/pollinations';
 
@@ -8,9 +8,11 @@ interface PreferencesProps {
   settings: AppSettings;
   updateSettings: (newSettings: Partial<AppSettings>) => void;
   onNavigate: (route: AppRoute) => void;
+  canInstall?: boolean;
+  onInstallApp?: () => void;
 }
 
-export const Preferences: React.FC<PreferencesProps> = ({ settings, updateSettings, onNavigate }) => {
+export const Preferences: React.FC<PreferencesProps> = ({ settings, updateSettings, onNavigate, canInstall, onInstallApp }) => {
   const [accountState, setAccountState] = useState<AccountState>({ profile: null, balance: null, usage: [], isLoading: false, error: null });
 
   const fetchDetails = useCallback(async () => {
@@ -35,7 +37,8 @@ export const Preferences: React.FC<PreferencesProps> = ({ settings, updateSettin
 
   return (
     <div className="flex flex-col h-full bg-black text-white w-full overflow-y-auto no-scrollbar">
-      <div className="max-w-2xl mx-auto w-full px-8 pt-12 pb-40 space-y-12">
+      {/* Widen the container from max-w-2xl to max-w-3xl for a more robust "app" feel */}
+      <div className="max-w-3xl mx-auto w-full px-6 sm:px-10 pt-12 pb-40 space-y-12">
         <header className="flex items-center justify-between">
             <button onClick={() => onNavigate(AppRoute.GENERATOR)} className="size-11 rounded-full bg-white/5 backdrop-blur-[40px] border-[0.5px] border-white/12 flex items-center justify-center text-white/50 active:scale-90 transition-all">
               <ArrowLeft size={20} />
@@ -43,6 +46,26 @@ export const Preferences: React.FC<PreferencesProps> = ({ settings, updateSettin
             <h1 className="text-xl font-black uppercase tracking-tighter logo-text">Resonance</h1>
             <div className="size-11" />
         </header>
+
+        {/* PWA Install Section - The "Real Install Thing" */}
+        {canInstall && (
+          <section className="space-y-4">
+              <p className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-2">App Architecture</p>
+              <div className="bg-primary/10 backdrop-blur-[40px] rounded-[2.5rem] p-8 border-[0.5px] border-primary/20 flex items-center justify-between gap-6 shadow-glow">
+                  <div className="flex flex-col gap-1">
+                      <span className="text-sm font-bold text-white tracking-tight">Install Resonance</span>
+                      <span className="text-[10px] text-white/40 uppercase font-black tracking-widest leading-relaxed">Add to home screen for a full native experience.</span>
+                  </div>
+                  <button 
+                      onClick={onInstallApp}
+                      className="px-6 py-3.5 rounded-2xl bg-primary text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-glow active:scale-95 transition-all shrink-0"
+                  >
+                      <PlusCircle size={16} />
+                      Install
+                  </button>
+              </div>
+          </section>
+        )}
 
         <section className="space-y-4">
             <p className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-2">BYOP • Access Core</p>

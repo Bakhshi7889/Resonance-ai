@@ -17,7 +17,7 @@ root.render(
 // Robust Service Worker Registration for PWA
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js')
+    navigator.serviceWorker.register('/sw.js')
       .then((registration) => {
         console.log('Resonance: SW registered: ', registration.scope);
       })
