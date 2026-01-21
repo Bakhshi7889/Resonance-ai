@@ -1,18 +1,21 @@
 import React, { useState, useEffect, useRef, memo, useMemo, useCallback } from 'react';
-import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue, useTransform, useSpring, useAnimate } from 'framer-motion';
+import { 
+    Settings, LayoutGrid, Shuffle, Eraser, Maximize2, Minimize2, 
+    Trash2, EyeOff, Wand2, Zap, ArrowUp, ChevronDown, 
+    Check, ShieldCheck, XCircle, Info, Hash, Clock
+} from 'lucide-react';
 import { generateImageUrl, getRandomSeed, getAccountDetails, getEstimatedImagesLeft } from '../services/pollinations';
 import { AppRoute, AppSettings, HistoryItem, MODEL_STYLES, ASPECT_RATIOS, AccountState } from '../types';
 
-const ZIMAGE_COST_PER_IMG = 0.0002;
 const SILENT_NEGATIVE = "nsfw, naked, nude, porn, sex, explicit, genitals, nipples, topless, breasts, bad anatomy, deformed, ugly, watermark, logo";
+const SPRING_CONFIG = { stiffness: 400, damping: 30 };
+const STORAGE_KEY_TELEMETRY = 'resonance_v4_telemetry';
 
 const NEGATIVE_SUGGESTIONS = [
-    "Distorted", "Blurry", "Text", "Lowres", "Watermark", "Malformed", "Extra Limbs", 
-    "Grainy", "Signature", "Logo", "Low Quality", "Mutilated", "Out of frame", "Username", 
-    "Poorly drawn", "Cropped", "Bad proportions", "Double face", "Cloned"
+    "Blurry", "Distorted", "Lowres", "Text", "Watermark", "Malformed", "Extra Limbs", "Grainy", "Logo", "Bad Anatomy"
 ];
 
-// Pure JS Skin Tone Density Auditor
 const performVisualAudit = async (imageUrl: string): Promise<boolean> => {
   return new Promise((resolve) => {
     const img = new Image();
@@ -22,46 +25,37 @@ const performVisualAudit = async (imageUrl: string): Promise<boolean> => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       if (!ctx) return resolve(false);
-      
-      // Sample a 100x100 grid for efficient heuristic processing
-      const w = 100;
-      const h = 100;
-      canvas.width = w;
-      canvas.height = h;
+      const w = 100, h = 100;
+      canvas.width = w; canvas.height = h;
       ctx.drawImage(img, 0, 0, w, h);
-      
       const data = ctx.getImageData(0, 0, w, h).data;
-      let flaggedPixels = 0;
-      const totalPixels = w * h;
-      
+      let flagged = 0;
       for (let i = 0; i < data.length; i += 4) {
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        
-        // Peer-reviewed skin detection heuristic range
-        const isFlagged = (r > 95 && g > 40 && b > 20 && 
-                       (Math.max(r, g, b) - Math.min(r, g, b) > 15) && 
-                       Math.abs(r - g) > 15 && r > g && r > b);
-        
-        if (isFlagged) flaggedPixels++;
+        const r = data[i], g = data[i+1], b = data[i+2];
+        if (r > 95 && g > 40 && b > 20 && (Math.max(r, g, b) - Math.min(r, g, b) > 15) && Math.abs(r - g) > 15 && r > g && r > b) flagged++;
       }
-      
-      const density = flaggedPixels / totalPixels;
-      // 45% skin density is highly likely to be explicit or tight portraits
-      resolve(density > 0.45);
+      resolve((flagged / (w * h)) > 0.45);
     };
     img.onerror = () => resolve(false);
   });
 };
 
 const formatPollen = (balance: number | null) => {
-    if (balance === null || balance === undefined) return '$0.000';
-    const formatted = balance.toLocaleString(undefined, { 
-        minimumFractionDigits: 3, 
-        maximumFractionDigits: 4 
-    });
-    return `$${formatted}`;
+    if (balance === null) return '$0.000';
+    return `$${balance.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 4 })}`;
+};
+
+const RatioIcon = ({ width, height, isSelected }: { width: number, height: number, isSelected: boolean }) => {
+    const base = 20;
+    const ratio = width / height;
+    const w = ratio > 1 ? base : base * ratio;
+    const h = ratio > 1 ? base / ratio : base;
+    return (
+        <div 
+            className={`rounded-[2px] border-[1.5px] transition-all duration-300 ${isSelected ? 'border-primary bg-primary/20 shadow-glow' : 'border-white/20'}`}
+            style={{ width: `${w}px`, height: `${h}px` }}
+        />
+    );
 };
 
 interface ImageGeneratorProps {
@@ -69,28 +63,43 @@ interface ImageGeneratorProps {
   onNavigate: (route: AppRoute) => void;
   onAddToHistory: (item: HistoryItem) => void;
   updateSettings?: (s: Partial<AppSettings>) => void;
-  remixItem?: HistoryItem | null;
-  onClearRemix?: () => void;
   sessionPrompt: string;
   setSessionPrompt: (prompt: string) => void;
   sessionImages: HistoryItem[];
   setSessionImages: React.Dispatch<React.SetStateAction<HistoryItem[]>>;
 }
 
-const GenerationCard = memo(({ item, index, visualSafety }: { item: HistoryItem, index: number, visualSafety: boolean }) => {
+const PromptHeader = memo(({ prompt, onClearBatch, batchId }: { prompt: string, onClearBatch: (id: string) => void, batchId: string }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    return (
+        <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="w-full flex flex-col gap-3 px-2 mb-4 group">
+            <div className="flex items-center gap-3">
+                <div 
+                    onClick={() => setIsExpanded(!isExpanded)}
+                    className="flex-1 flex items-center gap-3 px-6 py-4 rounded-[1.8rem] bg-white/[0.03] border-[0.5px] border-white/10 backdrop-blur-md cursor-pointer hover:bg-white/5 transition-all overflow-hidden shadow-sm"
+                >
+                    <Info size={14} className="text-primary shrink-0" />
+                    <p className={`text-[11px] font-medium text-white/50 tracking-tight leading-relaxed ${isExpanded ? '' : 'truncate'}`}>
+                        {prompt}
+                    </p>
+                </div>
+                <button 
+                    onClick={() => onClearBatch(batchId)}
+                    className="size-12 rounded-[1.5rem] bg-white/5 border-[0.5px] border-white/10 flex items-center justify-center text-white/10 hover:text-red-400 hover:bg-red-500/10 transition-all shrink-0 active:scale-90"
+                >
+                    <Trash2 size={16} />
+                </button>
+            </div>
+        </motion.div>
+    );
+});
+
+const GenerationCard = memo(({ item, index, visualSafety, onImageReady }: { item: HistoryItem, index: number, visualSafety: boolean, onImageReady?: (id: string) => void }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [visualRisk, setVisualRisk] = useState(false);
   const [isAuditing, setIsAuditing] = useState(false);
   
-  // Risk is now strictly based on visual audit results, no more prompt-based detection
-  const needsBlur = visualRisk;
-
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
-  const rotateX = useSpring(useTransform(y, [-100, 100], [5, -5]), { stiffness: 200, damping: 30 });
-  const rotateY = useSpring(useTransform(x, [-100, 100], [-5, 5]), { stiffness: 200, damping: 30 });
-
   const handleImageLoad = async () => {
       if (visualSafety) {
           setIsAuditing(true);
@@ -99,85 +108,54 @@ const GenerationCard = memo(({ item, index, visualSafety }: { item: HistoryItem,
           setIsAuditing(false);
       }
       setIsLoaded(true);
+      if (onImageReady) onImageReady(item.id);
   };
 
-  const handlePointerMove = (e: React.PointerEvent) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    x.set(e.clientX - rect.left - rect.width / 2);
-    y.set(e.clientY - rect.top - rect.height / 2);
-  };
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const rotateX = useSpring(useTransform(y, [-100, 100], [3, -3]), SPRING_CONFIG);
+  const rotateY = useSpring(useTransform(x, [-100, 100], [-3, 3]), SPRING_CONFIG);
 
   return (
     <motion.div 
       layout
-      onPointerMove={handlePointerMove}
-      onPointerLeave={() => { x.set(0); y.set(0); }}
-      initial={{ opacity: 0, scale: 0.95, y: 40 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ delay: index * 0.02, type: "spring", stiffness: 400, damping: 35 }}
-      className="relative shrink-0 overflow-hidden bg-white/[0.02] border-[0.5px] border-white/10 shadow-2xl rounded-[2.5rem] group/card flex items-center justify-center"
-      style={{ 
-        rotateX, rotateY, transformStyle: 'preserve-3d',
-        aspectRatio: `${item.width}/${item.height}`,
-        width: '100%',
-        maxWidth: 'min(calc(100vw - 48px), 600px)',
-        height: 'auto'
+      onPointerMove={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        x.set(e.clientX - rect.left - rect.width/2);
+        y.set(e.clientY - rect.top - rect.height/2);
       }}
+      onPointerLeave={() => { x.set(0); y.set(0); }}
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay: index * 0.05, type: "spring", ...SPRING_CONFIG }}
+      className="relative shrink-0 overflow-hidden bg-white/[0.02] border-[0.5px] border-white/10 shadow-liquid rounded-[2.5rem] flex items-center justify-center group/card"
+      style={{ rotateX, rotateY, transformStyle: 'preserve-3d', aspectRatio: `${item.width}/${item.height}`, width: '100%', maxWidth: '600px' }}
     >
       <img 
         src={item.url} 
         alt="vision"
-        className={`w-full h-full object-cover transition-all duration-1000 ease-out ${isLoaded && !isAuditing ? 'opacity-100 scale-100' : 'opacity-0 scale-110'} ${(needsBlur && !revealed) ? 'blur-[80px] saturate-50 brightness-50' : 'blur-0'}`}
+        className={`w-full h-full object-cover transition-all duration-1000 ease-out ${isLoaded && !isAuditing ? 'opacity-100' : 'opacity-0'} ${(visualRisk && !revealed) ? 'blur-[80px] saturate-50 brightness-50' : 'blur-0'}`}
         onLoad={handleImageLoad}
-        draggable={false}
       />
       {(!isLoaded || isAuditing) && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/20 gap-3">
-          <div className="size-10 rounded-full border-2 border-white/5 border-t-primary/60 animate-spin" />
-          {isAuditing && <span className="text-[8px] font-black uppercase tracking-[0.3em] text-white/30">Calibrating...</span>}
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-md">
+          <div className="size-8 rounded-full border-2 border-white/5 border-t-primary animate-spin" />
         </div>
       )}
-      {needsBlur && !revealed && isLoaded && !isAuditing && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center z-20 bg-black/60 backdrop-blur-3xl">
-          <span className="material-symbols-outlined text-white/40 text-4xl mb-4 !font-light">visibility_off</span>
-          <p className="text-[10px] text-white/60 font-black uppercase tracking-[0.3em] mb-6">Sensitive Content Detected</p>
-          <button onClick={(e) => { e.stopPropagation(); setRevealed(true); }} className="px-8 py-3 rounded-full bg-white text-black text-[10px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all">Reveal</button>
+      {visualRisk && !revealed && isLoaded && !isAuditing && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center z-20 bg-black/80 backdrop-blur-3xl">
+          <EyeOff className="text-white/10 mb-6" strokeWidth={1} size={54} />
+          <p className="text-[10px] text-white/30 font-black uppercase tracking-[0.4em] mb-10">Neural Filter Active</p>
+          <button onClick={() => setRevealed(true)} className="px-12 py-5 rounded-full bg-white text-black text-[11px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-glow">Reveal</button>
         </div>
       )}
-      <div className="absolute inset-0 rounded-[2.5rem] border-[0.5px] border-white/20 pointer-events-none group-hover/card:border-white/40 transition-colors" />
     </motion.div>
   );
 });
 
 const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }: { 
-    localSettings: AppSettings, 
-    updateLocalSetting: (k: keyof AppSettings, v: any) => void,
-    setAspectRatio: (w: number, h: number) => void
+    localSettings: AppSettings, updateLocalSetting: (k: keyof AppSettings, v: any) => void, setAspectRatio: (w: number, h: number) => void
 }) => {
-    const sortedStyles = useMemo(() => {
-        const categories = ['Basic', 'Realistic', 'Artistic', 'Thematic'];
-        return [...MODEL_STYLES].sort((a, b) => categories.indexOf(a.category) - categories.indexOf(b.category));
-    }, []);
-
-    const negativeTags = useMemo(() => {
-        return (localSettings.negativePrompt || "")
-            .split(',')
-            .map(t => t.trim())
-            .filter(t => t.length > 0);
-    }, [localSettings.negativePrompt]);
-
-    const addNegativeTag = (tag: string) => {
-        if (!negativeTags.some(t => t.toLowerCase() === tag.toLowerCase())) {
-            const newPrompt = negativeTags.length > 0 ? `${localSettings.negativePrompt}, ${tag}` : tag;
-            updateLocalSetting('negativePrompt', newPrompt);
-        }
-    };
-
-    const removeNegativeTag = (tag: string) => {
-        const filtered = negativeTags.filter(t => t.toLowerCase() !== tag.toLowerCase());
-        updateLocalSetting('negativePrompt', filtered.join(', '));
-    };
-
     const toggleStyle = (id: string) => {
         const current = localSettings.activeStyles || [];
         if (id === 'none') {
@@ -193,164 +171,187 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
         }
     };
 
+    // Centered Neural Circuit Logic
+    const selectedIndices = useMemo(() => {
+        const indices = MODEL_STYLES
+            .map((s, i) => (localSettings.activeStyles.includes(s.id) && s.id !== 'none') ? i : -1)
+            .filter(i => i !== -1);
+        return indices.length > 1 ? indices : [];
+    }, [localSettings.activeStyles]);
+
+    const meshData = useMemo(() => {
+        if (selectedIndices.length < 2) return null;
+        
+        const cardWidth = 112; 
+        const gap = 16; 
+        const containerPadding = 4; 
+        
+        const points = selectedIndices.map(index => {
+            return containerPadding + (index * (cardWidth + gap)) + (cardWidth / 2);
+        });
+
+        const minX = Math.min(...points);
+        const maxX = Math.max(...points);
+        const bridgeY = 32; 
+        
+        return { 
+            points, 
+            minX, 
+            maxX, 
+            bridgeY, 
+            totalWidth: (MODEL_STYLES.length * cardWidth) + ((MODEL_STYLES.length - 1) * gap) + (containerPadding * 2) 
+        };
+    }, [selectedIndices]);
+
     return (
-        <div className="px-5 py-6 flex flex-col gap-8 overflow-y-auto no-scrollbar max-h-[60vh] pb-32">
-            <div className="flex flex-col gap-3 glass-panel-sub p-5 rounded-[2.2rem] border-[0.5px] border-white/10">
-                <p className="text-[9px] text-white/30 font-black uppercase tracking-[0.2em]">Batch Capacity (Max 8)</p>
-                <div className="flex justify-between items-center gap-2">
-                    {[1, 2, 4, 6, 8].map(n => (
-                        <button 
-                            key={n} 
-                            onClick={() => updateLocalSetting('imageCount', n)}
-                            className={`flex-1 h-12 rounded-2xl text-[12px] font-black transition-all border ${localSettings.imageCount === n ? 'bg-primary/20 border-primary/50 text-primary shadow-glow scale-105' : 'bg-white/5 border-transparent text-white/30 hover:bg-white/10'}`}
-                        >
-                            {n}
-                        </button>
+        <div className="px-6 py-10 flex flex-col gap-10 overflow-y-auto no-scrollbar max-h-[60vh] pb-36">
+            <div className="grid grid-cols-2 gap-4">
+                <button onClick={() => updateLocalSetting('enhance', !localSettings.enhance)} className={`h-16 rounded-[1.5rem] flex items-center justify-center gap-3 transition-all border ${localSettings.enhance ? 'bg-primary/20 border-primary/40 text-primary shadow-glow' : 'bg-white/5 border-transparent text-white/20'}`}>
+                    <Wand2 size={16} />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Neural {localSettings.enhance ? 'ON' : 'OFF'}</span>
+                </button>
+                <button onClick={() => updateLocalSetting('visualSafety', !localSettings.visualSafety)} className={`h-16 rounded-[1.5rem] flex items-center justify-center gap-3 transition-all border ${localSettings.visualSafety ? 'bg-blue-500/20 border-blue-500/40 text-blue-400 shadow-glow' : 'bg-white/5 border-transparent text-white/20'}`}>
+                    <ShieldCheck size={16} />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Audit {localSettings.visualSafety ? 'ON' : 'OFF'}</span>
+                </button>
+            </div>
+
+            <div className="space-y-4">
+                <p className="text-[9px] text-white/20 font-black uppercase tracking-[0.2em] pl-1">Aspect Geometry</p>
+                <div className="grid grid-cols-5 gap-2 bg-white/5 p-2 rounded-[1.8rem] border border-white/5">
+                    {ASPECT_RATIOS.map(ratio => {
+                        const isSelected = localSettings.width === ratio.width && localSettings.height === ratio.height;
+                        return (
+                            <button key={ratio.label} onClick={() => setAspectRatio(ratio.width, ratio.height)} className={`h-14 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all ${isSelected ? 'bg-white/10 text-white shadow-lg' : 'text-white/20 hover:text-white/40'}`}>
+                                <RatioIcon width={ratio.width} height={ratio.height} isSelected={isSelected} />
+                                <span className="text-[8px] font-black">{ratio.label}</span>
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
+            <div className="space-y-4">
+                <p className="text-[9px] text-white/20 font-black uppercase tracking-[0.2em] pl-1">Batch Capacity</p>
+                <div className="grid grid-cols-4 gap-2 bg-white/5 p-2 rounded-[1.8rem] border border-white/5">
+                    {[1, 2, 4, 8].map(n => (
+                        <button key={n} onClick={() => updateLocalSetting('imageCount', n)} className={`h-14 rounded-2xl text-[10px] font-black transition-all ${localSettings.imageCount === n ? 'bg-primary text-white shadow-glow' : 'text-white/20 hover:text-white/40'}`}>{n}x</button>
                     ))}
                 </div>
             </div>
 
-            <div className="flex flex-col gap-6">
-                 <div className="grid grid-cols-2 gap-4">
-                    <div className="glass-panel-sub p-5 rounded-[2.2rem] flex flex-col gap-3">
-                        <p className="text-[9px] text-white/30 font-black uppercase tracking-[0.2em]">Neural Engine</p>
-                        <button 
-                            onClick={() => updateLocalSetting('enhance', !localSettings.enhance)}
-                            className={`w-full h-12 rounded-2xl text-[9px] font-black transition-all border flex items-center justify-center gap-2 ${localSettings.enhance ? 'bg-primary/20 border-primary/50 text-primary shadow-glow' : 'bg-white/5 border-transparent text-white/30 hover:bg-white/10'}`}
-                        >
-                            <span className="material-symbols-outlined text-[16px]">{localSettings.enhance ? 'auto_awesome' : 'auto_awesome_off'}</span>
-                            {localSettings.enhance ? 'ON' : 'OFF'}
-                        </button>
-                    </div>
-                    <div className="glass-panel-sub p-5 rounded-[2.2rem] flex flex-col gap-3">
-                        <p className="text-[9px] text-white/30 font-black uppercase tracking-[0.2em]">Neural Privacy</p>
-                        <button 
-                            onClick={() => updateLocalSetting('visualSafety', !localSettings.visualSafety)}
-                            className={`w-full h-12 rounded-2xl text-[9px] font-black transition-all border flex items-center justify-center gap-2 ${localSettings.visualSafety ? 'bg-blue-500/20 border-blue-500/50 text-blue-400 shadow-glow' : 'bg-white/5 border-transparent text-white/30 hover:bg-white/10'}`}
-                        >
-                            <span className="material-symbols-outlined text-[16px] animate-pulse-slow">{localSettings.visualSafety ? 'visibility_lock' : 'visibility'}</span>
-                            {localSettings.visualSafety ? 'AUDIT' : 'OFF'}
-                        </button>
-                    </div>
-                </div>
-
-                <div>
-                    <p className="text-[9px] text-white/30 font-black uppercase tracking-[0.2em] mb-4 pl-1">Aspect Geometry</p>
-                    <div className="flex gap-3 overflow-x-auto no-scrollbar px-1 pb-2">
-                        {ASPECT_RATIOS.map(ratio => {
-                            const isSelected = localSettings.width === ratio.width && localSettings.height === ratio.height;
-                            const iconDims: Record<string, { w: number, h: number }> = {
-                                "1:1": { w: 12, h: 12 }, "3:4": { w: 9, h: 12 }, "4:3": { w: 12, h: 9 }, "16:9": { w: 16, h: 9 }, "9:16": { w: 9, h: 16 }
-                            };
-                            const { w, h } = iconDims[ratio.label] || { w: 12, h: 12 };
-                            return (
-                                <button key={ratio.label} onClick={() => setAspectRatio(ratio.width, ratio.height)} className={`shrink-0 flex flex-col items-center justify-center gap-2 px-3 py-4 rounded-2xl min-w-[68px] border transition-all ${isSelected ? 'bg-primary/10 border-primary/40 shadow-glow' : 'bg-white/5 border-transparent opacity-50 hover:opacity-100'}`}>
-                                    <div className={`border-[1.5px] rounded-[2px] ${isSelected ? 'border-primary bg-primary/20' : 'border-white/30'}`} style={{ width: `${w}px`, height: `${h}px` }} />
-                                    <span className={`text-[8px] font-black ${isSelected ? 'text-primary' : 'text-white/40'}`}>{ratio.label}</span>
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                <div>
-                    <p className="text-[9px] text-white/30 font-black uppercase tracking-[0.2em] mb-4 pl-1">Style Matrix</p>
-                    <div className="flex gap-4 overflow-x-auto no-scrollbar px-1 pb-4">
-                        {sortedStyles.map(style => {
+            <div className="space-y-4">
+                <p className="text-[9px] text-white/20 font-black uppercase tracking-[0.2em] pl-1">Style Matrix</p>
+                <div className="relative">
+                    <div className="flex gap-4 overflow-x-auto no-scrollbar px-1 pb-24 relative z-10">
+                        {MODEL_STYLES.map(style => {
                             const isSelected = localSettings.activeStyles.includes(style.id);
                             return (
-                                <button key={style.id} onClick={() => toggleStyle(style.id)} className={`relative shrink-0 w-32 h-44 rounded-[2rem] overflow-hidden border transition-all duration-500 ${isSelected ? 'border-primary/60 ring-4 ring-primary/10 scale-105 z-10' : 'border-white/10 opacity-40 hover:opacity-100'}`}>
+                                <button 
+                                    key={style.id} 
+                                    onClick={() => toggleStyle(style.id)} 
+                                    className={`relative shrink-0 w-28 h-40 rounded-[1.8rem] overflow-hidden border transition-all duration-500 ${isSelected ? 'border-primary shadow-[0_4px_30px_rgba(59,130,246,0.4)] scale-105 z-10' : 'border-white/10 opacity-40 hover:opacity-100'}`}
+                                >
                                     <img src={style.image} alt={style.label} className="w-full h-full object-cover" loading="lazy" />
-                                    <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black to-transparent">
-                                        <p className={`text-[10px] font-black uppercase tracking-tight text-center ${isSelected ? 'text-primary' : 'text-white'}`}>{style.label}</p>
-                                        <p className="text-[7px] text-white/30 text-center uppercase font-black tracking-widest mt-1">{style.category}</p>
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-3">
+                                        <p className={`text-[9px] font-black uppercase tracking-tighter text-center leading-tight ${isSelected ? 'text-primary' : 'text-white/80'}`}>{style.label}</p>
                                     </div>
-                                    {isSelected && (
-                                        <div className="absolute top-2 right-2 size-6 rounded-full bg-primary flex items-center justify-center shadow-lg border border-white/20">
-                                            <span className="material-symbols-outlined text-white text-[14px] font-black">check</span>
-                                        </div>
+                                    {isSelected && style.id !== 'none' && (
+                                        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-12 bg-primary/20 blur-2xl pointer-events-none" />
                                     )}
                                 </button>
                             );
                         })}
-                    </div>
-                </div>
-
-                <div className="glass-panel-sub p-5 rounded-[2.2rem] flex flex-col gap-3">
-                    <p className="text-[9px] text-white/30 font-black uppercase tracking-[0.2em]">Seed Matrix</p>
-                    <div className="flex gap-2">
-                        <input 
-                            type="number"
-                            value={localSettings.seed || ''}
-                            onChange={(e) => updateLocalSetting('seed', parseInt(e.target.value) || 0)}
-                            placeholder="Auto-Seed Active"
-                            className="flex-1 h-12 bg-white/[0.03] border border-white/10 rounded-2xl px-4 text-[10px] text-white focus:ring-1 focus:ring-primary/40 focus:border-primary/40 transition-all placeholder:text-white/10"
-                        />
-                        <button onClick={() => updateLocalSetting('seed', getRandomSeed())} className="h-12 w-12 shrink-0 bg-white/5 border border-white/10 rounded-2xl text-white/40 hover:text-white transition-all flex items-center justify-center">
-                            <span className="material-symbols-outlined text-[18px]">shuffle</span>
-                        </button>
-                    </div>
-                </div>
-
-                <div className="flex flex-col gap-4">
-                    <p className="text-[9px] text-white/30 font-black uppercase tracking-[0.2em] pl-1">Exclusion Engine</p>
-                    <div className="flex flex-wrap gap-2 px-1">
+                        
+                        {/* Synapse Path Overlay (Circuit Lines Only) */}
                         <AnimatePresence>
-                            {negativeTags.map(tag => (
+                            {meshData && (
                                 <motion.div 
-                                    key={tag}
-                                    layout
-                                    initial={{ scale: 0.8, opacity: 0 }}
-                                    animate={{ scale: 1, opacity: 1 }}
-                                    exit={{ scale: 0.8, opacity: 0 }}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/30 text-primary shadow-glow"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="absolute bottom-6 left-0 h-[60px] z-0 pointer-events-none"
+                                    style={{ width: meshData.totalWidth }}
                                 >
-                                    <span className="text-[10px] font-black uppercase tracking-wider">{tag}</span>
-                                    <button 
-                                        onClick={() => removeNegativeTag(tag)}
-                                        className="size-4 rounded-full bg-primary/20 flex items-center justify-center hover:bg-primary/40 transition-all"
+                                    <svg 
+                                        width={meshData.totalWidth} 
+                                        height="60" 
+                                        viewBox={`0 0 ${meshData.totalWidth} 60`} 
+                                        className="overflow-visible"
                                     >
-                                        <span className="material-symbols-outlined text-[10px] font-black">close</span>
-                                    </button>
+                                        <defs>
+                                            <filter id="mesh-glow" x="-50%" y="-50%" width="200%" height="200%">
+                                                <feGaussianBlur stdDeviation="4" result="blur" />
+                                                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                                            </filter>
+                                        </defs>
+
+                                        {/* Main horizontal Path connecting ALL selected centers */}
+                                        <motion.line
+                                            initial={{ x1: meshData.minX, x2: meshData.minX }}
+                                            animate={{ 
+                                                x1: meshData.minX, 
+                                                x2: meshData.maxX, 
+                                                y1: meshData.bridgeY, 
+                                                y2: meshData.bridgeY,
+                                            }}
+                                            stroke="#3b82f6"
+                                            strokeWidth="3"
+                                            strokeLinecap="round"
+                                            filter="url(#mesh-glow)"
+                                            transition={{ type: "spring", ...SPRING_CONFIG }}
+                                        />
+
+                                        {/* Vertical Connection Stems (Dots removed as requested) */}
+                                        {meshData.points.map((x, i) => (
+                                            <g key={`neural-path-${i}`}>
+                                                <motion.line
+                                                    initial={{ opacity: 0, y1: 0, y2: 0 }}
+                                                    animate={{ x1: x, x2: x, y1: 0, y2: meshData.bridgeY, opacity: 1 }}
+                                                    stroke="#3b82f6"
+                                                    strokeWidth="2.5"
+                                                    strokeLinecap="round"
+                                                    filter="url(#mesh-glow)"
+                                                />
+                                            </g>
+                                        ))}
+                                    </svg>
                                 </motion.div>
-                            ))}
+                            )}
                         </AnimatePresence>
-                        {negativeTags.length === 0 && (
-                            <p className="text-[10px] text-white/10 italic py-2 pl-1">Exclusion Matrix is currently clear...</p>
-                        )}
-                    </div>
-                    <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-                        {NEGATIVE_SUGGESTIONS.map(suggestion => {
-                            const isActive = negativeTags.some(t => t.toLowerCase() === suggestion.toLowerCase());
-                            return (
-                                <button 
-                                    key={suggestion}
-                                    onClick={() => !isActive && addNegativeTag(suggestion)}
-                                    className={`shrink-0 px-4 py-2 rounded-full border text-[9px] font-black uppercase tracking-widest transition-all ${isActive ? 'bg-primary/20 border-primary/40 text-primary opacity-30 cursor-default' : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10 hover:text-white active:scale-95'}`}
-                                >
-                                    {suggestion}
-                                </button>
-                            );
-                        })}
-                    </div>
-                    <div className="relative group">
-                        <input 
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ',') {
-                                    e.preventDefault();
-                                    const val = (e.target as HTMLInputElement).value.trim();
-                                    if (val) addNegativeTag(val);
-                                    (e.target as HTMLInputElement).value = '';
-                                }
-                            }}
-                            placeholder="Inject custom exclusion tokens..."
-                            className="w-full bg-white/[0.03] border border-white/10 rounded-2xl p-5 text-xs text-white placeholder:text-white/10 focus:ring-1 focus:ring-primary/40 transition-all"
-                        />
-                        <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none opacity-20 group-focus-within:opacity-40 transition-opacity">
-                             <span className="material-symbols-outlined text-[18px]">keyboard_return</span>
-                        </div>
                     </div>
                 </div>
+            </div>
+
+            <div className="space-y-4">
+                <p className="text-[9px] text-white/20 font-black uppercase tracking-[0.2em] pl-1">Seed Override</p>
+                <div className="flex items-center gap-3">
+                    <div className="relative flex-1">
+                        <input type="number" value={localSettings.seed || ''} onChange={(e) => updateLocalSetting('seed', parseInt(e.target.value) || 0)} placeholder="Random (Auto)" className="w-full h-16 bg-white/5 border border-white/10 rounded-[1.5rem] px-6 text-[11px] font-mono text-white focus:ring-1 focus:ring-primary/40 placeholder:text-white/10" />
+                        <Hash size={14} className="absolute right-5 top-1/2 -translate-y-1/2 text-white/10" />
+                    </div>
+                    <button onClick={() => updateLocalSetting('seed', getRandomSeed())} className="size-16 rounded-[1.5rem] bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white transition-all active:scale-90"><Shuffle size={18} /></button>
+                </div>
+            </div>
+
+            <div className="glass-panel-sub p-6 rounded-[2.5rem] flex flex-col gap-5">
+                <p className="text-[9px] text-white/20 font-black uppercase tracking-[0.2em]">Exclusion Architecture</p>
+                <div className="flex flex-wrap gap-2">
+                    <AnimatePresence>
+                        {(localSettings.negativePrompt || "").split(',').filter(t => t.trim()).map(tag => (
+                            <motion.div key={tag} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/10 text-[9px] font-black uppercase tracking-widest text-white/60">
+                                {tag.trim()}
+                                <XCircle size={10} className="cursor-pointer hover:text-white" onClick={() => updateLocalSetting('negativePrompt', (localSettings.negativePrompt || "").split(',').filter(t => t.trim() !== tag.trim()).join(', '))} />
+                            </motion.div>
+                        ))}
+                    </AnimatePresence>
+                </div>
+                <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
+                    {NEGATIVE_SUGGESTIONS.map(s => (
+                        <button key={s} onClick={() => updateLocalSetting('negativePrompt', localSettings.negativePrompt ? `${localSettings.negativePrompt}, ${s}` : s)} className="shrink-0 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-[8px] font-black uppercase tracking-widest text-white/30 hover:text-white/60 hover:bg-white/10 transition-all">{s}</button>
+                    ))}
+                </div>
+                <input onKeyDown={(e) => { if(e.key === 'Enter') { const val = (e.target as HTMLInputElement).value; if(val) updateLocalSetting('negativePrompt', localSettings.negativePrompt ? `${localSettings.negativePrompt}, ${val}` : val); (e.target as HTMLInputElement).value = ''; } }} placeholder="Tokens to prevent..." className="w-full h-14 bg-white/[0.03] border border-white/10 rounded-2xl px-6 text-[11px] text-white focus:ring-1 focus:ring-primary/40 placeholder:text-white/10" />
             </div>
         </div>
     );
@@ -359,191 +360,374 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
 export const ImageGenerator: React.FC<ImageGeneratorProps> = ({ 
     settings: globalSettings, onNavigate, onAddToHistory, updateSettings, sessionPrompt, setSessionPrompt, sessionImages, setSessionImages
 }) => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [localSettings, setLocalSettings] = useState({ 
-    ...globalSettings, 
-    activeStyles: (globalSettings.activeStyles && globalSettings.activeStyles.length > 0) ? globalSettings.activeStyles : ['none'] 
-  });
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [localSettings, setLocalSettings] = useState({ ...globalSettings });
   const [showSettings, setShowSettings] = useState(false);
   const [isIslandExpanded, setIsIslandExpanded] = useState(false);
+  const [isInputExpanded, setIsInputExpanded] = useState(false);
+  const [renderTime, setRenderTime] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [accountState, setAccountState] = useState<AccountState>({ profile: null, balance: null, usage: [], isLoading: false, error: null });
-  const [sessionTotalCost, setSessionTotalCost] = useState(0);
+  const [pendingImages, setPendingImages] = useState<Set<string>>(new Set());
 
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const islandRef = useRef<HTMLDivElement>(null);
+  const [telemetry, setTelemetry] = useState<{ avgDuration: number; count: number }>(() => {
+    try {
+        const stored = localStorage.getItem(STORAGE_KEY_TELEMETRY);
+        return stored ? JSON.parse(stored) : { avgDuration: 5.0, count: 0 };
+    } catch {
+        return { avgDuration: 5.0, count: 0 };
+    }
+  });
+
+  const progressValue = useMotionValue(0);
+  const [scope, animate] = useAnimate();
+
+  const [accountState, setAccountState] = useState<AccountState>(() => {
+      try {
+          const cached = localStorage.getItem('resonance_cached_account');
+          return cached ? JSON.parse(cached) : { profile: null, balance: null, usage: [], isLoading: false, error: null };
+      } catch {
+          return { profile: null, balance: null, usage: [], isLoading: false, error: null };
+      }
+  });
+
   const scrollRef = useRef<HTMLDivElement>(null);
+  const timerRef = useRef<any>(null);
 
-  const showToast = useCallback((message: string) => {
-    setToastMessage(message);
-    setTimeout(() => setToastMessage(null), 3000);
-  }, []);
+  const showToast = (message: string) => { setToastMessage(message); setTimeout(() => setToastMessage(null), 3000); };
 
   const fetchAccount = useCallback(async () => {
       const data = await getAccountDetails(globalSettings.apiKey);
       setAccountState(data);
+      localStorage.setItem('resonance_cached_account', JSON.stringify(data));
   }, [globalSettings.apiKey]);
 
-  const scrollToBottom = useCallback(() => {
-    if (scrollRef.current) {
-        scrollRef.current.scrollTo({
-            top: scrollRef.current.scrollHeight,
-            behavior: 'smooth'
+  useEffect(() => {
+      fetchAccount(); 
+  }, [fetchAccount]);
+
+  const isActuallyRendering = useMemo(() => isProcessing || pendingImages.size > 0, [isProcessing, pendingImages]);
+
+  useEffect(() => {
+    if (isProcessing) {
+        animate(progressValue, 0.85, { 
+            duration: telemetry.avgDuration, 
+            ease: "easeOut" 
         });
+    } else if (pendingImages.size > 0) {
+        // Continue crawl
+    } else {
+        if (progressValue.get() > 0) {
+            animate(progressValue, 1, { duration: 0.4, ease: "circIn" }).then(() => {
+                setTimeout(() => animate(progressValue, 0, { duration: 0.2 }), 1000);
+            });
+        }
     }
+  }, [isProcessing, pendingImages.size, telemetry.avgDuration, animate, progressValue]);
+
+  useEffect(() => {
+      if (isActuallyRendering) {
+          if (!timerRef.current) {
+            setRenderTime(0);
+            timerRef.current = setInterval(() => setRenderTime(prev => prev + 0.1), 100);
+          }
+      } else {
+          if (renderTime > 1.0) {
+            setTelemetry(prev => {
+                const nextCount = prev.count + 1;
+                const nextAvg = (prev.avgDuration * prev.count + renderTime) / nextCount;
+                const nextData = { avgDuration: nextAvg, count: nextCount };
+                localStorage.setItem(STORAGE_KEY_TELEMETRY, JSON.stringify(nextData));
+                return nextData;
+            });
+          }
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+      }
+      return () => {
+          if (timerRef.current && !isActuallyRendering) {
+              clearInterval(timerRef.current);
+              timerRef.current = null;
+          }
+      };
+  }, [isActuallyRendering]);
+
+  const handleImageLoaded = useCallback((id: string) => {
+      setPendingImages(prev => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+      });
   }, []);
 
   useEffect(() => {
-      fetchAccount();
-      const interval = setInterval(fetchAccount, 20000); 
-      return () => clearInterval(interval);
-  }, [fetchAccount]);
-
-  useEffect(() => {
-    if (isLoading || sessionImages.length > 0) {
-        scrollToBottom();
-    }
-  }, [sessionImages.length, isLoading, scrollToBottom]);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-        if (islandRef.current && !islandRef.current.contains(e.target as Node)) setIsIslandExpanded(false);
-    };
-    if (isIslandExpanded) document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isIslandExpanded]);
-
-  useEffect(() => setLocalSettings(prev => ({ 
-    ...prev, ...globalSettings,
-    activeStyles: (globalSettings.activeStyles && globalSettings.activeStyles.length > 0) ? globalSettings.activeStyles : prev.activeStyles
-  })), [globalSettings]);
-
-  const generateImagesBatch = async (count: number): Promise<HistoryItem[]> => {
-        const batchId = crypto.randomUUID(); 
-        const selectedStyles = MODEL_STYLES.filter(s => localSettings.activeStyles.includes(s.id) && s.id !== 'none');
-        const combinedSuffix = selectedStyles.map(s => s.suffix).join('');
-        const promptWithStyles = `${sessionPrompt}${combinedSuffix}${selectedStyles.length > 0 ? ', highly detailed, 8k' : ''}`;
-        
-        const scale = localSettings.quality === 'hd' ? 2 : 1;
-        const finalWidth = Math.round(localSettings.width * scale);
-        const finalHeight = Math.round(localSettings.height * scale);
-
-        const cost = count * ZIMAGE_COST_PER_IMG;
-        setSessionTotalCost(prev => prev + cost);
-
-        const newItems: HistoryItem[] = [];
-        for (let i = 0; i < count; i++) {
-            if (abortControllerRef.current?.signal.aborted) break;
-            const itemSeed = localSettings.seed || (getRandomSeed() + i);
-            const params = { 
-                prompt: promptWithStyles, model: 'zimage', width: finalWidth, height: finalHeight, 
-                seed: itemSeed, enhance: localSettings.enhance, nologo: true, 
-                negative_prompt: localSettings.negativePrompt || SILENT_NEGATIVE, apiKey: globalSettings.apiKey, safe: true, private: true 
-            };
-            const item: HistoryItem = { 
-                ...params, id: Date.now().toString() + i, batchId, timestamp: Date.now(), 
-                url: generateImageUrl(params), prompt: sessionPrompt, styleIds: localSettings.activeStyles, styleSuffix: combinedSuffix 
-            };
-            newItems.push(item);
-            onAddToHistory(item);
-        }
-        setTimeout(fetchAccount, 5000);
-        return newItems;
-  };
+      if (pendingImages.size === 0 && !isProcessing && renderTime > 0) {
+          fetchAccount();
+      }
+  }, [pendingImages.size, isProcessing, fetchAccount, renderTime]);
 
   const handleGenerate = async () => {
-    if (!sessionPrompt) return;
-    setShowSettings(false); setIsLoading(true);
-    abortControllerRef.current = new AbortController();
-    scrollToBottom();
-    const newItems = await generateImagesBatch(localSettings.imageCount || 1);
-    if (!abortControllerRef.current?.signal.aborted) {
-        setSessionImages(prev => [...prev, ...newItems]);
-        setIsLoading(false);
+    if (!sessionPrompt || isActuallyRendering) return;
+    setShowSettings(false); 
+    setIsProcessing(true);
+    
+    const batchId = crypto.randomUUID();
+    const scale = localSettings.quality === 'hd' ? 2 : 1;
+    const activeStyleObjects = MODEL_STYLES.filter(s => localSettings.activeStyles.includes(s.id) && s.id !== 'none');
+    const styleSuffix = activeStyleObjects.map(s => s.suffix).join('');
+    const promptWithStyles = `${sessionPrompt}${styleSuffix}${activeStyleObjects.length > 0 ? ', ultra detailed, 8k' : ''}`;
+
+    const newBatch: HistoryItem[] = [];
+    const pendingIds = new Set<string>();
+
+    for (let i = 0; i < localSettings.imageCount; i++) {
+        const id = Date.now().toString() + i;
+        const seed = localSettings.seed || getRandomSeed() + i;
+        const params = { prompt: promptWithStyles, model: 'zimage', width: localSettings.width * scale, height: localSettings.height * scale, seed, enhance: localSettings.enhance, nologo: true, negative_prompt: localSettings.negativePrompt || SILENT_NEGATIVE, safe: true, private: true };
+        const item: HistoryItem = { ...params, id, batchId, timestamp: Date.now(), url: generateImageUrl(params), prompt: sessionPrompt };
+        newBatch.push(item);
+        pendingIds.add(id);
+        onAddToHistory(item);
     }
+    
+    setPendingImages(pendingIds);
+    setSessionImages(prev => [...prev, ...newBatch]);
+    
+    setTimeout(() => {
+        setIsProcessing(false);
+    }, 1500); 
+
+    setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }), 300);
   };
 
-  const updateLocalSetting = useCallback((key: keyof AppSettings, value: any) => {
+  const handleClearBatch = (batchId: string) => {
+    setSessionImages(prev => prev.filter(img => img.batchId !== batchId));
+    showToast("Batch Excised");
+  };
+
+  const updateLocalSetting = (key: keyof AppSettings, value: any) => {
       setLocalSettings(prev => ({ ...prev, [key]: value }));
-      if (updateSettings) updateSettings({ [key]: value });
-  }, [updateSettings]);
-
-  const setAspectRatio = useCallback((width: number, height: number) => {
-    updateLocalSetting('width', width);
-    updateLocalSetting('height', height);
-  }, [updateLocalSetting]);
-
-  const clearSessionFeed = () => {
-      setSessionImages([]);
-      showToast("Session Purged");
+      updateSettings?.({ [key]: value });
   };
+
+  const groupedImages = useMemo(() => {
+      const groups: { batchId: string, prompt: string, items: HistoryItem[] }[] = [];
+      sessionImages.forEach(img => {
+          const group = groups.find(g => g.batchId === img.batchId);
+          if (group) group.items.push(img);
+          else groups.push({ batchId: img.batchId || 'default', prompt: img.prompt, items: [img] });
+      });
+      return groups;
+  }, [sessionImages]);
+
+  const islandWidth = isIslandExpanded ? 400 : (isActuallyRendering ? 280 : 200);
+  const islandHeight = isIslandExpanded ? 420 : 44;
+  const islandRadius = isIslandExpanded ? 40 : 22;
 
   return (
-    <motion.div className="flex flex-col h-full relative overflow-hidden font-display bg-black">
-      <div className="fixed top-0 left-0 right-0 z-[200] h-24 flex justify-center pointer-events-none">
-          <div className="absolute top-8 left-1/2 -translate-x-1/2 pointer-events-auto">
-            <motion.div ref={islandRef} layout onClick={() => setIsIslandExpanded(!isIslandExpanded)} animate={{ width: isIslandExpanded ? 'min(380px, 90vw)' : '160px', height: isIslandExpanded ? 'auto' : '38px', borderRadius: isIslandExpanded ? '2rem' : '1.2rem' }} transition={{ type: "spring", stiffness: 450, damping: 32 }} className={`flex flex-col items-center shadow-liquid bg-black/80 backdrop-blur-[60px] overflow-hidden ${isLoading ? 'processing-border' : ''} border-[0.5px] border-white/20 origin-top cursor-pointer`}>
-                <motion.div className="flex items-center gap-3 w-full h-[38px] justify-center px-4 shrink-0" animate={{ opacity: isIslandExpanded ? 0 : 1 }}>
-                    <div className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-blue-500 shadow-glow" /><span className="text-[11px] font-black uppercase text-blue-400 font-mono tracking-tighter">{formatPollen(accountState.balance)}</span></div>
-                    <div className="w-[0.5px] h-3 bg-white/15" /><span className="text-[11px] font-black uppercase text-white/80 font-mono tracking-tighter">~{getEstimatedImagesLeft(accountState.balance)}</span>
-                </motion.div>
-                <AnimatePresence>
-                    {isIslandExpanded && (
-                        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full p-6 flex flex-col gap-6">
-                            <div className="flex justify-between items-center border-b border-white/5 pb-4"><div className="flex flex-col"><h3 className="text-[10px] font-black uppercase text-white tracking-[0.3em]">Core Processor</h3><p className="text-[8px] text-primary/80 font-mono uppercase tracking-widest mt-1">Status: Stable</p></div><span className="text-[9px] font-mono text-white/20">V4.32.R</span></div>
-                            <div className="grid grid-cols-2 gap-3"><div className="bg-white/5 rounded-2xl p-4 border border-white/5 flex flex-col items-center justify-center text-center"><p className="text-[8px] font-bold text-white/30 uppercase tracking-widest mb-1.5">Account</p><p className="text-sm font-mono font-bold text-blue-400">{formatPollen(accountState.balance)}</p></div><div className="bg-white/5 rounded-2xl p-4 border border-white/5 flex flex-col items-center justify-center text-center"><p className="text-[8px] font-bold text-white/30 uppercase tracking-widest mb-1.5">Session Burn</p><p className="text-sm font-mono font-bold text-red-500">-${sessionTotalCost.toFixed(4)}</p></div></div>
-                            <div className="flex flex-col gap-2"><button onClick={(e) => { e.stopPropagation(); if(sessionImages[0]) { navigator.clipboard.writeText(sessionImages[0].url); showToast("Link Copied"); } }} className="w-full h-11 rounded-2xl bg-white text-black text-[10px] font-black uppercase tracking-[0.2em] active:scale-95 transition-all disabled:opacity-20" disabled={sessionImages.length === 0}>Copy Asset Link</button><button onClick={(e) => { e.stopPropagation(); clearSessionFeed(); }} className="w-full h-11 rounded-2xl bg-white/10 border border-white/10 text-white text-[10px] font-black uppercase tracking-[0.2em] active:scale-95 transition-all">Clear Feed</button></div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-            </motion.div>
-          </div>
-      </div>
+    <div className="flex flex-col h-full relative overflow-hidden bg-black font-display">
+      
+      <AnimatePresence>
+          {isIslandExpanded && (
+              <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                exit={{ opacity: 0 }} 
+                className="fixed inset-0 z-[199]" 
+                onClick={() => setIsIslandExpanded(false)} 
+              />
+          )}
+      </AnimatePresence>
 
-      <div className="fixed top-8 left-0 right-0 z-[100] px-6 flex justify-between pointer-events-none">
-          <button onClick={() => onNavigate(AppRoute.PREFERENCES)} className="pointer-events-auto size-11 rounded-full glass-panel flex items-center justify-center text-white/40 border-[0.5px] border-white/15 active:scale-90 transition-all shadow-liquid"><span className="material-symbols-outlined text-[24px] !font-light">settings</span></button>
-          <button onClick={() => onNavigate(AppRoute.HISTORY)} className="pointer-events-auto size-11 rounded-full glass-panel flex items-center justify-center text-white/40 border-[0.5px] border-white/15 active:scale-90 transition-all shadow-liquid"><span className="material-symbols-outlined text-[24px] !font-light">grid_view</span></button>
-      </div>
-
-      <div ref={scrollRef} className="flex-1 overflow-y-auto no-scrollbar relative px-6 pb-[25vh]">
-          <div className="h-32 shrink-0" aria-hidden="true" />
-          <div className="max-w-4xl mx-auto w-full flex flex-col items-center gap-14">
-            <AnimatePresence mode="popLayout">
-                {sessionImages.length === 0 && !isLoading ? (
-                    <motion.div key="intro" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="text-center py-24">
-                        <div className="size-20 rounded-[2.2rem] bg-white/[0.04] border-[0.5px] border-white/12 flex items-center justify-center mb-8 mx-auto shadow-liquid"><span className="material-symbols-outlined text-4xl text-white/10 !font-light animate-pulse-slow">blur_on</span></div>
-                        <h2 className="text-4xl font-black uppercase logo-text text-white tracking-tighter">RESONANCE</h2>
-                        <p className="text-[10px] text-white/20 font-black uppercase tracking-[0.5em] mt-3 ml-[0.5em]">Synthetic Reality Studio</p>
+      <div className="fixed top-8 left-0 right-0 z-[200] flex justify-center pointer-events-none px-6">
+          <motion.div 
+            layout 
+            animate={{ 
+                width: islandWidth,
+                height: islandHeight,
+                borderRadius: islandRadius
+            }} 
+            transition={{ type: "spring", ...SPRING_CONFIG }} 
+            className="relative pointer-events-auto bg-black/85 backdrop-blur-[60px] border-[0.5px] border-white/20 shadow-liquid overflow-hidden cursor-pointer flex flex-col items-center" 
+            onClick={() => !isActuallyRendering && setIsIslandExpanded(!isIslandExpanded)}
+          >
+              <AnimatePresence>
+                {isActuallyRendering && (
+                    <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 z-0 pointer-events-none"
+                    >
+                        <svg className="w-full h-full" style={{ overflow: 'visible' }}>
+                            <motion.rect
+                                x="1"
+                                y="1"
+                                width="calc(100% - 2px)"
+                                height="calc(100% - 2px)"
+                                rx={islandRadius}
+                                fill="none"
+                                stroke="#3b82f6"
+                                strokeWidth="1.5"
+                                style={{
+                                    pathLength: progressValue,
+                                    filter: 'drop-shadow(0 0 3px rgba(59,130,246,0.6))'
+                                }}
+                            />
+                        </svg>
                     </motion.div>
-                ) : (
-                    <>
-                        {sessionImages.map((item, idx) => (<GenerationCard key={item.id} item={item} index={idx} visualSafety={localSettings.visualSafety} />))}
-                        {isLoading && (
-                             <motion.div key="loading-batch" initial={{ opacity: 0, scale: 0.98, y: 40 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} className="relative shrink-0 overflow-hidden bg-white/[0.03] border-[0.5px] border-white/15 rounded-[2.5rem] shadow-liquid animate-pulse flex items-center justify-center mb-4" style={{ aspectRatio: `${localSettings.width}/${localSettings.height}`, width: '100%', maxWidth: 'min(calc(100vw - 48px), 600px)', height: 'auto' }}>
-                                 <div className="flex flex-col items-center gap-4"><div className="size-10 rounded-full border-2 border-white/5 border-t-primary/60 animate-spin" /><span className="text-[10px] text-white/20 uppercase font-black tracking-[0.3em]">Architecting...</span></div>
-                             </motion.div>
-                        )}
-                    </>
                 )}
-            </AnimatePresence>
+              </AnimatePresence>
+
+              <div className="relative z-10 w-full h-full flex flex-col items-center">
+                {!isIslandExpanded ? (
+                    <div className="flex items-center justify-center w-full h-[44px] px-6 gap-3">
+                        {isActuallyRendering ? (
+                            <div className="flex items-center gap-4 w-full justify-center">
+                                <div className="flex items-center gap-2">
+                                    <div className="size-1.5 rounded-full bg-primary animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-primary/60">Rendering</span>
+                                </div>
+                                <div className="w-[0.5px] h-3 bg-white/20" />
+                                <div className="flex items-center gap-2 text-white/80">
+                                    <Clock size={12} className="opacity-40"/>
+                                    <span className="text-[10px] font-mono font-black">{renderTime.toFixed(1)}s</span>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="flex items-center gap-2">
+                                    <div className="size-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(59,130,246,0.6)]" />
+                                    <span className="text-[10px] font-bold font-mono text-primary tracking-tight">
+                                        {formatPollen(accountState.balance)}
+                                    </span>
+                                </div>
+                                <div className="w-[0.5px] h-3 bg-white/20" />
+                                <span className="text-[10px] font-bold font-mono text-white/40 tracking-tight">
+                                    ~{getEstimatedImagesLeft(accountState.balance)}
+                                </span>
+                            </>
+                        )}
+                    </div>
+                ) : (
+                    <div className="w-full p-8 flex flex-col gap-6">
+                        <div className="flex justify-between items-center pb-2">
+                            <h3 className="text-[11px] font-black uppercase text-white tracking-[0.3em]">Neural Core</h3>
+                            <Zap size={14} className="text-white/20" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-white/5 rounded-3xl p-5 border border-white/5 flex flex-col items-center"><p className="text-[9px] font-bold text-white/20 uppercase tracking-widest mb-1">Credits</p><p className="text-sm font-mono font-bold text-primary">{formatPollen(accountState.balance)}</p></div>
+                            <div className="bg-white/5 rounded-3xl p-5 border border-white/5 flex flex-col items-center"><p className="text-[9px] font-bold text-white/20 uppercase tracking-widest mb-1">Status</p><p className="text-sm font-mono font-bold text-white/80">Active</p></div>
+                        </div>
+                        <button onClick={(e) => { e.stopPropagation(); setSessionImages([]); setIsIslandExpanded(false); showToast("Feed Purged"); }} className="w-full h-14 rounded-[1.5rem] bg-white/5 border border-white/10 text-white text-[10px] font-black uppercase tracking-[0.3em] active:scale-95 transition-all">Clear Session Feed</button>
+                    </div>
+                )}
+              </div>
+          </motion.div>
+      </div>
+
+      <div className="fixed top-8 left-0 right-0 px-6 z-[100] flex justify-between pointer-events-none">
+          <button onClick={() => onNavigate(AppRoute.PREFERENCES)} className="pointer-events-auto size-11 rounded-full glass-panel flex items-center justify-center text-white/40 border-white/10 shadow-liquid active:scale-90 transition-all">
+              <Settings size={20} strokeWidth={1.5} />
+          </button>
+          <button onClick={() => onNavigate(AppRoute.HISTORY)} className="pointer-events-auto size-11 rounded-full glass-panel flex items-center justify-center text-white/40 border-white/10 shadow-liquid active:scale-90 transition-all">
+              <LayoutGrid size={20} strokeWidth={1.5} />
+          </button>
+      </div>
+
+      <div ref={scrollRef} className="flex-1 overflow-y-auto no-scrollbar relative px-6 pb-[32vh] pt-32">
+          <div className="max-w-4xl mx-auto flex flex-col items-center gap-20">
+              {groupedImages.length === 0 && !isActuallyRendering ? (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.9, rotateX: 20 }} 
+                    animate={{ opacity: 1, scale: 1, rotateX: 0 }} 
+                    transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+                    className="text-center py-28 perspective-1000"
+                  >
+                      <motion.div 
+                        initial={{ y: 20, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        transition={{ delay: 0.3 }}
+                        className="size-20 rounded-[2rem] bg-white/[0.04] border-[0.5px] border-white/10 flex items-center justify-center mb-10 mx-auto shadow-liquid backdrop-blur-3xl animate-liquid-pulse"
+                      >
+                        <Wand2 size={32} className="text-white/40" strokeWidth={1} />
+                      </motion.div>
+                      <motion.h2 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.5 }}
+                        className="text-7xl font-black logo-text liquid-text tracking-tighter"
+                      >
+                        RESONANCE
+                      </motion.h2>
+                      <motion.p 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.8 }}
+                        className="text-[10px] text-white/20 font-black uppercase tracking-[0.8em] mt-8"
+                      >
+                        Neural Architecture V4
+                      </motion.p>
+                  </motion.div>
+              ) : (
+                  <div className="w-full flex flex-col gap-28">
+                      {groupedImages.map((group) => (
+                          <div key={group.batchId} className="w-full flex flex-col items-center gap-10">
+                              <PromptHeader prompt={group.prompt} batchId={group.batchId} onClearBatch={handleClearBatch} />
+                              <div className="w-full flex flex-col items-center gap-16">
+                                  {group.items.map((item, idx) => (
+                                    <GenerationCard 
+                                      key={item.id} 
+                                      item={item} 
+                                      index={idx} 
+                                      visualSafety={localSettings.visualSafety} 
+                                      onImageReady={handleImageLoaded}
+                                    />
+                                  ))}
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+              )}
           </div>
       </div>
 
-      <div className="fixed bottom-8 left-0 right-0 px-6 z-50 pointer-events-none">
+      <div className="fixed bottom-10 left-0 right-0 px-6 z-50 pointer-events-none">
           <div className="max-w-2xl mx-auto w-full pointer-events-auto">
-              <motion.div layout transition={{ type: "spring", stiffness: 450, damping: 35 }} className={`glass-panel overflow-hidden shadow-liquid ${showSettings ? 'rounded-[3rem]' : 'rounded-full'} border-[0.5px] border-white/20`}>
-                  <div className="flex items-center gap-3 p-2.5">
-                      <button onClick={() => setShowSettings(!showSettings)} className={`size-11 rounded-full flex items-center justify-center transition-all ${showSettings ? 'bg-white text-black shadow-lg' : 'text-white/30 hover:text-white hover:bg-white/5'}`}><span className="material-symbols-outlined !font-light text-[24px]">{showSettings ? 'expand_more' : 'tune'}</span></button>
-                      <input value={sessionPrompt} onChange={(e) => setSessionPrompt(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleGenerate()} className="flex-1 bg-transparent border-none text-white text-base font-medium focus:ring-0 placeholder:text-white/15 px-1" placeholder="Define your reality..." />
-                      <button onClick={handleGenerate} disabled={!sessionPrompt || isLoading} className={`size-11 rounded-full flex items-center justify-center transition-all ${!sessionPrompt ? 'bg-white/5 text-white/10' : 'bg-primary text-white shadow-glow active:scale-90'}`}><span className="material-symbols-outlined text-[22px]">{isLoading ? 'stop' : 'arrow_upward'}</span></button>
+              <motion.div layout transition={{ type: "spring", ...SPRING_CONFIG }} className={`glass-panel overflow-hidden shadow-liquid ${showSettings ? 'rounded-[3rem]' : 'rounded-[2rem]'}`}>
+                  <div className="flex flex-col">
+                      <div className="flex items-end gap-3 p-3">
+                          <button onClick={() => setShowSettings(!showSettings)} className={`size-12 rounded-[1.2rem] flex items-center justify-center transition-all shrink-0 ${showSettings ? 'bg-white text-black' : 'text-white/20 hover:bg-white/5'}`}>
+                              <ChevronDown size={20} className={showSettings ? '' : 'rotate-180'} />
+                          </button>
+                          
+                          <div className="flex-1 flex flex-col gap-2 py-1">
+                              {isInputExpanded ? (
+                                  <textarea value={sessionPrompt} onChange={(e) => setSessionPrompt(e.target.value)} className="w-full bg-transparent border-none text-white text-base focus:ring-0 placeholder:text-white/10 min-h-[140px] max-h-[300px] resize-none py-2 px-1" placeholder="Architect your reality..." />
+                              ) : (
+                                  <input value={sessionPrompt} onChange={(e) => setSessionPrompt(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleGenerate()} className="w-full bg-transparent border-none text-white text-base focus:ring-0 placeholder:text-white/10 h-10 px-1" placeholder="Seed your imagination..." />
+                              )}
+                          </div>
+
+                          <div className="flex gap-2 shrink-0 mb-0.5">
+                              {sessionPrompt && (
+                                  <button onClick={() => setSessionPrompt('')} title="Clear Prompt" className="size-11 rounded-full flex items-center justify-center text-white/10 hover:text-white/40 transition-all"><Eraser size={18} /></button>
+                              )}
+                              <button onClick={() => setIsInputExpanded(!isInputExpanded)} className={`size-11 rounded-full flex items-center justify-center transition-all ${isInputExpanded ? 'text-primary' : 'text-white/10 hover:text-white/40'}`}>
+                                  {isInputExpanded ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                              </button>
+                              <button onClick={handleGenerate} disabled={!sessionPrompt || isActuallyRendering} className={`size-12 rounded-[1.2rem] flex items-center justify-center transition-all ${!sessionPrompt ? 'bg-white/5 text-white/5' : 'bg-primary text-white shadow-glow active:scale-90'}`}>
+                                  <ArrowUp size={22} />
+                              </button>
+                          </div>
+                      </div>
+                      <AnimatePresence>{showSettings && <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="border-t-[0.5px] border-white/10 bg-black/40"><SettingsPill localSettings={localSettings} updateLocalSetting={updateLocalSetting} setAspectRatio={(w, h) => { updateLocalSetting('width', w); updateLocalSetting('height', h); }} /></motion.div>}</AnimatePresence>
                   </div>
-                  <AnimatePresence>{showSettings && (<motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="border-t-[0.5px] border-white/5 bg-black/40 overflow-hidden"><SettingsPill localSettings={localSettings} updateLocalSetting={updateLocalSetting} setAspectRatio={setAspectRatio} /></motion.div>)}</AnimatePresence>
               </motion.div>
           </div>
       </div>
 
-      <AnimatePresence>{toastMessage && (<motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }} className="fixed bottom-32 left-1/2 -translate-x-1/2 z-[200] px-8 py-3.5 rounded-full glass-panel border border-white/20 shadow-liquid flex items-center"><span className="text-[10px] font-black text-white tracking-[0.2em] uppercase">{toastMessage}</span></motion.div>)}</AnimatePresence>
-    </motion.div>
+      <AnimatePresence>{toastMessage && <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed bottom-36 left-1/2 -translate-x-1/2 px-8 py-3 rounded-full glass-panel border-white/20 text-[10px] font-black uppercase tracking-widest">{toastMessage}</motion.div>}</AnimatePresence>
+    </div>
   );
 };
 
