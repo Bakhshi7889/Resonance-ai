@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DownloadCloud, Smartphone, Share, PlusSquare, ArrowLeft, ExternalLink, RefreshCw, Layers, Download, PlusCircle } from 'lucide-react';
+import { DownloadCloud, Smartphone, Share, PlusSquare, ArrowLeft, ExternalLink, RefreshCw, Layers, Download, PlusCircle, Trash2 } from 'lucide-react';
 import { AppSettings, AppRoute, AccountState } from '../types';
 import { getAccountDetails, getEstimatedImagesLeft, getAuthUrl } from '../services/pollinations';
 
@@ -32,7 +32,7 @@ export const Preferences: React.FC<PreferencesProps> = ({ settings, updateSettin
   const handleOpenPollinations = () => {
     window.open('https://enter.pollinations.ai', '_blank');
   };
-
+  
   const isManual = settings.apiKey && settings.apiKey.trim().length > 5;
 
   return (

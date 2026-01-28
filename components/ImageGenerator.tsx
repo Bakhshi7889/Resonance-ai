@@ -3,7 +3,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform, useSpring, useAn
 import { 
     Settings, LayoutGrid, Shuffle, Eraser, Maximize2, Minimize2, 
     Trash2, EyeOff, Wand2, Zap, ArrowUp, ChevronDown, 
-    Check, ShieldCheck, XCircle, Info, Hash, Clock
+    Check, ShieldCheck, XCircle, Info, Hash, Clock, AlertTriangle, RefreshCw
 } from 'lucide-react';
 import { generateImageUrl, getRandomSeed, getAccountDetails, getEstimatedImagesLeft } from '../services/pollinations';
 import { AppRoute, AppSettings, HistoryItem, MODEL_STYLES, ASPECT_RATIOS, AccountState } from '../types';
@@ -96,6 +96,7 @@ const PromptHeader = memo(({ prompt, onClearBatch, batchId }: { prompt: string, 
 
 const GenerationCard = memo(({ item, index, visualSafety, onImageReady }: { item: HistoryItem, index: number, visualSafety: boolean, onImageReady?: (id: string) => void }) => {
   const [isLoaded, setIsLoaded] = useState(false);
+  const [hasError, setHasError] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [visualRisk, setVisualRisk] = useState(false);
   const [isAuditing, setIsAuditing] = useState(false);
@@ -109,6 +110,21 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady }: { item
       }
       setIsLoaded(true);
       if (onImageReady) onImageReady(item.id);
+  };
+
+  const handleImageError = () => {
+      setHasError(true);
+      setIsLoaded(true); 
+      if (onImageReady) onImageReady(item.id);
+  };
+
+  const retry = () => {
+      setHasError(false);
+      setIsLoaded(false);
+      // Force reload by appending timestamp
+      const urlObj = new URL(item.url);
+      urlObj.searchParams.set('retry', Date.now().toString());
+      item.url = urlObj.toString();
   };
 
   const x = useMotionValue(0);
@@ -131,18 +147,33 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady }: { item
       className="relative shrink-0 overflow-hidden bg-white/[0.02] border-[0.5px] border-white/10 shadow-liquid rounded-[2.5rem] flex items-center justify-center group/card w-full max-w-3xl"
       style={{ rotateX, rotateY, transformStyle: 'preserve-3d', aspectRatio: `${item.width}/${item.height}` }}
     >
-      <img 
-        src={item.url} 
-        alt="vision"
-        className={`w-full h-full object-cover transition-all duration-1000 ease-out ${isLoaded && !isAuditing ? 'opacity-100' : 'opacity-0'} ${(visualRisk && !revealed) ? 'blur-[80px] saturate-50 brightness-50' : 'blur-0'}`}
-        onLoad={handleImageLoad}
-      />
-      {(!isLoaded || isAuditing) && (
+      {!hasError ? (
+          <img 
+            src={item.url} 
+            alt="vision"
+            className={`w-full h-full object-cover transition-all duration-1000 ease-out ${isLoaded && !isAuditing ? 'opacity-100' : 'opacity-0'} ${(visualRisk && !revealed) ? 'blur-[80px] saturate-50 brightness-50' : 'blur-0'}`}
+            onLoad={handleImageLoad}
+            onError={handleImageError}
+          />
+      ) : (
+          <div className="flex flex-col items-center justify-center gap-4 text-white/30 p-8 text-center">
+              <AlertTriangle size={32} className="text-red-400" />
+              <div className="flex flex-col gap-1">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-red-400">Generation Failed</p>
+                <p className="text-[9px] font-mono text-white/40 max-w-[200px] break-words">Connection Interrupted</p>
+              </div>
+              <button onClick={retry} className="px-4 py-2 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 text-[9px] font-bold uppercase tracking-widest text-white/60 flex items-center gap-2">
+                  <RefreshCw size={12} /> Retry
+              </button>
+          </div>
+      )}
+      
+      {(!isLoaded || isAuditing) && !hasError && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-md">
           <div className="size-8 rounded-full border-2 border-white/5 border-t-primary animate-spin" />
         </div>
       )}
-      {visualRisk && !revealed && isLoaded && !isAuditing && (
+      {visualRisk && !revealed && isLoaded && !isAuditing && !hasError && (
         <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center z-20 bg-black/80 backdrop-blur-3xl">
           <EyeOff className="text-white/10 mb-6" strokeWidth={1} size={54} />
           <p className="text-[10px] text-white/30 font-black uppercase tracking-[0.4em] mb-10">Neural Filter Active</p>
@@ -465,7 +496,29 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
     setIsProcessing(true);
     
     const batchId = crypto.randomUUID();
-    const scale = localSettings.quality === 'hd' ? 2 : 1;
+    
+    // RESOLUTION LOGIC REFACTOR: Capped at 1536px
+    const isHD = localSettings.quality === 'hd';
+    // Base scale is 1.5 for HD (1024 -> 1536)
+    // If not HD, stay at 1.0
+    const baseScale = isHD ? 1.5 : 1;
+    
+    let targetWidth = Math.round(localSettings.width * baseScale);
+    let targetHeight = Math.round(localSettings.height * baseScale);
+    
+    // HARD CAP for API stability
+    const MAX_DIM = 1536;
+    if (targetWidth > MAX_DIM || targetHeight > MAX_DIM) {
+        const ratio = targetWidth / targetHeight;
+        if (ratio > 1) {
+            targetWidth = MAX_DIM;
+            targetHeight = Math.round(MAX_DIM / ratio);
+        } else {
+            targetHeight = MAX_DIM;
+            targetWidth = Math.round(MAX_DIM * ratio);
+        }
+    }
+
     const activeStyleObjects = MODEL_STYLES.filter(s => localSettings.activeStyles.includes(s.id) && s.id !== 'none');
     const styleSuffix = activeStyleObjects.map(s => s.suffix).join('');
     const promptWithStyles = `${sessionPrompt}${styleSuffix}${activeStyleObjects.length > 0 ? ', ultra detailed, 8k' : ''}`;
@@ -476,7 +529,21 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
     for (let i = 0; i < localSettings.imageCount; i++) {
         const id = Date.now().toString() + i;
         const seed = localSettings.seed || getRandomSeed() + i;
-        const params = { prompt: promptWithStyles, model: 'zimage', width: localSettings.width * scale, height: localSettings.height * scale, seed, enhance: localSettings.enhance, nologo: true, negative_prompt: localSettings.negativePrompt || SILENT_NEGATIVE, safe: true, private: true };
+        
+        // IMPORTANT: Safe=true as requested
+        const params = { 
+            prompt: promptWithStyles, 
+            model: 'zimage', 
+            width: targetWidth, 
+            height: targetHeight, 
+            seed, 
+            enhance: localSettings.enhance, 
+            nologo: true, 
+            negative_prompt: localSettings.negativePrompt || SILENT_NEGATIVE, 
+            safe: true, 
+            private: true, 
+            apiKey: globalSettings.apiKey 
+        };
         const item: HistoryItem = { ...params, id, batchId, timestamp: Date.now(), url: generateImageUrl(params), prompt: sessionPrompt };
         newBatch.push(item);
         pendingIds.add(id);

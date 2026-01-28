@@ -142,6 +142,7 @@ const App: React.FC = () => {
       case AppRoute.GENERATOR:
         return (
           <ImageGenerator 
+            key="generator"
             settings={settings} 
             updateSettings={handleUpdateSettings}
             onNavigate={setCurrentRoute}
@@ -155,6 +156,7 @@ const App: React.FC = () => {
       case AppRoute.HISTORY:
         return (
           <History 
+            key="history"
             history={history} 
             onNavigate={setCurrentRoute}
             onRemix={(item) => {
@@ -167,6 +169,7 @@ const App: React.FC = () => {
       case AppRoute.PREFERENCES:
         return (
           <Preferences 
+            key="preferences"
             settings={settings} 
             updateSettings={handleUpdateSettings} 
             onNavigate={setCurrentRoute}

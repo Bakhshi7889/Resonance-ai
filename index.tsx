@@ -2,9 +2,6 @@ import React, { ReactNode } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 
-// HTTPS Guard REMOVED to prevent "refused to connect" errors in AI Studio/Preview environments.
-// The hosting provider (Netlify/Vercel) will handle HTTPS redirection automatically in production.
-
 interface ErrorBoundaryProps {
   children?: ReactNode;
 }
@@ -58,8 +55,8 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
         </div>
       );
     }
-    // Fix: Explicitly cast props to handle potential TS issue with React.Component inheritance
-    return (this.props as any).children;
+    // Fix: Explicitly cast 'this' to any to handle potential TS issue with React.Component inheritance where props is missing
+    return (this as any).props.children;
   }
 }
 
@@ -78,24 +75,21 @@ root.render(
   </React.StrictMode>
 );
 
-// SERVICE WORKER LOGIC
-// We first unregister any existing service workers to clear potential stale caches/redirects to /assets/
+// SERVICE WORKER CLEANUP
+// Aggressively remove any old service workers to prevent cache poisoning or 404s
 if ('serviceWorker' in navigator) {
-  // Unregister all first to ensure clean state if there's a bad cache
-  navigator.serviceWorker.getRegistrations().then(function(registrations) {
-    for(let registration of registrations) {
-        // Optional: Only unregister if it's NOT the current one, but for fixing the infinite loop/assets issue, let's just unregister.
-        // The subsequent register call will re-install the correct one.
-        registration.unregister();
-    }
-  }).then(() => {
-    // Register the new one
-    navigator.serviceWorker.register('/sw.js', { scope: '/' })
-      .then((registration) => {
-        console.log('Resonance: SW registered: ', registration.scope);
-      })
-      .catch((err) => {
-        console.log('Resonance: SW registration failed: ', err);
-      });
-  });
+  const killSW = () => {
+    navigator.serviceWorker.getRegistrations().then(function(registrations) {
+      for(let registration of registrations) {
+        registration.unregister().catch(e => console.warn('SW Unregister Warning:', e));
+      }
+    }).catch(e => console.warn('SW Access Warning:', e));
+  };
+
+  // Run cleanup if document is ready, otherwise wait for load
+  if (document.readyState === 'complete') {
+    killSW();
+  } else {
+    window.addEventListener('load', killSW);
+  }
 }

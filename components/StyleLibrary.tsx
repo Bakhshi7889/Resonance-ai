@@ -183,6 +183,7 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = ({ onNavigate, settings
         urlObj.searchParams.set('seed', seed.toString());
         urlObj.searchParams.set('key', getEffectiveKey());
         urlObj.searchParams.set('nologo', 'true');
+        urlObj.searchParams.set('safe', 'true'); // UPDATED: Safe mode enabled
         // Ensure consistent quality and size for previews
         urlObj.searchParams.set('enhance', 'true'); 
         urlObj.searchParams.set('width', '256');

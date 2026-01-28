@@ -1,3 +1,4 @@
+
 import { ImageGenerationParams, AccountState, UsageRecord } from '../types';
 
 const BASE_URL = 'https://gen.pollinations.ai';
@@ -19,45 +20,53 @@ export const generateImageUrl = (params: ImageGenerationParams): string => {
   const { 
     prompt, model, width, height, seed, enhance, nologo, 
     negative_prompt, private: privateMode,
-    quality, apiKey: userKey
+    quality, apiKey: userKey, safe
   } = params;
   
   const encodedPrompt = encodeURIComponent(prompt);
   const key = getEffectiveKey(userKey);
   
-  const queryObj: any = {
-    model,
-    width: width.toString(),
-    height: height.toString(),
-    seed: seed.toString(),
-    nologo: nologo.toString(),
-    private: privateMode.toString(),
-    key: key,
-    safe: 'true'
-  };
-
-  if (enhance) queryObj.enhance = 'true';
-  if (quality) queryObj.quality = quality;
+  const queryParams = new URLSearchParams();
   
-  if (negative_prompt) {
-    queryObj.negative_prompt = negative_prompt;
-  }
+  // Core parameters
+  queryParams.append('model', model);
+  queryParams.append('width', width.toString());
+  queryParams.append('height', height.toString());
+  queryParams.append('seed', seed.toString());
+  
+  // Optional boolean flags
+  if (enhance) queryParams.append('enhance', 'true');
+  if (nologo) queryParams.append('nologo', 'true');
+  if (privateMode) queryParams.append('private', 'true');
+  
+  // Strings
+  if (quality) queryParams.append('quality', quality);
+  if (negative_prompt) queryParams.append('negative_prompt', negative_prompt);
+  
+  // Safety & Auth
+  // IMPORTANT: Explicitly use the boolean value passed in parameters
+  queryParams.append('safe', safe ? 'true' : 'false');
+  queryParams.append('key', key);
 
-  const queryParams = new URLSearchParams(queryObj);
-  return `${BASE_URL}/image/${encodedPrompt}?${queryParams.toString()}`;
+  const finalUrl = `${BASE_URL}/image/${encodedPrompt}?${queryParams.toString()}`;
+  
+  return finalUrl;
 };
 
 export const getRandomSeed = () => Math.floor(Math.random() * 2147483647);
 
 export const getAccountDetails = async (userKey?: string): Promise<AccountState> => {
     const apiKey = getEffectiveKey(userKey);
+    // Use Authorization header for cleaner API calls where possible (GET fetch)
+    const headers = {
+        'Authorization': `Bearer ${apiKey}`
+    };
+
     try {
-        const queryParams = `?key=${apiKey}`;
-        
         const [profileRes, balanceRes, usageRes] = await Promise.all([
-            fetch(`${BASE_URL}/account/profile${queryParams}`),
-            fetch(`${BASE_URL}/account/balance${queryParams}`),
-            fetch(`${BASE_URL}/account/usage${queryParams}&limit=10`)
+            fetch(`${BASE_URL}/account/profile`, { headers }),
+            fetch(`${BASE_URL}/account/balance`, { headers }),
+            fetch(`${BASE_URL}/account/usage?limit=10`, { headers })
         ]);
         
         const profile = profileRes.ok ? await profileRes.json() : null;
