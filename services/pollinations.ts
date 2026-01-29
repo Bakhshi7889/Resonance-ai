@@ -1,11 +1,12 @@
 
 import { ImageGenerationParams, AccountState, UsageRecord } from '../types';
+import { addLog } from './logger';
 
 const BASE_URL = 'https://gen.pollinations.ai';
 const ESTIMATED_IMAGE_COST = 0.0002; 
 
 // The system core key used for out-of-the-box functionality
-export const HIDDEN_DEFAULT_KEY = 'pk_3GSNVfV62GUnxKBe';
+export const HIDDEN_DEFAULT_KEY = 'sk_fH3vuxg5ULiDIzbVK7y6ejUg4eK1f0VF';
 
 /**
  * Resolves the active API key with strict fallback.
@@ -50,6 +51,8 @@ export const generateImageUrl = (params: ImageGenerationParams): string => {
 
   const finalUrl = `${BASE_URL}/image/${encodedPrompt}?${queryParams.toString()}`;
   
+  addLog('info', 'Generated Image URL constructed', { prompt: prompt.substring(0, 50) + '...', model, width, height });
+
   return finalUrl;
 };
 
@@ -63,6 +66,7 @@ export const getAccountDetails = async (userKey?: string): Promise<AccountState>
     };
 
     try {
+        addLog('info', 'Fetching account details');
         const [profileRes, balanceRes, usageRes] = await Promise.all([
             fetch(`${BASE_URL}/account/profile`, { headers }),
             fetch(`${BASE_URL}/account/balance`, { headers }),
@@ -81,6 +85,7 @@ export const getAccountDetails = async (userKey?: string): Promise<AccountState>
             error: null 
         };
     } catch (error: any) {
+        addLog('error', 'Failed to fetch account details', error.message);
         return { 
             profile: null, 
             balance: null, 

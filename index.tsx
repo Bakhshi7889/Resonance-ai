@@ -9,19 +9,30 @@ interface ErrorBoundaryProps {
 interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
+  errorInfo: React.ErrorInfo | null;
 }
 
 // Simple Error Boundary to catch render crashes
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   
-  public state: ErrorBoundaryState = { hasError: false, error: null };
+  public state: ErrorBoundaryState = { hasError: false, error: null, errorInfo: null };
 
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("Resonance Critical Error:", error, errorInfo);
+    // Explicitly cast this to any to avoid TS error: Property 'setState' does not exist on type 'ErrorBoundary'
+    (this as any).setState({ errorInfo });
+  }
+
+  handleCopyLogs = () => {
+    const { error, errorInfo } = this.state;
+    const logContent = `CRITICAL ERROR REPORT\n---------------------\nMessage: ${error?.message}\n\nStack:\n${error?.stack}\n\nComponent Stack:\n${errorInfo?.componentStack}`;
+    navigator.clipboard.writeText(logContent).then(() => {
+        alert("Crash logs copied to clipboard.");
+    });
   }
 
   render() {
@@ -36,22 +47,72 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
           flexDirection: 'column', 
           alignItems: 'center', 
           justifyContent: 'center',
-          fontFamily: 'monospace'
+          fontFamily: 'monospace',
+          textAlign: 'center'
         }}>
-          <h2 style={{ color: '#ef4444', marginBottom: '1rem', fontSize: '1.5rem', fontWeight: 'bold' }}>System Malfunction</h2>
-          <p style={{ color: '#888', marginBottom: '2rem' }}>Resonance encountered a critical error.</p>
-          <pre style={{ background: '#111', padding: '1rem', borderRadius: '0.5rem', maxWidth: '80%', overflow: 'auto', border: '1px solid #333', color: '#f87171' }}>
-            {this.state.error?.message || 'Unknown error'}
-          </pre>
-          <button 
-            onClick={() => {
-                localStorage.clear();
-                window.location.reload();
-            }} 
-            style={{ marginTop: '2rem', padding: '0.75rem 1.5rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '0.5rem', cursor: 'pointer', fontWeight: 'bold' }}
-          >
-            Hard Reset & Reload
-          </button>
+          <h2 style={{ color: '#ef4444', marginBottom: '0.5rem', fontSize: '1.5rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.1em' }}>System Malfunction</h2>
+          <p style={{ color: '#666', marginBottom: '2rem', fontSize: '0.8rem' }}>Resonance Neural Core has encountered a critical failure.</p>
+          
+          <div style={{ 
+            background: '#111', 
+            padding: '1.5rem', 
+            borderRadius: '1rem', 
+            maxWidth: '90%',
+            width: '600px', 
+            overflow: 'auto', 
+            border: '1px solid #333', 
+            color: '#f87171',
+            textAlign: 'left',
+            maxHeight: '40vh',
+            marginBottom: '2rem',
+            fontSize: '0.75rem',
+            whiteSpace: 'pre-wrap'
+          }}>
+            <strong>{this.state.error?.toString()}</strong>
+            <br/><br/>
+            <span style={{color: '#444'}}>{this.state.errorInfo?.componentStack}</span>
+          </div>
+
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button 
+              onClick={this.handleCopyLogs}
+              style={{ 
+                padding: '0.75rem 1.5rem', 
+                background: '#222', 
+                color: 'white', 
+                border: '1px solid #444', 
+                borderRadius: '0.5rem', 
+                cursor: 'pointer', 
+                fontWeight: 'bold',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                fontSize: '0.75rem'
+              }}
+            >
+              Copy Logs
+            </button>
+            <button 
+              onClick={() => {
+                  localStorage.clear();
+                  window.location.reload();
+              }} 
+              style={{ 
+                padding: '0.75rem 1.5rem', 
+                background: '#3b82f6', 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: '0.5rem', 
+                cursor: 'pointer', 
+                fontWeight: 'bold',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                fontSize: '0.75rem',
+                boxShadow: '0 0 20px rgba(59, 130, 246, 0.4)'
+              }}
+            >
+              Hard Reset & Reload
+            </button>
+          </div>
         </div>
       );
     }

@@ -3,7 +3,9 @@ import { Layout } from './components/Layout';
 import ImageGenerator from './components/ImageGenerator';
 import { History } from './components/History';
 import { Preferences } from './components/Preferences';
-import { AppSettings, AppRoute, HistoryItem } from './types';
+import { StyleLibrary } from './components/StyleLibrary';
+import { CreateStyle } from './components/CreateStyle';
+import { AppSettings, AppRoute, HistoryItem, MODEL_STYLES } from './types';
 
 const STORAGE_KEY_SETTINGS = 'resonance_v4_settings';
 const STORAGE_KEY_HISTORY = 'resonance_v4_history';
@@ -19,6 +21,10 @@ const DEFAULT_SETTINGS: AppSettings = {
   negativePrompt: '',
   imageCount: 1,
   activeStyles: ['none'],
+  hiddenStyleIds: [],
+  favoriteStyleIds: [],
+  styleOrder: MODEL_STYLES.map(s => s.id), // Initialize with default order
+  customStyles: [], 
   apiKey: '',
   quality: 'hd',
   infiniteMode: false,
@@ -33,7 +39,15 @@ const App: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY_SETTINGS);
-      return stored ? { ...DEFAULT_SETTINGS, ...JSON.parse(stored) } : DEFAULT_SETTINGS;
+      if (stored) {
+          const parsed = JSON.parse(stored);
+          // Ensure styleOrder exists for legacy data migration
+          if (!parsed.styleOrder || parsed.styleOrder.length === 0) {
+              parsed.styleOrder = MODEL_STYLES.map(s => s.id);
+          }
+          return { ...DEFAULT_SETTINGS, ...parsed };
+      }
+      return DEFAULT_SETTINGS;
     } catch (e) {
       return DEFAULT_SETTINGS;
     }
@@ -176,6 +190,24 @@ const App: React.FC = () => {
             canInstall={!!deferredPrompt}
             onInstallApp={handleInstallApp}
           />
+        );
+      case AppRoute.STYLE_LIBRARY:
+        return (
+          <StyleLibrary
+            key="style-library"
+            settings={settings}
+            updateSettings={handleUpdateSettings}
+            onNavigate={setCurrentRoute}
+          />
+        );
+      case AppRoute.CREATE_STYLE:
+        return (
+            <CreateStyle 
+                key="create-style"
+                settings={settings}
+                updateSettings={handleUpdateSettings}
+                onNavigate={setCurrentRoute}
+            />
         );
       default:
         return null;

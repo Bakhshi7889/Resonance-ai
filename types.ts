@@ -18,12 +18,20 @@ export interface ImageGenerationParams {
 
 export interface HistoryItem extends ImageGenerationParams {
   id: string;
-  batchId?: string;
+  batchId?: string; // Links images generated in the same request
   timestamp: number;
   url: string;
   prompt: string;
   styleSuffix?: string; // The specific keywords added by the style
   // ... extends ImageGenerationParams
+}
+
+export interface CustomStyle {
+  id: string;
+  label: string;
+  category: string;
+  suffix: string;
+  image: string;
 }
 
 export interface AppSettings {
@@ -35,6 +43,10 @@ export interface AppSettings {
   negativePrompt: string;
   imageCount: number;
   activeStyles: string[];
+  hiddenStyleIds: string[];
+  favoriteStyleIds: string[];
+  styleOrder: string[]; // New: Manual order of styles
+  customStyles: CustomStyle[];
   apiKey: string;
   quality: 'low' | 'hd';
   infiniteMode: boolean;
@@ -67,7 +79,9 @@ export interface AccountState {
 export enum AppRoute {
   GENERATOR = 'generator',
   HISTORY = 'history',
-  PREFERENCES = 'preferences'
+  PREFERENCES = 'preferences',
+  STYLE_LIBRARY = 'style_library',
+  CREATE_STYLE = 'create_style'
 }
 
 export const AVAILABLE_MODELS = [
@@ -86,6 +100,18 @@ export const MODEL_STYLES = [
   // NONE OPTION (FIRST)
   { id: 'none', label: 'None', category: 'Basic', suffix: '', image: 'https://gen.pollinations.ai/image/Clean%20minimalist%20void?model=zimage&width=256&height=384&nologo=true&seed=0&safe=true' },
   
+  // NEW STYLES
+  { id: 'cyberpunk', label: 'Cyberpunk', category: 'Thematic', suffix: ', cyberpunk aesthetic, neon rain, high tech low life, chrome reflections, futuristic city street, blue and pink volumetric lighting', image: 'https://gen.pollinations.ai/image/Cyberpunk%20street?model=zimage&width=256&height=384&nologo=true&seed=42&safe=true' },
+  { id: 'steampunk', label: 'Steampunk', category: 'Thematic', suffix: ', steampunk aesthetic, brass gears, copper pipes, victorian fashion, steam engine atmosphere, warm sepia tones, intricate mechanical details', image: 'https://gen.pollinations.ai/image/Steampunk%20machine?model=zimage&width=256&height=384&nologo=true&seed=43&safe=true' },
+  { id: 'watercolor', label: 'Watercolor', category: 'Artistic', suffix: ', watercolor painting, soft bleeding colors, textured paper, wet-on-wet technique, artistic splashes, dreamy atmosphere', image: 'https://gen.pollinations.ai/image/Watercolor%20flower?model=zimage&width=256&height=384&nologo=true&seed=44&safe=true' },
+  { id: 'synthwave', label: 'Synthwave', category: 'Thematic', suffix: ', synthwave aesthetic, retro 80s style, neon grid, sunset, palm trees, purple and orange gradient, digital horizon', image: 'https://gen.pollinations.ai/image/Synthwave%20landscape?model=zimage&width=256&height=384&nologo=true&seed=45&safe=true' },
+  { id: 'inkwash', label: 'Ink Wash', category: 'Artistic', suffix: ', sumi-e ink wash painting, expressive black brush strokes, negative space, minimalistic, traditional asian art style', image: 'https://gen.pollinations.ai/image/Ink%20wash%20mountain?model=zimage&width=256&height=384&nologo=true&seed=46&safe=true' },
+  { id: 'lowpoly', label: 'Low Poly', category: 'Artistic', suffix: ', low poly 3d render, geometric shapes, flat shading, vibrant colors, minimal detail, sharp edges', image: 'https://gen.pollinations.ai/image/Low%20poly%20animal?model=zimage&width=256&height=384&nologo=true&seed=47&safe=true' },
+  { id: 'pixelart', label: 'Pixel Art', category: 'Artistic', suffix: ', 16-bit pixel art, retro game sprite, limited color palette, dithering, blocky details, nostalgic', image: 'https://gen.pollinations.ai/image/Pixel%20art%20character?model=zimage&width=256&height=384&nologo=true&seed=48&safe=true' },
+  { id: 'claymation', label: 'Claymation', category: 'Artistic', suffix: ', claymation style, plasticine texture, stop motion aesthetic, fingerprint details, soft lighting, handmade feel', image: 'https://gen.pollinations.ai/image/Claymation%20figure?model=zimage&width=256&height=384&nologo=true&seed=49&safe=true' },
+  { id: 'graffiti', label: 'Graffiti', category: 'Artistic', suffix: ', street art graffiti, spray paint texture, vibrant urban colors, drip effects, mural style, concrete wall background', image: 'https://gen.pollinations.ai/image/Graffiti%20art?model=zimage&width=256&height=384&nologo=true&seed=50&safe=true' },
+  { id: 'blueprint', label: 'Blueprint', category: 'Thematic', suffix: ', technical blueprint drawing, white lines on blue paper, schematic details, architectural measurements, grid background', image: 'https://gen.pollinations.ai/image/Blueprint%20schematic?model=zimage&width=256&height=384&nologo=true&seed=51&safe=true' },
+
   // REALISTIC CATEGORY
   { id: 'realism', label: 'Realism', category: 'Realistic', suffix: ', RAW, hyper-realistic, 35mm film photography, warm color temperature, soft flash, slight grain, natural imperfections, editorial snapshot', image: 'https://gen.pollinations.ai/image/Realistic%20portrait?model=zimage&width=256&height=384&nologo=true&seed=10&safe=true' },
   { id: 'selfie', label: 'Phone Selfie', category: 'Realistic', suffix: ', smartphone front camera aesthetic, mild barrel distortion, natural skin texture with visible pores, soft selfie flash, 9:16 vertical feel', image: 'https://gen.pollinations.ai/image/Phone%20selfie%20portrait?model=zimage&width=256&height=384&nologo=true&seed=1&safe=true' },

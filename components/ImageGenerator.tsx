@@ -3,10 +3,11 @@ import { motion, AnimatePresence, useMotionValue, useTransform, useSpring, useAn
 import { 
     Settings, LayoutGrid, Shuffle, Eraser, Maximize2, Minimize2, 
     Trash2, EyeOff, Wand2, Zap, ArrowUp, ChevronDown, 
-    Check, ShieldCheck, XCircle, Info, Hash, Clock, AlertTriangle, RefreshCw
+    Check, ShieldCheck, XCircle, Info, Hash, Clock, AlertTriangle, RefreshCw, Layers, Heart
 } from 'lucide-react';
-import { generateImageUrl, getRandomSeed, getAccountDetails, getEstimatedImagesLeft } from '../services/pollinations';
+import { generateImageUrl, getRandomSeed, getAccountDetails, getEstimatedImagesLeft, getEffectiveKey } from '../services/pollinations';
 import { AppRoute, AppSettings, HistoryItem, MODEL_STYLES, ASPECT_RATIOS, AccountState } from '../types';
+import { addLog } from '../services/logger';
 
 const SILENT_NEGATIVE = "nsfw, naked, nude, porn, sex, explicit, genitals, nipples, topless, breasts, bad anatomy, deformed, ugly, watermark, logo";
 const SPRING_CONFIG = { stiffness: 400, damping: 30 };
@@ -112,10 +113,36 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady }: { item
       if (onImageReady) onImageReady(item.id);
   };
 
-  const handleImageError = () => {
+  const handleImageError = async () => {
       setHasError(true);
       setIsLoaded(true); 
       if (onImageReady) onImageReady(item.id);
+
+      addLog('warn', 'Image element reported error', { id: item.id });
+      
+      try {
+          // Perform a diagnostic fetch to see WHY it failed (e.g. 429, 500, or text error message)
+          const res = await fetch(item.url);
+          if (!res.ok) {
+              const text = await res.text();
+              addLog('error', `Generation Failed: ${res.status}`, { 
+                  status: res.status,
+                  statusText: res.statusText,
+                  response: text.substring(0, 200), // Log the first 200 chars of response
+                  url: item.url 
+              });
+          } else {
+             // If fetch succeeds but img tag failed, it might be a content-type issue or decoding error
+             const blob = await res.blob();
+             addLog('warn', 'Image fetch succeeded but render failed', { 
+                 type: blob.type, 
+                 size: blob.size,
+                 url: item.url 
+             });
+          }
+      } catch (e: any) {
+          addLog('error', 'Diagnostic fetch failed (Network Error)', { message: e.message, url: item.url });
+      }
   };
 
   const retry = () => {
@@ -125,6 +152,7 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady }: { item
       const urlObj = new URL(item.url);
       urlObj.searchParams.set('retry', Date.now().toString());
       item.url = urlObj.toString();
+      addLog('info', 'Retrying generation', { id: item.id });
   };
 
   const x = useMotionValue(0);
@@ -160,7 +188,7 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady }: { item
               <AlertTriangle size={32} className="text-red-400" />
               <div className="flex flex-col gap-1">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-red-400">Generation Failed</p>
-                <p className="text-[9px] font-mono text-white/40 max-w-[200px] break-words">Connection Interrupted</p>
+                <p className="text-[9px] font-mono text-white/40 max-w-[200px] break-words">Check logs for details</p>
               </div>
               <button onClick={retry} className="px-4 py-2 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 text-[9px] font-bold uppercase tracking-widest text-white/60 flex items-center gap-2">
                   <RefreshCw size={12} /> Retry
@@ -187,6 +215,9 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady }: { item
 const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }: { 
     localSettings: AppSettings, updateLocalSetting: (k: keyof AppSettings, v: any) => void, setAspectRatio: (w: number, h: number) => void
 }) => {
+    // Get effective key for previews
+    const effectiveKey = useMemo(() => getEffectiveKey(localSettings.apiKey), [localSettings.apiKey]);
+
     const toggleStyle = (id: string) => {
         const current = localSettings.activeStyles || [];
         if (id === 'none') {
@@ -202,12 +233,51 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
         }
     };
 
+    // MERGE BUILT-IN AND CUSTOM STYLES
+    const allStyles = useMemo(() => {
+        return [...MODEL_STYLES, ...(localSettings.customStyles || [])];
+    }, [localSettings.customStyles]);
+
+    // FILTER, SORT, AND GROUP STYLES
+    const visibleStyles = useMemo(() => {
+        const filtered = allStyles.filter(s => !(localSettings.hiddenStyleIds || []).includes(s.id));
+        
+        return filtered.sort((a, b) => {
+            // 1. 'none' always pinned to start
+            if (a.id === 'none') return -1;
+            if (b.id === 'none') return 1;
+
+            const aSelected = localSettings.activeStyles.includes(a.id);
+            const bSelected = localSettings.activeStyles.includes(b.id);
+            
+            // 2. Selected items bubble to the top (after 'none')
+            // This is the "Put them at the start" feature request
+            if (aSelected && !bSelected) return -1;
+            if (!aSelected && bSelected) return 1;
+
+            // 3. Manual Order (styleOrder)
+            // This handles the "if unselected moved to original places"
+            if (localSettings.styleOrder && localSettings.styleOrder.length > 0) {
+                let idxA = localSettings.styleOrder.indexOf(a.id);
+                let idxB = localSettings.styleOrder.indexOf(b.id);
+                if (idxA === -1) idxA = 9999;
+                if (idxB === -1) idxB = 9999;
+                return idxA - idxB;
+            }
+
+            // Fallback
+            return 0;
+        });
+    }, [localSettings.hiddenStyleIds, allStyles, localSettings.activeStyles, localSettings.styleOrder]);
+
+    const activeCount = localSettings.activeStyles.filter(s => s !== 'none').length;
+
     const selectedIndices = useMemo(() => {
-        const indices = MODEL_STYLES
+        const indices = visibleStyles
             .map((s, i) => (localSettings.activeStyles.includes(s.id) && s.id !== 'none') ? i : -1)
             .filter(i => i !== -1);
         return indices.length > 1 ? indices : [];
-    }, [localSettings.activeStyles]);
+    }, [localSettings.activeStyles, visibleStyles]);
 
     const meshData = useMemo(() => {
         if (selectedIndices.length < 2) return null;
@@ -229,9 +299,9 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
             minX, 
             maxX, 
             bridgeY, 
-            totalWidth: (MODEL_STYLES.length * cardWidth) + ((MODEL_STYLES.length - 1) * gap) + (containerPadding * 2) 
+            totalWidth: (visibleStyles.length * cardWidth) + ((visibleStyles.length - 1) * gap) + (containerPadding * 2) 
         };
-    }, [selectedIndices]);
+    }, [selectedIndices, visibleStyles.length]);
 
     return (
         <div className="px-6 py-10 flex flex-col gap-10 overflow-y-auto no-scrollbar max-h-[60vh] pb-36">
@@ -271,25 +341,47 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
             </div>
 
             <div className="space-y-4">
-                <p className="text-[9px] text-white/20 font-black uppercase tracking-[0.2em] pl-1">Style Matrix</p>
+                <div className="flex items-center justify-between pr-4">
+                    <p className="text-[9px] text-white/20 font-black uppercase tracking-[0.2em] pl-1">Style Matrix</p>
+                    {activeCount > 1 && (
+                        <span className="text-[9px] font-black text-primary uppercase tracking-widest animate-pulse flex items-center gap-1">
+                             <Layers size={10} /> {activeCount} BLEND ACTIVE
+                        </span>
+                    )}
+                </div>
                 <div className="relative">
                     <div className="flex gap-4 overflow-x-auto no-scrollbar px-1 pb-24 relative z-10">
-                        {MODEL_STYLES.map(style => {
+                        {visibleStyles.map(style => {
                             const isSelected = localSettings.activeStyles.includes(style.id);
+                            const isFavorite = (localSettings.favoriteStyleIds || []).includes(style.id);
+                            // Append API key to preview images. Check if custom style image already has params, if so, append key.
+                            // Custom styles usually have static URLs we generated, but appending key doesn't hurt.
+                            const separator = style.image.includes('?') ? '&' : '?';
+                            const previewUrl = `${style.image}${separator}key=${effectiveKey}`;
+
                             return (
-                                <button 
+                                <motion.button 
+                                    layout
                                     key={style.id} 
                                     onClick={() => toggleStyle(style.id)} 
                                     className={`relative shrink-0 w-28 h-40 rounded-[1.8rem] overflow-hidden border transition-all duration-500 ${isSelected ? 'border-primary shadow-[0_4px_30px_rgba(59,130,246,0.4)] scale-105 z-10' : 'border-white/10 opacity-40 hover:opacity-100'}`}
                                 >
-                                    <img src={style.image} alt={style.label} className="w-full h-full object-cover" loading="lazy" />
+                                    <img src={previewUrl} alt={style.label} className="w-full h-full object-cover" loading="lazy" />
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-3">
                                         <p className={`text-[9px] font-black uppercase tracking-tighter text-center leading-tight ${isSelected ? 'text-primary' : 'text-white/80'}`}>{style.label}</p>
                                     </div>
+                                    
+                                    {/* Small Favorite Indicator in Generator */}
+                                    {isFavorite && (
+                                        <div className="absolute top-2 right-2 size-5 rounded-full bg-red-500 flex items-center justify-center shadow-lg">
+                                            <Heart size={10} fill="white" className="text-white" strokeWidth={0} />
+                                        </div>
+                                    )}
+
                                     {isSelected && style.id !== 'none' && (
                                         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-12 bg-primary/20 blur-2xl pointer-events-none" />
                                     )}
-                                </button>
+                                </motion.button>
                             );
                         })}
                         
@@ -495,6 +587,8 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
     setShowSettings(false); 
     setIsProcessing(true);
     
+    addLog('info', 'Generation Session Started', { count: localSettings.imageCount, prompt: sessionPrompt });
+
     const batchId = crypto.randomUUID();
     
     // RESOLUTION LOGIC REFACTOR: Capped at 1536px
@@ -519,7 +613,10 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
         }
     }
 
-    const activeStyleObjects = MODEL_STYLES.filter(s => localSettings.activeStyles.includes(s.id) && s.id !== 'none');
+    // MERGE BUILT-IN AND CUSTOM STYLES
+    const allStyles = [...MODEL_STYLES, ...(localSettings.customStyles || [])];
+    const activeStyleObjects = allStyles.filter(s => localSettings.activeStyles.includes(s.id) && s.id !== 'none');
+    
     const styleSuffix = activeStyleObjects.map(s => s.suffix).join('');
     const promptWithStyles = `${sessionPrompt}${styleSuffix}${activeStyleObjects.length > 0 ? ', ultra detailed, 8k' : ''}`;
 
