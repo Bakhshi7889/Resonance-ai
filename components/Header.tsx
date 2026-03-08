@@ -1,45 +1,57 @@
-import React from 'react';
+import React, { memo } from 'react';
+import { motion } from 'framer-motion';
 
 interface HeaderProps {
-  title?: string;
+  title: string;
   leftIcon?: string;
-  rightIcon?: string;
   onLeftClick?: () => void;
+  rightIcon?: string;
   onRightClick?: () => void;
-  transparent?: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ 
+export const Header: React.FC<HeaderProps> = memo(({ 
   title, 
   leftIcon, 
-  rightIcon, 
   onLeftClick, 
-  onRightClick,
-  transparent = false
+  rightIcon, 
+  onRightClick 
 }) => {
   return (
-    <header className={`sticky top-0 z-50 flex items-center justify-between px-6 py-4 transition-all duration-300 ${!transparent ? 'bg-white/5 backdrop-blur-[40px] border-b-[0.5px] border-white/12' : ''}`}>
-      {leftIcon ? (
-        <button 
-          onClick={onLeftClick}
-          className="flex size-10 items-center justify-center rounded-full bg-white/5 backdrop-blur-[40px] border-[0.5px] border-white/12 text-white hover:bg-white/10 transition-colors active:scale-95"
+    <header className="flex items-center justify-between px-6 py-6 pt-12 z-20 relative">
+      <div className="flex-1 flex items-center">
+        {leftIcon && (
+          <button 
+            onClick={onLeftClick}
+            className="size-11 rounded-full bg-white/5 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all active:scale-90"
+          >
+            <span className="material-symbols-outlined text-[22px]">{leftIcon}</span>
+          </button>
+        )}
+      </div>
+      
+      <div className="flex-[2] flex justify-center">
+        <motion.h1 
+          key={title}
+          initial={{ opacity: 0, y: 5 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-sm font-black uppercase tracking-[0.3em] text-white text-center"
         >
-          <span className="material-symbols-outlined text-[20px]">{leftIcon}</span>
-        </button>
-      ) : <div className="size-10" />}
-
-      {title && (
-        <h1 className="text-white text-lg font-bold tracking-tight uppercase tracking-tighter">{title}</h1>
-      )}
-
-      {rightIcon ? (
-        <button 
-          onClick={onRightClick}
-          className="flex size-10 items-center justify-center rounded-full bg-white/5 backdrop-blur-[40px] border-[0.5px] border-white/12 text-white hover:bg-white/10 transition-colors active:scale-95"
-        >
-          <span className="material-symbols-outlined text-[20px]">{rightIcon}</span>
-        </button>
-      ) : <div className="size-10" />}
+          {title}
+        </motion.h1>
+      </div>
+      
+      <div className="flex-1 flex items-center justify-end">
+        {rightIcon && (
+          <button 
+            onClick={onRightClick}
+            className="size-11 rounded-full bg-white/5 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all active:scale-90"
+          >
+            <span className="material-symbols-outlined text-[22px]">{rightIcon}</span>
+          </button>
+        )}
+      </div>
     </header>
   );
-};
+});
+
+Header.displayName = 'Header';

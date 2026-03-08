@@ -5,7 +5,12 @@ import { History } from './components/History';
 import { Preferences } from './components/Preferences';
 import { StyleLibrary } from './components/StyleLibrary';
 import { CreateStyle } from './components/CreateStyle';
+import { CreatePreset } from './components/CreatePreset';
+import { CommunityFeed } from './components/CommunityFeed';
+import { Leaderboard } from './components/Leaderboard';
 import { AppSettings, AppRoute, HistoryItem, MODEL_STYLES } from './types';
+import { supabase } from './services/supabase';
+import { storage } from './services/storage';
 
 const STORAGE_KEY_SETTINGS = 'resonance_v4_settings';
 const STORAGE_KEY_HISTORY = 'resonance_v4_history';
@@ -25,7 +30,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   favoriteStyleIds: [],
   styleOrder: MODEL_STYLES.map(s => s.id), // Initialize with default order
   customStyles: [], 
-  apiKey: '',
+  apiKey: 'sk_fH3vuxg5ULiDIzbVK7y6ejUg4eK1f0VF',
   quality: 'hd',
   infiniteMode: false,
   seed: 0,
@@ -35,45 +40,99 @@ const DEFAULT_SETTINGS: AppSettings = {
 const App: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<AppRoute>(AppRoute.GENERATOR);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [user, setUser] = useState<any>(null);
+  const [isStorageLoaded, setIsStorageLoaded] = useState(false);
   
-  const [settings, setSettings] = useState<AppSettings>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_SETTINGS);
-      if (stored) {
-          const parsed = JSON.parse(stored);
-          // Ensure styleOrder exists for legacy data migration
-          if (!parsed.styleOrder || parsed.styleOrder.length === 0) {
-              parsed.styleOrder = MODEL_STYLES.map(s => s.id);
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [sessionPrompt, setSessionPrompt] = useState('');
+  const [sessionImages, setSessionImages] = useState<HistoryItem[]>([]);
+
+  // Load from IndexedDB (with localStorage migration)
+  useEffect(() => {
+    const loadStorage = async () => {
+      try {
+        // 1. Try IndexedDB first
+        let storedSettings = await storage.get<AppSettings>(STORAGE_KEY_SETTINGS);
+        let storedHistory = await storage.get<HistoryItem[]>(STORAGE_KEY_HISTORY);
+        let storedPrompt = await storage.get<string>(STORAGE_KEY_SESSION_PROMPT);
+        let storedImages = await storage.get<HistoryItem[]>(STORAGE_KEY_SESSION_IMAGES);
+
+        // 2. Migration from localStorage if IndexedDB is empty
+        if (!storedSettings) {
+          const legacySettings = localStorage.getItem(STORAGE_KEY_SETTINGS);
+          if (legacySettings) {
+            try {
+              storedSettings = JSON.parse(legacySettings);
+              await storage.set(STORAGE_KEY_SETTINGS, storedSettings);
+            } catch (e) {}
           }
-          return { ...DEFAULT_SETTINGS, ...parsed };
+        }
+        if (!storedHistory) {
+          const legacyHistory = localStorage.getItem(STORAGE_KEY_HISTORY);
+          if (legacyHistory) {
+            try {
+              storedHistory = JSON.parse(legacyHistory);
+              await storage.set(STORAGE_KEY_HISTORY, storedHistory);
+            } catch (e) {}
+          }
+        }
+        if (!storedPrompt) {
+          const legacyPrompt = localStorage.getItem(STORAGE_KEY_SESSION_PROMPT);
+          if (legacyPrompt) {
+            storedPrompt = legacyPrompt;
+            await storage.set(STORAGE_KEY_SESSION_PROMPT, storedPrompt);
+          }
+        }
+        if (!storedImages) {
+          const legacyImages = localStorage.getItem(STORAGE_KEY_SESSION_IMAGES);
+          if (legacyImages) {
+            try {
+              storedImages = JSON.parse(legacyImages);
+              await storage.set(STORAGE_KEY_SESSION_IMAGES, storedImages);
+            } catch (e) {}
+          }
+        }
+
+        // 3. Apply settings with defaults/migrations
+        if (storedSettings) {
+          if (!storedSettings.styleOrder || storedSettings.styleOrder.length === 0) {
+            storedSettings.styleOrder = MODEL_STYLES.map(s => s.id);
+          }
+          if (!storedSettings.apiKey || storedSettings.apiKey.trim() === '') {
+            storedSettings.apiKey = 'sk_fH3vuxg5ULiDIzbVK7y6ejUg4eK1f0VF';
+          }
+          setSettings({ ...DEFAULT_SETTINGS, ...storedSettings });
+        }
+
+        if (storedHistory) setHistory(storedHistory);
+        if (storedPrompt) setSessionPrompt(storedPrompt);
+        if (storedImages) setSessionImages(storedImages);
+
+      } catch (e) {
+        console.error('Storage Load Error:', e);
+      } finally {
+        setIsStorageLoaded(true);
       }
-      return DEFAULT_SETTINGS;
-    } catch (e) {
-      return DEFAULT_SETTINGS;
-    }
-  });
+    };
 
-  const [history, setHistory] = useState<HistoryItem[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_HISTORY);
-      return stored ? JSON.parse(stored) : [];
-    } catch (e) {
-      return [];
-    }
-  });
+    loadStorage();
+  }, []);
 
-  const [sessionPrompt, setSessionPrompt] = useState(() => {
-    return localStorage.getItem(STORAGE_KEY_SESSION_PROMPT) || '';
-  });
+  // Supabase Auth Listener
+  useEffect(() => {
+    if (!supabase) return;
 
-  const [sessionImages, setSessionImages] = useState<HistoryItem[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_SESSION_IMAGES);
-      return stored ? JSON.parse(stored) : [];
-    } catch (e) {
-      return [];
-    }
-  });
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // PWA Install Prompt Logic
   useEffect(() => {
@@ -97,8 +156,19 @@ const App: React.FC = () => {
     setDeferredPrompt(null);
   }, [deferredPrompt]);
 
-  // Cross-tab synchronization
+  // Cross-tab synchronization and BYOP handle
   useEffect(() => {
+    // Handle BYOP redirect key in hash
+    if (window.location.hash.includes('api_key=')) {
+        const params = new URLSearchParams(window.location.hash.slice(1));
+        const key = params.get('api_key');
+        if (key) {
+            handleUpdateSettings({ apiKey: key });
+            // Clear hash without reloading
+            window.history.replaceState(null, '', window.location.pathname);
+        }
+    }
+
     const handleStorageChange = (e: StorageEvent) => {
       if (!e.newValue) return;
       try {
@@ -117,20 +187,20 @@ const App: React.FC = () => {
   const handleUpdateSettings = useCallback((newSettings: Partial<AppSettings>) => {
     setSettings(prev => {
       const updated = { ...prev, ...newSettings };
-      localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(updated));
+      storage.set(STORAGE_KEY_SETTINGS, updated);
       return updated;
     });
   }, []);
 
   const handleSetSessionPrompt = useCallback((prompt: string) => {
     setSessionPrompt(prompt);
-    localStorage.setItem(STORAGE_KEY_SESSION_PROMPT, prompt);
+    storage.set(STORAGE_KEY_SESSION_PROMPT, prompt);
   }, []);
 
   const handleAddToHistory = useCallback((item: HistoryItem) => {
     setHistory(prev => {
       const updated = [item, ...prev].slice(0, 500);
-      localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(updated));
+      storage.set(STORAGE_KEY_HISTORY, updated);
       return updated;
     });
   }, []);
@@ -138,7 +208,7 @@ const App: React.FC = () => {
   const handleDeleteHistory = useCallback((ids: string[]) => {
     setHistory(prev => {
       const updated = prev.filter(item => !ids.includes(item.id));
-      localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(updated));
+      storage.set(STORAGE_KEY_HISTORY, updated);
       return updated;
     });
   }, []);
@@ -146,10 +216,18 @@ const App: React.FC = () => {
   const handleSetSessionImages = useCallback((update: React.SetStateAction<HistoryItem[]>) => {
     setSessionImages(prev => {
       const next = typeof update === 'function' ? update(prev) : update;
-      localStorage.setItem(STORAGE_KEY_SESSION_IMAGES, JSON.stringify(next));
+      storage.set(STORAGE_KEY_SESSION_IMAGES, next);
       return next;
     });
   }, []);
+
+  if (!isStorageLoaded) {
+    return (
+      <div className="fixed inset-0 bg-black flex items-center justify-center">
+        <div className="size-12 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
+      </div>
+    );
+  }
 
   const renderScreen = () => {
     switch (currentRoute) {
@@ -175,6 +253,7 @@ const App: React.FC = () => {
             onNavigate={setCurrentRoute}
             onRemix={(item) => {
                 handleSetSessionPrompt(item.prompt);
+                handleUpdateSettings({ seed: item.seed });
                 setCurrentRoute(AppRoute.GENERATOR);
             }}
             onDelete={handleDeleteHistory}
@@ -206,6 +285,27 @@ const App: React.FC = () => {
                 key="create-style"
                 settings={settings}
                 updateSettings={handleUpdateSettings}
+                onNavigate={setCurrentRoute}
+            />
+        );
+      case AppRoute.CREATE_PRESET:
+        return (
+            <CreatePreset 
+                key="create-preset"
+                onNavigate={setCurrentRoute}
+            />
+        );
+      case AppRoute.COMMUNITY:
+        return (
+            <CommunityFeed 
+                key="community"
+                onNavigate={setCurrentRoute}
+            />
+        );
+      case AppRoute.LEADERBOARD:
+        return (
+            <Leaderboard 
+                key="leaderboard"
                 onNavigate={setCurrentRoute}
             />
         );

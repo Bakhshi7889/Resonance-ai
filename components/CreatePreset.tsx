@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { motion } from 'framer-motion';
 import { AppRoute } from '../types';
 import { Header } from './Header';
@@ -7,7 +7,7 @@ interface CreatePresetProps {
   onNavigate: (route: AppRoute) => void;
 }
 
-export const CreatePreset: React.FC<CreatePresetProps> = ({ onNavigate }) => {
+export const CreatePreset: React.FC<CreatePresetProps> = memo(({ onNavigate }) => {
   return (
     <motion.div 
       className="flex flex-col h-full bg-background-dark w-full"
@@ -74,4 +74,6 @@ export const CreatePreset: React.FC<CreatePresetProps> = ({ onNavigate }) => {
       </div>
     </motion.div>
   );
-};
+});
+
+CreatePreset.displayName = 'CreatePreset';

@@ -1,114 +1,60 @@
-
-import { ImageGenerationParams, AccountState, UsageRecord } from '../types';
 import { addLog } from './logger';
 
-const BASE_URL = 'https://gen.pollinations.ai';
-const ESTIMATED_IMAGE_COST = 0.0002; 
+export const getEffectiveKey = (key?: string) => key || 'sk_fH3vuxg5ULiDIzbVK7y6ejUg4eK1f0VF';
 
-// The system core key used for out-of-the-box functionality
-export const HIDDEN_DEFAULT_KEY = 'sk_fH3vuxg5ULiDIzbVK7y6ejUg4eK1f0VF';
+export const getRandomSeed = () => Math.floor(Math.random() * 1000000);
 
-/**
- * Resolves the active API key with strict fallback.
- */
-export const getEffectiveKey = (userKey?: string) => {
-    const trimmed = userKey?.trim();
-    if (trimmed && trimmed.length > 5) return trimmed;
-    return HIDDEN_DEFAULT_KEY;
-};
-
-export const generateImageUrl = (params: ImageGenerationParams): string => {
-  const { 
-    prompt, model, width, height, seed, enhance, nologo, 
-    negative_prompt, private: privateMode,
-    quality, apiKey: userKey, safe
-  } = params;
-  
-  const encodedPrompt = encodeURIComponent(prompt);
-  const key = getEffectiveKey(userKey);
-  
-  const queryParams = new URLSearchParams();
-  
-  // Core parameters
-  queryParams.append('model', model);
-  queryParams.append('width', width.toString());
-  queryParams.append('height', height.toString());
-  queryParams.append('seed', seed.toString());
-  
-  // Optional boolean flags
-  if (enhance) queryParams.append('enhance', 'true');
-  if (nologo) queryParams.append('nologo', 'true');
-  if (privateMode) queryParams.append('private', 'true');
-  
-  // Strings
-  if (quality) queryParams.append('quality', quality);
-  if (negative_prompt) queryParams.append('negative_prompt', negative_prompt);
-  
-  // Safety & Auth
-  // IMPORTANT: Explicitly use the boolean value passed in parameters
-  queryParams.append('safe', safe ? 'true' : 'false');
-  queryParams.append('key', key);
-
-  const finalUrl = `${BASE_URL}/image/${encodedPrompt}?${queryParams.toString()}`;
-  
-  addLog('info', 'Generated Image URL constructed', { prompt: prompt.substring(0, 50) + '...', model, width, height });
-
-  return finalUrl;
-};
-
-export const getRandomSeed = () => Math.floor(Math.random() * 2147483647);
-
-export const getAccountDetails = async (userKey?: string): Promise<AccountState> => {
-    const apiKey = getEffectiveKey(userKey);
-    // Use Authorization header for cleaner API calls where possible (GET fetch)
-    const headers = {
-        'Authorization': `Bearer ${apiKey}`
-    };
-
+export const generateImageUrl = async (params: any) => {
     try {
-        addLog('info', 'Fetching account details');
-        const [profileRes, balanceRes, usageRes] = await Promise.all([
-            fetch(`${BASE_URL}/account/profile`, { headers }),
-            fetch(`${BASE_URL}/account/balance`, { headers }),
-            fetch(`${BASE_URL}/account/usage?limit=10`, { headers })
-        ]);
-        
-        const profile = profileRes.ok ? await profileRes.json() : null;
-        const balanceData = balanceRes.ok ? await balanceRes.json() : { balance: 0 };
-        const usageData = usageRes.ok ? await usageRes.json() : { usage: [] };
+        const response = await fetch('/.netlify/functions/generate', {
+            method: 'POST',
+            body: JSON.stringify(params),
+        });
 
-        return { 
-            profile, 
-            balance: balanceData.balance, 
-            usage: Array.isArray(usageData.usage) ? usageData.usage : [],
-            isLoading: false, 
-            error: null 
-        };
-    } catch (error: any) {
-        addLog('error', 'Failed to fetch account details', error.message);
-        return { 
-            profile: null, 
-            balance: null, 
-            usage: [],
-            isLoading: false, 
-            error: error.message || 'Sync Error' 
-        };
+        const contentType = response.headers.get("content-type");
+        if (!response.ok || !contentType || !contentType.includes("application/json")) {
+            addLog('error', 'Generation proxy unavailable or returned invalid response.');
+            return null;
+        }
+
+        const data = await response.json();
+        return data.url;
+    } catch (e) {
+        addLog('error', 'Generation proxy failed', e);
+        return null;
     }
 };
 
-export const getEstimatedImagesLeft = (balance: number | null): string => {
-    if (balance === null || balance === undefined || balance === 0) return '0';
-    const count = Math.floor(balance / ESTIMATED_IMAGE_COST);
-    if (count >= 1000) return `${(count / 1000).toFixed(0)}k`;
-    return count.toString();
+export const getAuthUrl = (redirectUri: string) => {
+    return `https://enter.pollinations.ai/authorize?redirect_url=${encodeURIComponent(redirectUri)}`;
 };
 
-export const getAuthUrl = (redirectUrl: string) => {
-    const params = new URLSearchParams({
-        redirect_url: redirectUrl,
-        permissions: 'profile,balance,usage',
-        models: 'zimage',
-        expiry: '30'
-    });
-    return `https://enter.pollinations.ai/authorize?${params.toString()}`;
+export const getAccountDetails = async () => {
+    try {
+        addLog('info', 'Initiating account sync via Netlify API...');
+        const response = await fetch('/.netlify/functions/account');
+        
+        // Check if the response is actually JSON
+        const contentType = response.headers.get("content-type");
+        if (!response.ok || !contentType || !contentType.includes("application/json")) {
+            addLog('warn', 'Sync server unavailable or returned non-JSON response. This is expected in local development if Netlify functions are not running.');
+            return { profile: null, balance: 0, usage: [], isLoading: false, error: null };
+        }
+
+        const data = await response.json();
+        
+        if (data.error) throw new Error(data.error);
+
+        addLog('info', 'Sync complete', { balance: data.balance });
+        return { ...data, isLoading: false, error: null };
+    } catch (e: any) {
+        addLog('error', 'Critical sync error', e.message);
+        return { profile: null, balance: null, usage: [], isLoading: false, error: e.message };
+    }
+};
+
+export const getEstimatedImagesLeft = (balance: number | null) => {
+    if (balance === null) return 0;
+    // Based on latest docs: 0.0002 Pollen per image
+    return Math.floor(balance / 0.0002);
 };

@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Space Grotesk", sans-serif;
+  --color-primary: #3b82f6;
+  --color-background-pure: #000000;
+  --color-background-dark: #000000;
+  --color-surface-dark: #000000;
+  
+  --shadow-glow: 0 0 30px -5px rgba(59, 130, 246, 0.6);
+  --shadow-liquid: 0 10px 50px -10px rgba(0,0,0,0.95);
+  --animate-spin-slow: spin 3s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@layer base {
+  body {
+    @apply bg-black text-white overflow-x-hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer components {
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  
+  .glass-panel {
+    @apply bg-white/[0.03] backdrop-blur-[50px] border-[0.5px] border-white/12;
+    -webkit-backdrop-filter: blur(50px);
+  }
+  
+  .liquid-text {
+    background: linear-gradient(to right, #ffffff 20%, #3b82f6 40%, #3b82f6 60%, #ffffff 80%);
+    background-size: 200% auto;
+    color: #000;
+    background-clip: text;
+    text-fill-color: transparent;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shine 4s linear infinite;
+  }
+
+  .logo-text {
+    @apply tracking-[-0.05em];
+    text-shadow: 0 0 40px rgba(59, 130, 246, 0.3);
+  }
+}
+
+@keyframes shine {
+  to { background-position: 200% center; }
+}
+
+@keyframes liquid-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.05); }
+}
+
+.animate-liquid-pulse {
+  animation: liquid-pulse 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Performance optimizations */
+.will-change-transform {
+  will-change: transform;
+}
+
+.will-change-opacity {
+  will-change: opacity;
+}
+
+.will-change-contents {
+  will-change: contents;
+}

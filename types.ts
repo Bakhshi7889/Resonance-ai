@@ -20,10 +20,10 @@ export interface HistoryItem extends ImageGenerationParams {
   id: string;
   batchId?: string; // Links images generated in the same request
   timestamp: number;
+  startTime?: number; // When the generation was initiated
   url: string;
   prompt: string;
   styleSuffix?: string; // The specific keywords added by the style
-  // ... extends ImageGenerationParams
 }
 
 export interface CustomStyle {
@@ -74,6 +74,7 @@ export interface AccountState {
   usage: UsageRecord[];
   isLoading: boolean;
   error: string | null;
+  user: any | null; // Supabase user
 }
 
 export enum AppRoute {
@@ -81,17 +82,22 @@ export enum AppRoute {
   HISTORY = 'history',
   PREFERENCES = 'preferences',
   STYLE_LIBRARY = 'style_library',
-  CREATE_STYLE = 'create_style'
+  CREATE_STYLE = 'create_style',
+  CREATE_PRESET = 'create_preset',
+  COMMUNITY = 'community',
+  LEADERBOARD = 'leaderboard'
 }
 
 export const AVAILABLE_MODELS = [
   { id: 'zimage', name: 'Z-Image', description: 'Poly-modal Synthesis' },
+  { id: 'flux', name: 'Flux Schnell', description: 'High-speed Latent Diffusion' },
+  { id: 'flux-2-dev', name: 'Flux.2 Dev', description: 'Alpha Neural Architecture' },
 ];
 
 export const ASPECT_RATIOS = [
   { label: '1:1', width: 1024, height: 1024 },
-  { label: '3:4', width: 768, height: 1024 },
-  { label: '4:3', width: 1024, height: 768 },
+  { label: '3:4', width: 896, height: 1152 },
+  { label: '4:3', width: 1152, height: 896 },
   { label: '16:9', width: 1280, height: 720 },
   { label: '9:16', width: 720, height: 1280 },
 ];
@@ -141,5 +147,26 @@ export const MODEL_STYLES = [
   // THEMATIC CATEGORY
   { id: 'futuristic', label: 'Neon Future', category: 'Thematic', suffix: ', cosmic gradient, glowing edges, motion blur, clean grid, neon blue glow, atmospheric haze, 8K realism', image: 'https://gen.pollinations.ai/image/Futuristic%20cityscape?model=zimage&width=256&height=384&nologo=true&seed=23&safe=true' },
   { id: 'fashion', label: 'High Fashion', category: 'Thematic', suffix: ', glamorous makeup, smoky eyes, luxurious interior, satin textures, high-fashion editorial pose', image: 'https://gen.pollinations.ai/image/High%20fashion%20model?model=zimage&width=256&height=384&nologo=true&seed=24&safe=true' },
-  { id: 'horror', label: 'Horror Moody', category: 'Thematic', suffix: ', eerie shadows, distorted perspectives, creeping fog, desaturated tones, tense composition, low-key lighting', image: 'https://gen.pollinations.ai/image/Horror%20scene?model=zimage&width=256&height=384&nologo=true&seed=25&safe=true' }
+  { id: 'horror', label: 'Horror Moody', category: 'Thematic', suffix: ', eerie shadows, distorted perspectives, creeping fog, desaturated tones, tense composition, low-key lighting', image: 'https://gen.pollinations.ai/image/Horror%20scene?model=zimage&width=256&height=384&nologo=true&seed=25&safe=true' },
+
+  // TURBO OPTIMIZED STYLES (NEW / UPDATED)
+  { id: 'realism_turbo', label: 'Realism (Turbo)', category: 'Turbo', suffix: ', photorealistic, ultra-detailed skin texture and pores, natural lighting, shot on Canon EOS R5 85mm f/1.8 lens, shallow depth of field, bokeh, 8K resolution, sharp focus, intricate details', image: 'https://gen.pollinations.ai/image/Hyper-realistic%20portrait%208k?model=zimage&width=256&height=384&nologo=true&seed=100&safe=true' },
+  { id: 'cinematic_turbo', label: 'Cinematic (Turbo)', category: 'Turbo', suffix: ', cinematic composition, dramatic key light, high-end magazine cover, professional studio lighting, eye-level shot, leading lines, shallow depth of field, volumetric god rays', image: 'https://gen.pollinations.ai/image/Cinematic%20masterpiece%20lighting?model=zimage&width=256&height=384&nologo=true&seed=101&safe=true' },
+  { id: 'oil_painting_turbo', label: 'Oil Painting (Turbo)', category: 'Turbo', suffix: ', oil painting on canvas, visible brush strokes, textured impasto, rich earthy palette, classical European portraiture, museum-grade fine art, expressive detail', image: 'https://gen.pollinations.ai/image/Classical%20oil%20painting?model=zimage&width=256&height=384&nologo=true&seed=102&safe=true' },
+  { id: 'anime_turbo', label: 'Anime (Turbo)', category: 'Turbo', suffix: ', anime-style illustration, sharp line art, cel-shaded coloring, vibrant colors, dynamic perspective, studio-quality key visual, smoothmixanime', image: 'https://gen.pollinations.ai/image/High%20quality%20anime%20key%20visual?model=zimage&width=256&height=384&nologo=true&seed=103&safe=true' },
+  { id: 'painterly_turbo', label: 'Painterly (Turbo)', category: 'Turbo', suffix: ', painterly style, high-end artbook illustration, rich color palette, epic atmosphere, soft god rays, intricate foliage', image: 'https://gen.pollinations.ai/image/Epic%20fantasy%20painterly%20art?model=zimage&width=256&height=384&nologo=true&seed=104&safe=true' },
+  { id: 'watercolor_turbo', label: 'Watercolor (Turbo)', category: 'Turbo', suffix: ', watercolor painting, soft washes, delicate flowing lines, gentle pastel colors, peaceful magical mood, translucent layers', image: 'https://gen.pollinations.ai/image/Delicate%20watercolor%20landscape?model=zimage&width=256&height=384&nologo=true&seed=105&safe=true' },
+  { id: 'vintage_turbo', label: 'Vintage (Turbo)', category: 'Turbo', suffix: ', vintage 35mm film, light grain, warm tones, nostalgic atmosphere, shot on Kodak Portra, 8k resolution, sharp focus', image: 'https://gen.pollinations.ai/image/Vintage%2035mm%20film%20photo?model=zimage&width=256&height=384&nologo=true&seed=106&safe=true' },
+  { id: 'surreal_turbo', label: 'Surreal (Turbo)', category: 'Turbo', suffix: ', surreal dreamlike atmosphere, impossible geometry, floating ethereal elements, melting organic forms, vibrant contrasting dreamscape, otherworldly haze, layered transparent realities', image: 'https://gen.pollinations.ai/image/Surreal%20dreamscape%20impossible%20geometry?model=zimage&width=256&height=384&nologo=true&seed=107&safe=true' },
+  { id: 'ghibli_turbo', label: 'Ghibli (Turbo)', category: 'Turbo', suffix: ', studio ghibli hand-drawn animation style, soft pastel whimsical palette, lush magical backgrounds, gentle glowing atmosphere, delicate line work', image: 'https://gen.pollinations.ai/image/Whimsical%20ghibli%20forest?model=zimage&width=256&height=384&nologo=true&seed=108&safe=true' },
+  { id: 'minimalist_turbo', label: 'Minimalist (Turbo)', category: 'Turbo', suffix: ', minimalist negative space, clean geometric flat design, muted simple palette, uncluttered modern lines, bold symmetry', image: 'https://gen.pollinations.ai/image/Minimalist%20geometric%20design?model=zimage&width=256&height=384&nologo=true&seed=109&safe=true' },
+  { id: 'isometric_turbo', label: 'Isometric (Turbo)', category: 'Turbo', suffix: ', isometric axonometric view, intricate layered perspective, precise mechanical details, technical blueprint clarity', image: 'https://gen.pollinations.ai/image/Isometric%20mechanical%20room?model=zimage&width=256&height=384&nologo=true&seed=110&safe=true' },
+  { id: 'double_exposure', label: 'Double Exposure', category: 'Turbo', suffix: ', double exposure layered blend, transparent overlapping scenes, artistic multiple exposure effect, soft ghosting transitions', image: 'https://gen.pollinations.ai/image/Double%20exposure%20art?model=zimage&width=256&height=384&nologo=true&seed=111&safe=true' },
+  { id: 'vector_graphic', label: 'Vector Graphic', category: 'Turbo', suffix: ', clean vector illustration, bold flat colors, sharp modern outlines, graphic design precision', image: 'https://gen.pollinations.ai/image/Clean%20vector%20graphic?model=zimage&width=256&height=384&nologo=true&seed=112&safe=true' },
+  { id: 'pastel_gouache', label: 'Pastel Gouache', category: 'Turbo', suffix: ', soft pastel gouache painting, blended textured washes, delicate paper grain feel, gentle diffused edges', image: 'https://gen.pollinations.ai/image/Soft%20gouache%20painting?model=zimage&width=256&height=384&nologo=true&seed=113&safe=true' },
+  { id: 'chiaroscuro', label: 'Chiaroscuro', category: 'Turbo', suffix: ', chiaroscuro dramatic light-shadow play, high contrast renaissance illumination, deep moody gradients', image: 'https://gen.pollinations.ai/image/Chiaroscuro%20lighting%20portrait?model=zimage&width=256&height=384&nologo=true&seed=114&safe=true' },
+  { id: 'volumetric', label: 'Volumetric', category: 'Turbo', suffix: ', volumetric god rays, dappled sunlight haze, soft diffused fog layers, ethereal backlit mist', image: 'https://gen.pollinations.ai/image/Volumetric%20lighting%20mist?model=zimage&width=256&height=384&nologo=true&seed=115&safe=true' },
+  { id: 'macro', label: 'Macro Photo', category: 'Turbo', suffix: ', macro extreme close-up, intricate micro textures, shallow depth of field bokeh, hyper-detailed surfaces', image: 'https://gen.pollinations.ai/image/Macro%20texture%20detail?model=zimage&width=256&height=384&nologo=true&seed=116&safe=true' },
+  { id: 'papercraft', label: 'Papercraft', category: 'Turbo', suffix: ', paper craft collage texture, holographic iridescent shine, glossy reflective surfaces, translucent layered glass, nostalgic retro poster grain, cloud art soft blending, silhouette dramatic outline', image: 'https://gen.pollinations.ai/image/Intricate%20papercraft%20art?model=zimage&width=256&height=384&nologo=true&seed=117&safe=true' },
+  { id: 'masterpiece', label: 'Masterpiece', category: 'Turbo', suffix: ', masterpiece, best quality, ultra-detailed, sharp focus, intricate details, 8K UHD, highly detailed textures, volumetric lighting', image: 'https://gen.pollinations.ai/image/Masterpiece%20ultra%20detailed?model=zimage&width=256&height=384&nologo=true&seed=118&safe=true' }
 ];

@@ -1,6 +1,8 @@
 import React, { ReactNode } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import './index.css';
+import { storage } from './services/storage';
 
 interface ErrorBoundaryProps {
   children?: ReactNode;
@@ -92,7 +94,10 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
               Copy Logs
             </button>
             <button 
-              onClick={() => {
+              onClick={async () => {
+                  try {
+                    await storage.clear();
+                  } catch (e) {}
                   localStorage.clear();
                   window.location.reload();
               }} 

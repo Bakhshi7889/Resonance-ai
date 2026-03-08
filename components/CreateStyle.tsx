@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppRoute, AppSettings, CustomStyle } from '../types';
 import { Header } from './Header';
@@ -18,7 +18,7 @@ const PREVIEW_SUBJECTS = [
     "A magical forest"
 ];
 
-export const CreateStyle: React.FC<CreateStyleProps> = ({ onNavigate, settings, updateSettings }) => {
+export const CreateStyle: React.FC<CreateStyleProps> = memo(({ onNavigate, settings, updateSettings }) => {
   const [name, setName] = useState('');
   const [suffix, setSuffix] = useState('');
   const [coverImage, setCoverImage] = useState<string | null>(null);
@@ -32,12 +32,12 @@ export const CreateStyle: React.FC<CreateStyleProps> = ({ onNavigate, settings, 
     setCoverImage(null);
     
     // Generate 4 unique variations
-    const promises = PREVIEW_SUBJECTS.map((subject, index) => {
+    const promises = PREVIEW_SUBJECTS.map(async (subject, index) => {
         // Use a semi-deterministic seed offset to ensure variety but consistency during generation batch
         const seed = getRandomSeed() + index; 
         const prompt = `${subject}${suffix}`;
         
-        const url = generateImageUrl({
+        const url = await generateImageUrl({
             prompt,
             model: 'zimage',
             width: 512, // Slightly larger for better cover quality
@@ -209,4 +209,6 @@ export const CreateStyle: React.FC<CreateStyleProps> = ({ onNavigate, settings, 
       </div>
     </motion.div>
   );
-};
+});
+
+CreateStyle.displayName = 'CreateStyle';

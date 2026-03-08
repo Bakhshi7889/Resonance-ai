@@ -3,14 +3,19 @@ import { motion, AnimatePresence, useMotionValue, useTransform, useSpring, useAn
 import { 
     Settings, LayoutGrid, Shuffle, Eraser, Maximize2, Minimize2, 
     Trash2, EyeOff, Wand2, Zap, ArrowUp, ChevronDown, 
-    Check, ShieldCheck, XCircle, Info, Hash, Clock, AlertTriangle, RefreshCw, Layers, Heart
+    Check, ShieldCheck, XCircle, Hash, Clock, AlertTriangle, RefreshCw, Layers, Heart,
+    Sparkles, Loader2, Camera, Plus, X, LogIn, LogOut, User, Globe, Download, Share2
 } from 'lucide-react';
 import { generateImageUrl, getRandomSeed, getAccountDetails, getEstimatedImagesLeft, getEffectiveKey } from '../services/pollinations';
-import { AppRoute, AppSettings, HistoryItem, MODEL_STYLES, ASPECT_RATIOS, AccountState } from '../types';
+import { AppRoute, AppSettings, HistoryItem, MODEL_STYLES, ASPECT_RATIOS, AccountState, AVAILABLE_MODELS } from '../types';
 import { addLog } from '../services/logger';
+import { enhancePrompt } from '../services/ai';
+import { supabase } from '../services/supabase';
+import { storage } from '../services/storage';
 
 const SILENT_NEGATIVE = "nsfw, naked, nude, porn, sex, explicit, genitals, nipples, topless, breasts, bad anatomy, deformed, ugly, watermark, logo";
 const SPRING_CONFIG = { stiffness: 400, damping: 30 };
+const LIQUID_SPRING = { stiffness: 260, damping: 20, mass: 1 };
 const STORAGE_KEY_TELEMETRY = 'resonance_v4_telemetry';
 
 const NEGATIVE_SUGGESTIONS = [
@@ -77,10 +82,10 @@ const PromptHeader = memo(({ prompt, onClearBatch, batchId }: { prompt: string, 
             <div className="flex items-center gap-3">
                 <div 
                     onClick={() => setIsExpanded(!isExpanded)}
-                    className="flex-1 flex items-center gap-3 px-6 py-4 rounded-[1.8rem] bg-white/[0.03] border-[0.5px] border-white/10 backdrop-blur-md cursor-pointer hover:bg-white/5 transition-all overflow-hidden shadow-sm"
+                    className="flex-1 flex items-center gap-3 px-6 py-4 rounded-[1.8rem] glass-panel cursor-pointer hover:bg-white/5 transition-all overflow-hidden shadow-sm"
                 >
-                    <Info size={14} className="text-primary shrink-0" />
-                    <p className={`text-[11px] font-medium text-white/50 tracking-tight leading-relaxed ${isExpanded ? '' : 'truncate'}`}>
+                    <Camera size={14} className="text-primary shrink-0" />
+                    <p className={`text-xs font-medium text-white/70 tracking-tight leading-relaxed ${isExpanded ? '' : 'truncate'}`}>
                         {prompt}
                     </p>
                 </div>
@@ -95,7 +100,7 @@ const PromptHeader = memo(({ prompt, onClearBatch, batchId }: { prompt: string, 
     );
 });
 
-const GenerationCard = memo(({ item, index, visualSafety, onImageReady }: { item: HistoryItem, index: number, visualSafety: boolean, onImageReady?: (id: string) => void }) => {
+const GenerationCard = memo(({ item, index, visualSafety, onImageReady, onNavigate }: { item: HistoryItem, index: number, visualSafety: boolean, onImageReady?: (id: string) => void, onNavigate: (route: AppRoute) => void }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [revealed, setRevealed] = useState(false);
@@ -155,6 +160,44 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady }: { item
       addLog('info', 'Retrying generation', { id: item.id });
   };
 
+  const handleShare = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!supabase) return;
+    
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+        alert("Login to share");
+        return;
+    }
+
+    const { error } = await supabase
+        .from('generations')
+        .update({ is_public: true })
+        .eq('url', item.url)
+        .eq('user_id', session.user.id);
+
+    if (error) alert("Share failed");
+    else alert("Shared to Community!");
+  };
+
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+        const response = await fetch(item.url);
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `resonance-${item.width}x${item.height}-${Date.now()}.jpg`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
+    } catch (e) {
+        window.open(item.url, '_blank');
+    }
+  };
+
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const rotateX = useSpring(useTransform(y, [-100, 100], [3, -3]), SPRING_CONFIG);
@@ -169,17 +212,17 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady }: { item
         y.set(e.clientY - rect.top - rect.height/2);
       }}
       onPointerLeave={() => { x.set(0); y.set(0); }}
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ delay: index * 0.05, type: "spring", ...SPRING_CONFIG }}
-      className="relative shrink-0 overflow-hidden bg-white/[0.02] border-[0.5px] border-white/10 shadow-liquid rounded-[2.5rem] flex items-center justify-center group/card w-full max-w-3xl"
+      initial={{ opacity: 0, scale: 0.8, y: 40 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={LIQUID_SPRING}
+      className="relative shrink-0 overflow-hidden bg-white/[0.02] border-[0.5px] border-white/10 shadow-liquid rounded-[2.5rem] flex items-center justify-center group/card w-full max-w-3xl will-change-transform"
       style={{ rotateX, rotateY, transformStyle: 'preserve-3d', aspectRatio: `${item.width}/${item.height}` }}
     >
       {!hasError ? (
           <img 
             src={item.url} 
             alt="vision"
-            className={`w-full h-full object-cover transition-all duration-1000 ease-out ${isLoaded && !isAuditing ? 'opacity-100' : 'opacity-0'} ${(visualRisk && !revealed) ? 'blur-[80px] saturate-50 brightness-50' : 'blur-0'}`}
+            className={`w-full h-full object-cover transition-all duration-500 ease-out ${isLoaded && !isAuditing ? 'opacity-100' : 'opacity-0'} ${(visualRisk && !revealed) ? 'blur-[80px] saturate-50 brightness-50' : 'blur-0'}`}
             onLoad={handleImageLoad}
             onError={handleImageError}
           />
@@ -188,7 +231,12 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady }: { item
               <AlertTriangle size={32} className="text-red-400" />
               <div className="flex flex-col gap-1">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-red-400">Generation Failed</p>
-                <p className="text-[9px] font-mono text-white/40 max-w-[200px] break-words">Check logs for details</p>
+                <button 
+                    onClick={() => onNavigate(AppRoute.PREFERENCES)}
+                    className="text-[9px] font-mono text-white/40 max-w-[200px] break-words hover:text-white/60 underline underline-offset-2"
+                >
+                    Check logs for details
+                </button>
               </div>
               <button onClick={retry} className="px-4 py-2 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 text-[9px] font-bold uppercase tracking-widest text-white/60 flex items-center gap-2">
                   <RefreshCw size={12} /> Retry
@@ -196,6 +244,23 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady }: { item
           </div>
       )}
       
+      {isLoaded && !isAuditing && !hasError && (!visualRisk || revealed) && (
+        <div className="absolute bottom-6 right-6 flex gap-2 opacity-0 group-hover/card:opacity-100 transition-all translate-y-2 group-hover/card:translate-y-0 z-30">
+           <button 
+               onClick={handleDownload}
+               className="size-10 rounded-full bg-black/40 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white/60 hover:text-white hover:bg-black/60 transition-all active:scale-90"
+           >
+               <Download size={16} />
+           </button>
+           <button 
+               onClick={handleShare}
+               className="size-10 rounded-full bg-black/40 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white/60 hover:text-white hover:bg-black/60 transition-all active:scale-90"
+           >
+               <Share2 size={16} />
+           </button>
+        </div>
+      )}
+
       {(!isLoaded || isAuditing) && !hasError && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-md">
           <div className="size-8 rounded-full border-2 border-white/5 border-t-primary animate-spin" />
@@ -210,6 +275,59 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady }: { item
       )}
     </motion.div>
   );
+});
+
+const NeuralMesh = memo(({ meshData, visibleStylesCount }: { meshData: any, visibleStylesCount: number }) => {
+    if (!meshData) return null;
+    return (
+        <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute bottom-6 left-0 h-[60px] z-0 pointer-events-none"
+            style={{ width: meshData.totalWidth }}
+        >
+            <svg 
+                width={meshData.totalWidth} 
+                height="60" 
+                viewBox={`0 0 ${meshData.totalWidth} 60`} 
+                className="overflow-visible"
+            >
+                <defs>
+                    <filter id="mesh-glow" x="-50%" y="-50%" width="200%" height="200%">
+                        <feGaussianBlur stdDeviation="4" result="blur" />
+                        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                    </filter>
+                </defs>
+                <motion.line
+                    initial={{ x1: meshData.minX, x2: meshData.minX }}
+                    animate={{ 
+                        x1: meshData.minX, 
+                        x2: meshData.maxX, 
+                        y1: meshData.bridgeY, 
+                        y2: meshData.bridgeY,
+                    }}
+                    stroke="#3b82f6"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    filter="url(#mesh-glow)"
+                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                />
+                {meshData.points.map((x: number, i: number) => (
+                    <g key={`neural-path-${i}`}>
+                        <motion.line
+                            initial={{ opacity: 0, y1: 0, y2: 0 }}
+                            animate={{ x1: x, x2: x, y1: 0, y2: meshData.bridgeY, opacity: 1 }}
+                            stroke="#3b82f6"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            filter="url(#mesh-glow)"
+                        />
+                    </g>
+                ))}
+            </svg>
+        </motion.div>
+    );
 });
 
 const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }: { 
@@ -304,45 +422,62 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
     }, [selectedIndices, visibleStyles.length]);
 
     return (
-        <div className="px-6 py-10 flex flex-col gap-10 overflow-y-auto no-scrollbar max-h-[60vh] pb-36">
-            <div className="grid grid-cols-2 gap-4">
-                <button onClick={() => updateLocalSetting('enhance', !localSettings.enhance)} className={`h-16 rounded-[1.5rem] flex items-center justify-center gap-3 transition-all border ${localSettings.enhance ? 'bg-primary/20 border-primary/40 text-primary shadow-glow' : 'bg-white/5 border-transparent text-white/20'}`}>
-                    <Wand2 size={16} />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Neural {localSettings.enhance ? 'ON' : 'OFF'}</span>
+        <div className="px-5 py-6 flex flex-col gap-6 overflow-y-auto no-scrollbar max-h-[60vh] pb-24">
+            <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => updateLocalSetting('enhance', !localSettings.enhance)} className={`relative h-12 rounded-2xl flex items-center justify-center gap-2 transition-all border ${localSettings.enhance ? 'bg-primary/20 border-primary/40 text-primary shadow-glow' : 'bg-white/5 border-transparent text-white/20'}`}>
+                    <Wand2 size={14} />
+                    <span className="text-[9px] font-black uppercase tracking-widest">Neural {localSettings.enhance ? 'ON' : 'OFF'}</span>
+                    <span className="absolute -top-1 -right-1 bg-black/80 text-[7px] px-1.5 py-0.5 rounded-full border border-white/10 font-bold text-white/40">+~3s</span>
                 </button>
-                <button onClick={() => updateLocalSetting('visualSafety', !localSettings.visualSafety)} className={`h-16 rounded-[1.5rem] flex items-center justify-center gap-3 transition-all border ${localSettings.visualSafety ? 'bg-blue-500/20 border-blue-500/40 text-blue-400 shadow-glow' : 'bg-white/5 border-transparent text-white/20'}`}>
-                    <ShieldCheck size={16} />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Audit {localSettings.visualSafety ? 'ON' : 'OFF'}</span>
+                <button onClick={() => updateLocalSetting('visualSafety', !localSettings.visualSafety)} className={`h-12 rounded-2xl flex items-center justify-center gap-2 transition-all border ${localSettings.visualSafety ? 'bg-blue-500/20 border-blue-500/40 text-blue-400 shadow-glow' : 'bg-white/5 border-transparent text-white/20'}`}>
+                    <ShieldCheck size={14} />
+                    <span className="text-[9px] font-black uppercase tracking-widest">Audit {localSettings.visualSafety ? 'ON' : 'OFF'}</span>
                 </button>
             </div>
 
-            <div className="space-y-4">
-                <p className="text-[9px] text-white/20 font-black uppercase tracking-[0.2em] pl-1">Aspect Geometry</p>
-                <div className="grid grid-cols-5 gap-2 bg-white/5 p-2 rounded-[1.8rem] border border-white/5">
+            <div className="space-y-3">
+                <p className="text-[8px] text-white/20 font-black uppercase tracking-[0.2em] pl-1">Aspect Geometry</p>
+                <div className="grid grid-cols-5 gap-1.5 bg-white/5 p-1.5 rounded-2xl border border-white/5">
                     {ASPECT_RATIOS.map(ratio => {
                         const isSelected = localSettings.width === ratio.width && localSettings.height === ratio.height;
                         return (
-                            <button key={ratio.label} onClick={() => setAspectRatio(ratio.width, ratio.height)} className={`h-14 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all ${isSelected ? 'bg-white/10 text-white shadow-lg' : 'text-white/20 hover:text-white/40'}`}>
+                            <button key={ratio.label} onClick={() => setAspectRatio(ratio.width, ratio.height)} className={`h-12 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all ${isSelected ? 'bg-white/10 text-white shadow-lg' : 'text-white/20 hover:text-white/40'}`}>
                                 <RatioIcon width={ratio.width} height={ratio.height} isSelected={isSelected} />
-                                <span className="text-[8px] font-black">{ratio.label}</span>
+                                <span className="text-[7px] font-black">{ratio.label}</span>
                             </button>
                         );
                     })}
                 </div>
             </div>
 
-            <div className="space-y-4">
-                <p className="text-[9px] text-white/20 font-black uppercase tracking-[0.2em] pl-1">Batch Capacity</p>
-                <div className="grid grid-cols-4 gap-2 bg-white/5 p-2 rounded-[1.8rem] border border-white/5">
+            <div className="space-y-3">
+                <p className="text-[8px] text-white/20 font-black uppercase tracking-[0.2em] pl-1">Batch Capacity</p>
+                <div className="grid grid-cols-4 gap-1.5 bg-white/5 p-1.5 rounded-2xl border border-white/5">
                     {[1, 2, 4, 8].map(n => (
-                        <button key={n} onClick={() => updateLocalSetting('imageCount', n)} className={`h-14 rounded-2xl text-[10px] font-black transition-all ${localSettings.imageCount === n ? 'bg-primary text-white shadow-glow' : 'text-white/20 hover:text-white/40'}`}>{n}x</button>
+                        <button key={n} onClick={() => updateLocalSetting('imageCount', n)} className={`h-12 rounded-xl text-[9px] font-black transition-all ${localSettings.imageCount === n ? 'bg-primary text-white shadow-glow' : 'text-white/20 hover:text-white/40'}`}>{n}x</button>
                     ))}
                 </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
+                <p className="text-[8px] text-white/20 font-black uppercase tracking-[0.2em] pl-1">Neural Model</p>
+                <div className="grid grid-cols-3 gap-2 bg-white/5 p-1.5 rounded-2xl border border-white/5">
+                    {AVAILABLE_MODELS.map(m => (
+                        <button 
+                            key={m.id} 
+                            onClick={() => updateLocalSetting('model', m.id)} 
+                            className={`h-12 rounded-xl text-[8px] font-black transition-all flex flex-col items-center justify-center gap-1 ${localSettings.model === m.id ? 'bg-primary text-white shadow-glow' : 'text-white/20 hover:text-white/40'}`}
+                        >
+                            {m.id === 'zimage' ? <Zap size={10} /> : <Sparkles size={10} />}
+                            <span className="truncate w-full px-1">{m.name}</span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            <div className="space-y-3">
                 <div className="flex items-center justify-between pr-4">
-                    <p className="text-[9px] text-white/20 font-black uppercase tracking-[0.2em] pl-1">Style Matrix</p>
+                    <p className="text-[8px] text-white/20 font-black uppercase tracking-[0.2em] pl-1">Style Matrix</p>
                     {activeCount > 1 && (
                         <span className="text-[9px] font-black text-primary uppercase tracking-widest animate-pulse flex items-center gap-1">
                              <Layers size={10} /> {activeCount} BLEND ACTIVE
@@ -386,55 +521,7 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
                         })}
                         
                         <AnimatePresence>
-                            {meshData && (
-                                <motion.div 
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    className="absolute bottom-6 left-0 h-[60px] z-0 pointer-events-none"
-                                    style={{ width: meshData.totalWidth }}
-                                >
-                                    <svg 
-                                        width={meshData.totalWidth} 
-                                        height="60" 
-                                        viewBox={`0 0 ${meshData.totalWidth} 60`} 
-                                        className="overflow-visible"
-                                    >
-                                        <defs>
-                                            <filter id="mesh-glow" x="-50%" y="-50%" width="200%" height="200%">
-                                                <feGaussianBlur stdDeviation="4" result="blur" />
-                                                <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                                            </filter>
-                                        </defs>
-                                        <motion.line
-                                            initial={{ x1: meshData.minX, x2: meshData.minX }}
-                                            animate={{ 
-                                                x1: meshData.minX, 
-                                                x2: meshData.maxX, 
-                                                y1: meshData.bridgeY, 
-                                                y2: meshData.bridgeY,
-                                            }}
-                                            stroke="#3b82f6"
-                                            strokeWidth="3"
-                                            strokeLinecap="round"
-                                            filter="url(#mesh-glow)"
-                                            transition={{ type: "spring", ...SPRING_CONFIG }}
-                                        />
-                                        {meshData.points.map((x, i) => (
-                                            <g key={`neural-path-${i}`}>
-                                                <motion.line
-                                                    initial={{ opacity: 0, y1: 0, y2: 0 }}
-                                                    animate={{ x1: x, x2: x, y1: 0, y2: meshData.bridgeY, opacity: 1 }}
-                                                    stroke="#3b82f6"
-                                                    strokeWidth="2.5"
-                                                    strokeLinecap="round"
-                                                    filter="url(#mesh-glow)"
-                                                />
-                                            </g>
-                                        ))}
-                                    </svg>
-                                </motion.div>
-                            )}
+                            <NeuralMesh meshData={meshData} visibleStylesCount={visibleStyles.length} />
                         </AnimatePresence>
                     </div>
                 </div>
@@ -445,7 +532,14 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
                 <div className="flex items-center gap-3">
                     <div className="relative flex-1">
                         <input type="number" value={localSettings.seed || ''} onChange={(e) => updateLocalSetting('seed', parseInt(e.target.value) || 0)} placeholder="Random (Auto)" className="w-full h-16 bg-white/5 border border-white/10 rounded-[1.5rem] px-6 text-[11px] font-mono text-white focus:ring-1 focus:ring-primary/40 placeholder:text-white/10" />
-                        <Hash size={14} className="absolute right-5 top-1/2 -translate-y-1/2 text-white/10" />
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                            {localSettings.seed !== 0 && (
+                                <button onClick={() => updateLocalSetting('seed', 0)} className="p-2 text-white/20 hover:text-white/60 transition-colors">
+                                    <X size={14} />
+                                </button>
+                            )}
+                            <Hash size={14} className="text-white/10" />
+                        </div>
                     </div>
                     <button onClick={() => updateLocalSetting('seed', getRandomSeed())} className="size-16 rounded-[1.5rem] bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white transition-all active:scale-90"><Shuffle size={18} /></button>
                 </div>
@@ -481,31 +575,96 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
   const [localSettings, setLocalSettings] = useState({ ...globalSettings });
   const [showSettings, setShowSettings] = useState(false);
   const [isIslandExpanded, setIsIslandExpanded] = useState(false);
+  const [isEnhancing, setIsEnhancing] = useState(false);
   const [isInputExpanded, setIsInputExpanded] = useState(false);
+  const [showPromptTools, setShowPromptTools] = useState(false);
   const [renderTime, setRenderTime] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [pendingImages, setPendingImages] = useState<Set<string>>(new Set());
 
-  const [telemetry, setTelemetry] = useState<{ avgDuration: number; count: number }>(() => {
-    try {
-        const stored = localStorage.getItem(STORAGE_KEY_TELEMETRY);
-        return stored ? JSON.parse(stored) : { avgDuration: 5.0, count: 0 };
-    } catch {
-        return { avgDuration: 5.0, count: 0 };
-    }
-  });
+  const [telemetry, setTelemetry] = useState<{ avgDuration: number; count: number }>({ avgDuration: 8.0, count: 0 });
 
-  const progressValue = useMotionValue(0);
+  const [selectedImage, setSelectedImage] = useState<HistoryItem | null>(null);
+
+  const isActuallyRendering = useMemo(() => isProcessing || pendingImages.size > 0, [isProcessing, pendingImages]);
+
+  const totalEstimatedTime = useMemo(() => Math.max(1, telemetry.avgDuration * localSettings.imageCount), [telemetry.avgDuration, localSettings.imageCount]);
+  const remainingTime = Math.max(0, totalEstimatedTime - renderTime);
+  
+  const progressMotionValue = useMotionValue(0);
+  useEffect(() => {
+      // Ensure a minimum progress of 0.05 so the circle is always visible during rendering
+      const progress = isActuallyRendering ? Math.max(0.05, Math.min(1, renderTime / totalEstimatedTime)) : 0;
+      progressMotionValue.set(progress);
+  }, [isActuallyRendering, renderTime, totalEstimatedTime, progressMotionValue]);
+  
+  const progressValue = useSpring(progressMotionValue, { stiffness: 40, damping: 15 });
+
   const [scope, animate] = useAnimate();
 
-  const [accountState, setAccountState] = useState<AccountState>(() => {
+  const [accountState, setAccountState] = useState<AccountState>({ profile: null, balance: null, usage: [], isLoading: false, error: null, user: null });
+
+  // Load telemetry and account cache from IndexedDB
+  useEffect(() => {
+    const loadCache = async () => {
       try {
-          const cached = localStorage.getItem('resonance_cached_account');
-          return cached ? JSON.parse(cached) : { profile: null, balance: null, usage: [], isLoading: false, error: null };
-      } catch {
-          return { profile: null, balance: null, usage: [], isLoading: false, error: null };
+        const storedTelemetry = await storage.get<any>(STORAGE_KEY_TELEMETRY);
+        if (storedTelemetry) {
+          if (storedTelemetry.avgDuration > 100) {
+            setTelemetry({ avgDuration: 8.0, count: 0 });
+          } else {
+            setTelemetry(storedTelemetry);
+          }
+        }
+
+        const cachedAccount = await storage.get<any>('resonance_cached_account');
+        if (cachedAccount) {
+          setAccountState(prev => ({ ...prev, ...cachedAccount }));
+        }
+      } catch (e) {
+        console.error('Cache Load Error:', e);
       }
-  });
+    };
+    loadCache();
+  }, []);
+
+  // Sync Supabase user to account state
+  useEffect(() => {
+      if (!supabase) return;
+      supabase.auth.getSession().then(({ data: { session } }) => {
+          setAccountState(prev => ({ ...prev, user: session?.user ?? null }));
+      });
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+          setAccountState(prev => ({ ...prev, user: session?.user ?? null }));
+      });
+      return () => subscription.unsubscribe();
+  }, []);
+
+  const getRedirectUrl = () => {
+      const envUrl = (import.meta as any).env.VITE_APP_URL;
+      if (envUrl) return envUrl;
+      return window.location.origin;
+  };
+
+  const handleLogin = async () => {
+      if (!supabase) {
+          showToast("Supabase not configured");
+          return;
+      }
+      const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'github',
+          options: {
+              redirectTo: getRedirectUrl()
+          }
+      });
+      if (error) showToast(error.message);
+  };
+
+  const handleLogout = async () => {
+      if (!supabase) return;
+      await supabase.auth.signOut();
+      showToast("Logged out");
+  };
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<any>(null);
@@ -513,32 +672,17 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
   const showToast = (message: string) => { setToastMessage(message); setTimeout(() => setToastMessage(null), 3000); };
 
   const fetchAccount = useCallback(async () => {
-      const data = await getAccountDetails(globalSettings.apiKey);
-      setAccountState(data);
-      localStorage.setItem('resonance_cached_account', JSON.stringify(data));
-  }, [globalSettings.apiKey]);
+      const data = await getAccountDetails();
+      setAccountState(prev => ({ ...prev, ...data }));
+      storage.set('resonance_cached_account', data);
+  }, []);
 
   useEffect(() => {
-      fetchAccount(); 
+      // fetchAccount(); // Removed to avoid checking on mount
   }, [fetchAccount]);
 
-  const isActuallyRendering = useMemo(() => isProcessing || pendingImages.size > 0, [isProcessing, pendingImages]);
-
   useEffect(() => {
-    if (isProcessing) {
-        animate(progressValue, 0.85, { 
-            duration: telemetry.avgDuration, 
-            ease: "easeOut" 
-        });
-    } else if (pendingImages.size > 0) {
-        // Continue crawl
-    } else {
-        if (progressValue.get() > 0) {
-            animate(progressValue, 1, { duration: 0.4, ease: "circIn" }).then(() => {
-                setTimeout(() => animate(progressValue, 0, { duration: 0.2 }), 1000);
-            });
-        }
-    }
+    // Progress is now calculated directly from renderTime in the render cycle
   }, [isProcessing, pendingImages.size, telemetry.avgDuration, animate, progressValue]);
 
   useEffect(() => {
@@ -553,7 +697,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                 const nextCount = prev.count + 1;
                 const nextAvg = (prev.avgDuration * prev.count + renderTime) / nextCount;
                 const nextData = { avgDuration: nextAvg, count: nextCount };
-                localStorage.setItem(STORAGE_KEY_TELEMETRY, JSON.stringify(nextData));
+                storage.set(STORAGE_KEY_TELEMETRY, nextData);
                 return nextData;
             });
           }
@@ -574,13 +718,43 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
           next.delete(id);
           return next;
       });
-  }, []);
+
+      // Update telemetry per image for better accuracy
+      const item = sessionImages.find(img => img.id === id);
+      if (item && item.startTime) {
+          const duration = (Date.now() - item.startTime) / 1000;
+          // Only count if under 20s to keep average realistic for turbo models
+          if (duration > 0.5 && duration < 20) {
+              setTelemetry(prev => {
+                  const nextCount = prev.count + 1;
+                  const nextAvg = (prev.avgDuration * prev.count + duration) / nextCount;
+                  const nextData = { avgDuration: nextAvg, count: nextCount };
+                  storage.set(STORAGE_KEY_TELEMETRY, nextData);
+                  return nextData;
+              });
+          }
+      }
+  }, [sessionImages]);
 
   useEffect(() => {
       if (pendingImages.size === 0 && !isProcessing && renderTime > 0) {
           fetchAccount();
       }
   }, [pendingImages.size, isProcessing, fetchAccount, renderTime]);
+
+  const handleEnhance = async () => {
+      if (!sessionPrompt || isEnhancing) return;
+      setIsEnhancing(true);
+      try {
+          const enhanced = await enhancePrompt(sessionPrompt, localSettings.model, globalSettings.apiKey);
+          setSessionPrompt(enhanced);
+          showToast("Prompt Enhanced");
+      } catch (error: any) {
+          showToast("Enhancement Failed");
+      } finally {
+          setIsEnhancing(false);
+      }
+  };
 
   const handleGenerate = async () => {
     if (!sessionPrompt || isActuallyRendering) return;
@@ -591,37 +765,37 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
 
     const batchId = crypto.randomUUID();
     
-    // RESOLUTION LOGIC REFACTOR: Capped at 1536px
+    // RESOLUTION LOGIC: Using hardcoded dimensions from presets for maximum quality
     const isHD = localSettings.quality === 'hd';
-    // Base scale is 1.5 for HD (1024 -> 1536)
-    // If not HD, stay at 1.0
-    const baseScale = isHD ? 1.5 : 1;
-    
-    let targetWidth = Math.round(localSettings.width * baseScale);
-    let targetHeight = Math.round(localSettings.height * baseScale);
-    
-    // HARD CAP for API stability
-    const MAX_DIM = 1536;
-    if (targetWidth > MAX_DIM || targetHeight > MAX_DIM) {
-        const ratio = targetWidth / targetHeight;
-        if (ratio > 1) {
-            targetWidth = MAX_DIM;
-            targetHeight = Math.round(MAX_DIM / ratio);
-        } else {
-            targetHeight = MAX_DIM;
-            targetWidth = Math.round(MAX_DIM * ratio);
-        }
-    }
+    // If quality is low, we downscale to roughly 480p/720p equivalent
+    const targetWidth = isHD ? localSettings.width : Math.round(localSettings.width * 0.5);
+    const targetHeight = isHD ? localSettings.height : Math.round(localSettings.height * 0.5);
 
     // MERGE BUILT-IN AND CUSTOM STYLES
     const allStyles = [...MODEL_STYLES, ...(localSettings.customStyles || [])];
     const activeStyleObjects = allStyles.filter(s => localSettings.activeStyles.includes(s.id) && s.id !== 'none');
     
     const styleSuffix = activeStyleObjects.map(s => s.suffix).join('');
-    const promptWithStyles = `${sessionPrompt}${styleSuffix}${activeStyleObjects.length > 0 ? ', ultra detailed, 8k' : ''}`;
+    
+    // NEURAL ENHANCE: If enabled, we use our own Gemini-based enhancement before sending to Pollinations
+    let basePrompt = sessionPrompt;
+    if (localSettings.enhance) {
+        try {
+            setIsEnhancing(true);
+            showToast("Neural Core Enhancing...");
+            basePrompt = await enhancePrompt(sessionPrompt, localSettings.model, globalSettings.apiKey);
+            setIsEnhancing(false);
+        } catch (e) {
+            console.error("Neural Enhance Failed, falling back to original prompt", e);
+            setIsEnhancing(false);
+        }
+    }
+
+    const promptWithStyles = `${basePrompt}${styleSuffix}${activeStyleObjects.length > 0 ? ', ultra detailed, 8k' : ''}`;
 
     const newBatch: HistoryItem[] = [];
     const pendingIds = new Set<string>();
+    const now = Date.now();
 
     for (let i = 0; i < localSettings.imageCount; i++) {
         const id = Date.now().toString() + i;
@@ -630,18 +804,21 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
         // IMPORTANT: Safe=true as requested
         const params = { 
             prompt: promptWithStyles, 
-            model: 'zimage', 
+            model: localSettings.model || 'zimage', 
             width: targetWidth, 
             height: targetHeight, 
             seed, 
-            enhance: localSettings.enhance, 
+            // We set enhance to false because we already enhanced it with our custom logic if it was enabled
+            enhance: false, 
             nologo: true, 
             negative_prompt: localSettings.negativePrompt || SILENT_NEGATIVE, 
             safe: true, 
             private: true, 
             apiKey: globalSettings.apiKey 
         };
-        const item: HistoryItem = { ...params, id, batchId, timestamp: Date.now(), url: generateImageUrl(params), prompt: sessionPrompt };
+        
+        const imageUrl = await generateImageUrl(params);
+        const item: HistoryItem = { ...params, id, batchId, timestamp: now, startTime: now, url: imageUrl, prompt: sessionPrompt, styleSuffix };
         newBatch.push(item);
         pendingIds.add(id);
         onAddToHistory(item);
@@ -649,10 +826,28 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
     
     setPendingImages(pendingIds);
     setSessionImages(prev => [...prev, ...newBatch]);
+
+    // PERSIST TO SUPABASE IF LOGGED IN
+    if (accountState.user && supabase) {
+        const dbItems = newBatch.map(item => ({
+            user_id: accountState.user.id,
+            prompt: item.prompt,
+            url: item.url,
+            model: item.model,
+            width: item.width,
+            height: item.height,
+            seed: item.seed,
+            style_suffix: item.styleSuffix,
+            is_public: false
+        }));
+        
+        supabase.from('generations').insert(dbItems).then(({ error }) => {
+            if (error) addLog('error', 'Supabase Save Failed', error);
+            else addLog('info', 'Batch Synced to Cloud');
+        });
+    }
     
-    setTimeout(() => {
-        setIsProcessing(false);
-    }, 1500); 
+    setIsProcessing(false);
 
     setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }), 300);
   };
@@ -678,9 +873,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
   }, [sessionImages]);
 
   // FIX: Adaptive Island sizing. Use a percentage of screen on mobile (wider) and max-width on desktop.
-  // calc(100vw - 32px) ensures it spans the width with small padding on mobile.
-  // min(..., 600px) ensures it doesn't get ridiculously wide on desktop.
-  const islandWidth = isIslandExpanded ? "min(calc(100vw - 32px), 600px)" : (isActuallyRendering ? 280 : 200);
+  const islandWidth = isIslandExpanded ? "100%" : (isActuallyRendering ? 240 : 180);
   const islandHeight = isIslandExpanded ? "auto" : 44;
   const islandRadius = isIslandExpanded ? 40 : 22;
 
@@ -693,120 +886,154 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                 initial={{ opacity: 0 }} 
                 animate={{ opacity: 1 }} 
                 exit={{ opacity: 0 }} 
-                className="fixed inset-0 z-[199] bg-black/40 backdrop-blur-sm" 
+                className="fixed inset-0 z-[299] bg-black/60 backdrop-blur-md" 
                 onClick={() => setIsIslandExpanded(false)} 
               />
           )}
       </AnimatePresence>
 
-      <div className="fixed top-8 left-0 right-0 z-[200] flex flex-col items-center pointer-events-none px-4">
-          <motion.div 
-            layout 
-            animate={{ 
-                width: islandWidth,
-                height: islandHeight,
-                borderRadius: islandRadius
-            }} 
-            transition={{ type: "spring", ...SPRING_CONFIG }} 
-            className="relative pointer-events-auto bg-black/85 backdrop-blur-[60px] border-[0.5px] border-white/20 shadow-liquid overflow-hidden cursor-pointer flex flex-col items-center mb-4" 
-            onClick={() => !isActuallyRendering && setIsIslandExpanded(!isIslandExpanded)}
+      <div className="fixed top-8 left-6 z-[250] pointer-events-none">
+          <button 
+            onClick={() => onNavigate(AppRoute.PREFERENCES)} 
+            className="pointer-events-auto size-11 rounded-full glass-panel flex items-center justify-center text-white/40 shadow-liquid active:scale-90 transition-all hover:bg-white/5"
           >
-              <AnimatePresence>
-                {isActuallyRendering && (
-                    <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="absolute inset-0 z-0 pointer-events-none"
-                    >
-                        <svg className="w-full h-full" style={{ overflow: 'visible' }}>
-                            <motion.rect
-                                x="1"
-                                y="1"
-                                width="calc(100% - 2px)"
-                                height="calc(100% - 2px)"
-                                rx={islandRadius}
-                                fill="none"
-                                stroke="#3b82f6"
-                                strokeWidth="1.5"
-                                style={{
-                                    pathLength: progressValue,
-                                    filter: 'drop-shadow(0 0 3px rgba(59,130,246,0.6))'
-                                }}
-                            />
-                        </svg>
-                    </motion.div>
-                )}
-              </AnimatePresence>
-
-              <div className="relative z-10 w-full flex flex-col items-center">
-                {!isIslandExpanded ? (
-                    <div className="flex items-center justify-center w-full h-[44px] px-6 gap-3">
-                        {isActuallyRendering ? (
-                            <div className="flex items-center gap-4 w-full justify-center">
-                                <div className="flex items-center gap-2">
-                                    <div className="size-1.5 rounded-full bg-primary animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-primary/60">Rendering</span>
-                                </div>
-                                <div className="w-[0.5px] h-3 bg-white/20" />
-                                <div className="flex items-center gap-2 text-white/80">
-                                    <Clock size={12} className="opacity-40"/>
-                                    <span className="text-[10px] font-mono font-black">{renderTime.toFixed(1)}s</span>
-                                </div>
-                            </div>
-                        ) : (
-                            <>
-                                <div className="flex items-center gap-2">
-                                    <div className="size-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(59,130,246,0.6)]" />
-                                    <span className="text-[10px] font-bold font-mono text-primary tracking-tight">
-                                        {formatPollen(accountState.balance)}
-                                    </span>
-                                </div>
-                                <div className="w-[0.5px] h-3 bg-white/20" />
-                                <span className="text-[10px] font-bold font-mono text-white/40 tracking-tight">
-                                    ~{getEstimatedImagesLeft(accountState.balance)}
-                                </span>
-                            </>
-                        )}
-                    </div>
-                ) : (
-                    <div className="w-full p-8 flex flex-col gap-6">
-                        <div className="flex justify-between items-center pb-2">
-                            <h3 className="text-[11px] font-black uppercase text-white tracking-[0.3em]">Neural Core</h3>
-                            <Zap size={14} className="text-white/20" />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-white/5 rounded-3xl p-5 border border-white/5 flex flex-col items-center">
-                                <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest mb-1">Credits</p>
-                                <p className="text-sm font-mono font-bold text-primary">{formatPollen(accountState.balance)}</p>
-                            </div>
-                            <div className="bg-white/5 rounded-3xl p-5 border border-white/5 flex flex-col items-center">
-                                <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest mb-1">Status</p>
-                                <p className="text-sm font-mono font-bold text-white/80">Active</p>
-                            </div>
-                        </div>
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); setSessionImages([]); setIsIslandExpanded(false); showToast("Feed Purged"); }} 
-                            className="w-full h-14 rounded-[1.5rem] bg-white/5 border border-white/10 text-white text-[10px] font-black uppercase tracking-[0.3em] active:scale-95 transition-all"
-                        >
-                            Clear Session Feed
-                        </button>
-                    </div>
-                )}
-              </div>
-          </motion.div>
-      </div>
-
-      <div className="fixed top-8 left-0 right-0 px-6 z-[100] flex justify-between pointer-events-none">
-          <button onClick={() => onNavigate(AppRoute.PREFERENCES)} className="pointer-events-auto size-11 rounded-full glass-panel flex items-center justify-center text-white/40 border-white/10 shadow-liquid active:scale-90 transition-all">
               <Settings size={20} strokeWidth={1.5} />
           </button>
-          <button onClick={() => onNavigate(AppRoute.HISTORY)} className="pointer-events-auto size-11 rounded-full glass-panel flex items-center justify-center text-white/40 border-white/10 shadow-liquid active:scale-90 transition-all">
+      </div>
+
+      <div className="fixed top-8 right-6 z-[250] pointer-events-none flex gap-3">
+          <button 
+            onClick={() => onNavigate(AppRoute.HISTORY)} 
+            className="pointer-events-auto size-11 rounded-full glass-panel flex items-center justify-center text-white/40 shadow-liquid active:scale-90 transition-all hover:bg-white/5"
+          >
               <LayoutGrid size={20} strokeWidth={1.5} />
           </button>
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto no-scrollbar relative px-6 pb-[32vh] pt-44">
+      <div className="fixed top-8 left-0 right-0 z-[300] flex flex-col items-center pointer-events-none px-4">
+          <motion.div 
+            layout 
+            initial={false}
+            animate={{ 
+                width: islandWidth,
+                borderRadius: isIslandExpanded ? 32 : 100
+            }}
+            transition={{ 
+                width: {
+                    type: "spring", 
+                    stiffness: 400, 
+                    damping: 35, 
+                    mass: 1
+                },
+                borderRadius: {
+                    type: "spring", 
+                    stiffness: 400, 
+                    damping: 35, 
+                    mass: 1
+                },
+                layout: {
+                    type: "spring", 
+                    stiffness: 400, 
+                    damping: 35, 
+                    mass: 1
+                }
+            }} 
+            className="relative pointer-events-auto glass-panel shadow-liquid overflow-hidden cursor-pointer flex flex-col items-center will-change-transform" 
+            onClick={() => !isActuallyRendering && setIsIslandExpanded(!isIslandExpanded)}
+          >
+              <AnimatePresence>
+                {isActuallyRendering && (
+                    <div className="absolute inset-0 z-0 pointer-events-none" />
+                )}
+              </AnimatePresence>
+
+              <div className="relative z-10 w-full flex flex-col items-center">
+                <AnimatePresence mode="wait">
+                    {!isIslandExpanded ? (
+                        <motion.div 
+                            key="collapsed"
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            transition={{ 
+                                duration: 0.2
+                            }}
+                            className="flex items-center justify-center w-full h-[44px] px-6 gap-3"
+                        >
+                            {isActuallyRendering ? (
+                                <div className="flex items-center gap-4 w-full justify-center">
+                                    <div className="flex items-center gap-2">
+                                        <div className="size-1.5 rounded-full bg-primary animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-primary/60">
+                                            {pendingImages.size > 0 ? `BATCH ${localSettings.imageCount - pendingImages.size}/${localSettings.imageCount}` : 'FINALIZING'}
+                                        </span>
+                                    </div>
+                                    <div className="w-[0.5px] h-3 bg-white/20" />
+                                    <div className="flex items-center gap-2 text-white/80">
+                                        <Clock size={12} className="opacity-40"/>
+                                        <span className="text-[10px] font-mono font-black">
+                                            {isActuallyRendering ? `${remainingTime.toFixed(1)}s` : `${renderTime.toFixed(1)}s`}
+                                        </span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="flex items-center gap-2">
+                                        <div className="size-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(59,130,246,0.6)]" />
+                                        <span className="text-[10px] font-bold font-mono text-primary tracking-tight">
+                                            {formatPollen(accountState.balance)}
+                                        </span>
+                                    </div>
+                                    <div className="w-[0.5px] h-3 bg-white/20" />
+                                    <span className="text-[10px] font-bold font-mono text-white/40 tracking-tight">
+                                        ~{getEstimatedImagesLeft(accountState.balance)}
+                                    </span>
+                                </>
+                            )}
+                        </motion.div>
+                    ) : (
+                        <motion.div 
+                            key="expanded"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 10 }}
+                            transition={{ 
+                                duration: 0.2,
+                                delay: isIslandExpanded ? 0.15 : 0
+                            }}
+                            className="w-full p-8 flex flex-col gap-6"
+                        >
+                            <div className="flex justify-between items-center pb-2">
+                                <h3 className="text-[11px] font-black uppercase text-white tracking-[0.3em]">Neural Core</h3>
+                                <Zap size={14} className="text-white/20" />
+                            </div>
+                             <div className="grid grid-cols-2 gap-3">
+                                <div className="bg-white/5 rounded-3xl p-4 border border-white/5 flex flex-col items-center">
+                                    <p className="text-[8px] font-bold text-white/20 uppercase tracking-widest mb-1">Credits</p>
+                                    <p className="text-xs font-mono font-bold text-primary">{formatPollen(accountState.balance)}</p>
+                                </div>
+                                <div className="bg-white/5 rounded-3xl p-4 border border-white/5 flex flex-col items-center">
+                                    <p className="text-[8px] font-bold text-white/20 uppercase tracking-widest mb-1">Avg. Speed</p>
+                                    <p className="text-xs font-mono font-bold text-white/80">{telemetry.avgDuration.toFixed(1)}s</p>
+                                </div>
+                            </div>
+
+                            <div className="pt-2">
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); setSessionImages([]); setIsIslandExpanded(false); showToast("Feed Purged"); }} 
+                                    className="w-full h-14 rounded-[1.5rem] bg-white/5 border border-white/10 text-white text-[10px] font-black uppercase tracking-[0.3em] active:scale-95 transition-all"
+                                >
+                                    Clear Session Feed
+                                </button>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+              </div>
+          </motion.div>
+      </div>
+
+      <div ref={scrollRef} className="flex-1 overflow-y-auto no-scrollbar relative px-6 pb-[32vh] pt-44 will-change-transform">
           <div className="flex flex-col items-center gap-20">
               {groupedImages.length === 0 && !isActuallyRendering ? (
                   <motion.div 
@@ -837,27 +1064,39 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                         transition={{ delay: 0.8 }}
                         className="text-[10px] text-white/20 font-black uppercase tracking-[0.8em] mt-8"
                       >
-                        Neural Architecture V4
+                        Neural Architecture V5
                       </motion.p>
                   </motion.div>
               ) : (
                   <div className="w-full flex flex-col items-center gap-28">
-                      {groupedImages.map((group) => (
-                          <div key={group.batchId} className="w-full flex flex-col items-center gap-10">
-                              <PromptHeader prompt={group.prompt} batchId={group.batchId} onClearBatch={handleClearBatch} />
-                              <div className="w-full flex flex-col items-center gap-16">
-                                  {group.items.map((item, idx) => (
-                                    <GenerationCard 
-                                      key={item.id} 
-                                      item={item} 
-                                      index={idx} 
-                                      visualSafety={localSettings.visualSafety} 
-                                      onImageReady={handleImageLoaded}
-                                    />
-                                  ))}
-                              </div>
-                          </div>
-                      ))}
+                      <AnimatePresence mode="popLayout">
+                          {groupedImages.map((group) => (
+                              <motion.div 
+                                  layout
+                                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                                  exit={{ opacity: 0, scale: 0.9, y: -20 }}
+                                  transition={LIQUID_SPRING}
+                                  key={group.batchId} 
+                                  className="w-full flex flex-col items-center gap-10"
+                              >
+                                  <PromptHeader prompt={group.prompt} batchId={group.batchId} onClearBatch={handleClearBatch} />
+                                  <div className="w-full flex flex-col items-center gap-16">
+                                      {group.items.map((item, idx) => (
+                                        <div key={item.id} onClick={() => setSelectedImage(item)} className="cursor-pointer active:scale-[0.98] transition-transform">
+                                            <GenerationCard 
+                                              item={item} 
+                                              index={idx} 
+                                              visualSafety={localSettings.visualSafety} 
+                                              onImageReady={handleImageLoaded}
+                                              onNavigate={onNavigate}
+                                            />
+                                        </div>
+                                      ))}
+                                  </div>
+                              </motion.div>
+                          ))}
+                      </AnimatePresence>
                   </div>
               )}
           </div>
@@ -867,42 +1106,149 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
           <div className="w-full max-w-3xl pointer-events-auto">
               <motion.div 
                   layout 
-                  transition={{ type: "spring", ...SPRING_CONFIG }} 
-                  className={`glass-panel overflow-hidden shadow-liquid w-full ${showSettings ? 'rounded-[3rem]' : 'rounded-[2rem]'}`}
+                  transition={{ type: "spring", ...LIQUID_SPRING }} 
+                  className={`glass-panel overflow-hidden shadow-liquid w-full will-change-transform ${showSettings ? 'rounded-[2.5rem]' : 'rounded-[2rem]'}`}
               >
                   <div className="flex flex-col">
-                      <div className="flex items-end gap-3 p-3">
-                          <button onClick={() => setShowSettings(!showSettings)} className={`size-12 rounded-[1.2rem] flex items-center justify-center transition-all shrink-0 ${showSettings ? 'bg-white text-black' : 'text-white/20 hover:bg-white/5'}`}>
-                              <ChevronDown size={20} className={showSettings ? '' : 'rotate-180'} />
-                          </button>
-                          
-                          <div className="flex-1 flex flex-col gap-2 py-1">
-                              {isInputExpanded ? (
-                                  <textarea value={sessionPrompt} onChange={(e) => setSessionPrompt(e.target.value)} className="w-full bg-transparent border-none text-white text-base focus:ring-0 placeholder:text-white/10 min-h-[140px] max-h-[300px] resize-none py-2 px-1" placeholder="Architect your reality..." />
-                              ) : (
-                                  <input value={sessionPrompt} onChange={(e) => setSessionPrompt(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleGenerate()} className="w-full bg-transparent border-none text-white text-base focus:ring-0 placeholder:text-white/10 h-10 px-1" placeholder="Seed your imagination..." />
+                      <div className={`flex p-2 ${isInputExpanded ? 'flex-col gap-3' : 'flex-row items-center gap-2'}`}>
+                          {!isInputExpanded && (
+                              <button 
+                                onClick={() => setShowSettings(!showSettings)} 
+                                className={`size-10 rounded-2xl flex items-center justify-center transition-all shrink-0 ${showSettings ? 'bg-white text-black shadow-glow' : 'bg-white/5 text-white/20 hover:bg-white/10'}`}
+                              >
+                                  <Settings size={18} className={showSettings ? 'animate-spin-slow' : ''} />
+                              </button>
+                          )}
+
+                          {/* Prompt Input Area */}
+                          <div className={`flex-1 bg-white/[0.03] rounded-2xl border border-white/5 flex transition-all focus-within:border-primary/30 focus-within:bg-white/[0.05] ${isInputExpanded ? 'p-5 min-h-[250px]' : 'items-center px-3 min-h-[50px] flex-row gap-2'}`}>
+                              <div className="flex-1">
+                                  {isInputExpanded ? (
+                                      <textarea 
+                                        value={sessionPrompt} 
+                                        onChange={(e) => setSessionPrompt(e.target.value)} 
+                                        className="w-full bg-transparent border-none text-white text-[15px] focus:ring-0 placeholder:text-white/10 min-h-[200px] max-h-[600px] resize-none p-0 leading-relaxed" 
+                                        placeholder="Architect your reality..." 
+                                        autoFocus
+                                      />
+                                  ) : (
+                                      <input 
+                                        value={sessionPrompt} 
+                                        onChange={(e) => setSessionPrompt(e.target.value)} 
+                                        onKeyDown={(e) => e.key === 'Enter' && handleGenerate()} 
+                                        className="w-full bg-transparent border-none text-white text-[14px] focus:ring-0 placeholder:text-white/10 h-6 p-0" 
+                                        placeholder="Seed your imagination..." 
+                                      />
+                                  )}
+                              </div>
+
+                              {!isInputExpanded && (
+                                <div className="flex items-center gap-1">
+                                    <AnimatePresence>
+                                        {showPromptTools && (
+                                            <motion.div 
+                                              initial={{ opacity: 0, x: 20, scale: 0.8 }}
+                                              animate={{ opacity: 1, x: 0, scale: 1 }}
+                                              exit={{ opacity: 0, x: 20, scale: 0.8 }}
+                                              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                                              className="flex items-center gap-1"
+                                            >
+                                                {sessionPrompt && (
+                                                    <>
+                                                        <button 
+                                                            onClick={handleEnhance} 
+                                                            disabled={isEnhancing}
+                                                            className={`size-8 rounded-full flex items-center justify-center transition-all ${isEnhancing ? 'text-primary animate-spin' : 'text-white/20 hover:text-white/60 hover:bg-white/5'}`}
+                                                        >
+                                                            {isEnhancing ? <Loader2 size={14} /> : <Sparkles size={14} />}
+                                                        </button>
+                                                        <button 
+                                                          onClick={() => setSessionPrompt('')} 
+                                                          className="size-8 rounded-full flex items-center justify-center text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                                                        >
+                                                          <Eraser size={14} />
+                                                        </button>
+                                                    </>
+                                                )}
+                                                <button 
+                                                  onClick={() => setIsInputExpanded(!isInputExpanded)} 
+                                                  className="size-8 rounded-full flex items-center justify-center text-white/20 hover:text-white/60 hover:bg-white/5 transition-all"
+                                                >
+                                                    <Maximize2 size={14} />
+                                                </button>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                    
+                                    <button 
+                                      onClick={() => setShowPromptTools(!showPromptTools)} 
+                                      className={`size-8 rounded-full flex items-center justify-center transition-all ${showPromptTools ? 'bg-white/10 text-white' : 'text-white/20 hover:text-white/60 hover:bg-white/5'}`}
+                                    >
+                                        <motion.div
+                                          animate={{ rotate: showPromptTools ? 45 : 0 }}
+                                          transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                                        >
+                                          <Plus size={16} />
+                                        </motion.div>
+                                    </button>
+                                </div>
                               )}
                           </div>
+ 
+                          {/* Bottom Controls Area */}
+                          <div className={`flex items-center ${isInputExpanded ? 'justify-between px-1' : 'gap-2'}`}>
+                              <div className="flex items-center gap-2">
+                                  {isInputExpanded && (
+                                      <button 
+                                        onClick={() => setShowSettings(!showSettings)} 
+                                        className={`size-10 rounded-2xl flex items-center justify-center transition-all shrink-0 ${showSettings ? 'bg-white text-black shadow-glow' : 'bg-white/5 text-white/20 hover:bg-white/10'}`}
+                                      >
+                                          <Settings size={18} className={showSettings ? 'animate-spin-slow' : ''} />
+                                      </button>
+                                  )}
 
-                          <div className="flex gap-2 shrink-0 mb-0.5">
-                              {sessionPrompt && (
-                                  <button onClick={() => setSessionPrompt('')} title="Clear Prompt" className="size-11 rounded-full flex items-center justify-center text-white/10 hover:text-white/40 transition-all"><Eraser size={18} /></button>
-                              )}
-                              <button onClick={() => setIsInputExpanded(!isInputExpanded)} className={`size-11 rounded-full flex items-center justify-center transition-all ${isInputExpanded ? 'text-primary' : 'text-white/10 hover:text-white/40'}`}>
-                                  {isInputExpanded ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-                              </button>
-                              <button onClick={handleGenerate} disabled={!sessionPrompt || isActuallyRendering} className={`size-12 rounded-[1.2rem] flex items-center justify-center transition-all ${!sessionPrompt ? 'bg-white/5 text-white/5' : 'bg-primary text-white shadow-glow active:scale-90'}`}>
+                                  {isInputExpanded && (
+                                      <div className="flex items-center gap-1 bg-white/[0.03] border border-white/5 rounded-2xl p-1">
+                                          <button 
+                                              onClick={handleEnhance} 
+                                              disabled={isEnhancing}
+                                              className={`size-9 rounded-xl flex items-center justify-center transition-all ${isEnhancing ? 'text-primary animate-spin' : 'text-white/20 hover:text-white/60 hover:bg-white/5'}`}
+                                          >
+                                              {isEnhancing ? <Loader2 size={16} /> : <Sparkles size={16} />}
+                                          </button>
+                                          <button 
+                                            onClick={() => setSessionPrompt('')} 
+                                            className="size-9 rounded-xl flex items-center justify-center text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                                          >
+                                            <Eraser size={16} />
+                                          </button>
+                                          <button 
+                                            onClick={() => setIsInputExpanded(false)} 
+                                            className="size-9 rounded-xl flex items-center justify-center text-primary bg-primary/10 transition-all"
+                                          >
+                                              <Minimize2 size={16} />
+                                          </button>
+                                      </div>
+                                  )}
+                              </div>
+
+                              <button 
+                                onClick={handleGenerate} 
+                                disabled={!sessionPrompt || isActuallyRendering} 
+                                className={`size-12 rounded-2xl flex items-center justify-center transition-all shrink-0 ${!sessionPrompt ? 'bg-white/5 text-white/5' : 'bg-primary text-white shadow-glow active:scale-90'}`}
+                              >
                                   <ArrowUp size={22} />
                               </button>
                           </div>
                       </div>
-                      <AnimatePresence>
+                      <AnimatePresence initial={false}>
                           {showSettings && (
                               <motion.div 
                                   initial={{ height: 0, opacity: 0 }} 
                                   animate={{ height: 'auto', opacity: 1 }} 
                                   exit={{ height: 0, opacity: 0 }} 
-                                  className="border-t-[0.5px] border-white/10 bg-black/40 overflow-hidden"
+                                  transition={LIQUID_SPRING}
+                                  className="border-t-[0.5px] border-white/10 bg-black/20 overflow-hidden"
                               >
                                   <SettingsPill 
                                       localSettings={localSettings} 
@@ -918,6 +1264,62 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
       </div>
 
       <AnimatePresence>{toastMessage && <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed bottom-36 left-1/2 -translate-x-1/2 px-8 py-3 rounded-full glass-panel border-white/20 text-[10px] font-black uppercase tracking-widest">{toastMessage}</motion.div>}</AnimatePresence>
+
+      <AnimatePresence>
+          {selectedImage && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex flex-col items-center justify-center p-4 sm:p-10"
+                onClick={() => setSelectedImage(null)}
+              >
+                  <motion.div 
+                    initial={{ scale: 0.9, y: 20 }}
+                    animate={{ scale: 1, y: 0 }}
+                    exit={{ scale: 0.9, y: 20 }}
+                    className="relative w-full max-w-4xl aspect-[2/3] sm:aspect-auto sm:h-[80vh] rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                      <img src={selectedImage.url} alt={selectedImage.prompt} className="w-full h-full object-contain bg-black/40" />
+                      
+                      <div className="absolute top-6 right-6 flex gap-3">
+                          <button 
+                            onClick={() => setSelectedImage(null)}
+                            className="size-12 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center text-white hover:bg-white/10 transition-all"
+                          >
+                              <X size={20} />
+                          </button>
+                      </div>
+
+                      <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black via-black/60 to-transparent">
+                          <p className="text-xs text-white/60 font-medium leading-relaxed mb-6 line-clamp-3">{selectedImage.prompt}</p>
+                          <div className="flex flex-wrap gap-4">
+                              <div className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 flex items-center gap-2">
+                                  <Hash size={12} className="text-primary" />
+                                  <span className="text-[10px] font-mono text-white/80">{selectedImage.seed}</span>
+                              </div>
+                              <div className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 flex items-center gap-2">
+                                  <Layers size={12} className="text-primary" />
+                                  <span className="text-[10px] font-mono text-white/80 uppercase">{selectedImage.model}</span>
+                              </div>
+                              <button 
+                                onClick={() => {
+                                    const link = document.createElement('a');
+                                    link.href = selectedImage.url;
+                                    link.download = `resonance-${selectedImage.id}.png`;
+                                    link.click();
+                                }}
+                                className="px-6 py-2 rounded-xl bg-primary text-white text-[10px] font-black uppercase tracking-widest shadow-glow ml-auto"
+                              >
+                                  Download
+                              </button>
+                          </div>
+                      </div>
+                  </motion.div>
+              </motion.div>
+          )}
+      </AnimatePresence>
     </div>
   );
 };

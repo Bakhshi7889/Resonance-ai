@@ -45,7 +45,7 @@ const StyleCard = memo(({
             exit={{ opacity: 0, scale: 0.9 }}
             whileHover={{ y: -5 }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className={`bg-surface-dark rounded-3xl border overflow-hidden group relative flex flex-col ${
+            className={`bg-surface-dark rounded-3xl border overflow-hidden group relative flex flex-col will-change-transform ${
                 isActive ? 'border-primary shadow-[0_0_20px_rgba(59,130,246,0.3)]' : 
                 isHidden ? 'border-red-500/20 opacity-50 grayscale' : 
                 'border-white/5 hover:border-white/20 hover:shadow-2xl'
@@ -150,7 +150,7 @@ const StyleCard = memo(({
     );
 });
 
-export const StyleLibrary: React.FC<StyleLibraryProps> = ({ onNavigate, settings, updateSettings }) => {
+export const StyleLibrary: React.FC<StyleLibraryProps> = memo(({ onNavigate, settings, updateSettings }) => {
   const toggleVisibility = useCallback((styleId: string) => {
       const currentHidden = settings.hiddenStyleIds || [];
       let newHidden;
@@ -327,4 +327,6 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = ({ onNavigate, settings
       </div>
     </motion.div>
   );
-};
+});
+
+StyleLibrary.displayName = 'StyleLibrary';

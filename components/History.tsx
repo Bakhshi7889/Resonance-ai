@@ -1,7 +1,9 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, memo } from 'react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { HistoryItem, AppRoute } from '../types';
 import { Header } from './Header';
+import { supabase } from '../services/supabase';
+import { Globe, Share2 } from 'lucide-react';
 
 interface HistoryProps {
   history: HistoryItem[];
@@ -30,7 +32,7 @@ const swipeVariants = {
   })
 };
 
-export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix, onDelete }) => {
+export const History: React.FC<HistoryProps> = memo(({ history, onNavigate, onRemix, onDelete }) => {
   const [fullscreenImageIndex, setFullscreenImageIndex] = useState<number | null>(null);
   const [slideDirection, setSlideDirection] = useState(0);
   const [showInfoPanel, setShowInfoPanel] = useState(false);
@@ -120,7 +122,7 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix, 
         const blobUrl = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = blobUrl;
-        link.download = `resonance-${Date.now()}.jpg`;
+        link.download = `resonance-${currentFullscreenItem?.width}x${currentFullscreenItem?.height}-${Date.now()}.jpg`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -130,10 +132,41 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix, 
     }
   };
 
-  const handleUpscale = () => {
-      if (currentFullscreenItem) {
-          // Open the original image in HD or just direct high-res link
-          window.open(currentFullscreenItem.url, '_blank');
+  const handleShare = async () => {
+      if (!supabase || !currentFullscreenItem) return;
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+          alert("Please log in to share images.");
+          return;
+      }
+
+      const { error } = await supabase
+          .from('generations')
+          .update({ is_public: true })
+          .eq('url', currentFullscreenItem.url)
+          .eq('user_id', session.user.id);
+
+      if (error) {
+          // If update fails, try inserting (maybe it was generated before cloud sync)
+          const { error: insertError } = await supabase
+              .from('generations')
+              .insert({
+                  user_id: session.user.id,
+                  prompt: currentFullscreenItem.prompt,
+                  url: currentFullscreenItem.url,
+                  model: currentFullscreenItem.model,
+                  width: currentFullscreenItem.width,
+                  height: currentFullscreenItem.height,
+                  seed: currentFullscreenItem.seed,
+                  style_suffix: currentFullscreenItem.styleSuffix,
+                  is_public: true
+              });
+          
+          if (insertError) alert("Failed to share: " + insertError.message);
+          else alert("Shared to Community!");
+      } else {
+          alert("Shared to Community!");
       }
   };
 
@@ -163,11 +196,11 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix, 
 
             <div className="flex flex-col gap-10 py-6">
                 {groupedHistory.map((group) => (
-                    <div key={group.title} className="flex flex-col gap-4">
+                    <div key={group.title} className="flex flex-col gap-4" style={{ contentVisibility: 'auto' }}>
                         <h3 className="text-white/30 text-[10px] font-black uppercase tracking-[0.3em] pl-1">
                             {group.title}
                         </h3>
-                        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                        <div className="columns-2 md:columns-3 lg:columns-4 gap-3 space-y-3">
                             {group.items.map((item) => {
                                 const globalIndex = history.findIndex(i => i.id === item.id);
                                 const isSelected = selectedIds.includes(item.id);
@@ -182,9 +215,15 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix, 
                                                 setFullscreenImageIndex(globalIndex);
                                             }
                                         }}
-                                        className={`relative aspect-[4/5] cursor-pointer group rounded-2xl overflow-hidden border transition-all ${isSelected ? 'border-primary ring-2 ring-primary ring-offset-2 ring-offset-black' : 'border-white/5 hover:border-white/20'}`}
+                                        className={`relative break-inside-avoid cursor-pointer group rounded-2xl overflow-hidden border transition-all mb-4 will-change-transform ${isSelected ? 'border-primary ring-2 ring-primary ring-offset-2 ring-offset-black' : 'border-white/5 hover:border-white/20'}`}
                                     >
-                                        <img src={item.url} className="w-full h-full object-cover" alt="thumbnail" loading="lazy" />
+                                        <img 
+                                            src={item.url} 
+                                            className="w-full h-auto block" 
+                                            alt="thumbnail" 
+                                            loading="lazy" 
+                                            style={{ aspectRatio: `${item.width}/${item.height}` }}
+                                        />
                                         {isSelectionMode && (
                                             <div className="absolute inset-0 bg-black/20 z-10 flex items-start justify-end p-2">
                                                 <div className={`size-5 rounded-full border border-white/40 flex items-center justify-center transition-colors ${isSelected ? 'bg-primary border-primary' : 'bg-black/40'}`}>
@@ -208,7 +247,7 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix, 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[150] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6"
+                className="fixed inset-0 z-[150] bg-black flex items-center justify-center p-6"
               >
                   <motion.div 
                     initial={{ scale: 0.9, y: 20 }}
@@ -235,11 +274,11 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix, 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-2xl flex flex-col"
+                className="fixed inset-0 z-[100] bg-black flex flex-col will-change-opacity"
                 onClick={() => setFullscreenImageIndex(null)}
             >
                  <div className="absolute top-0 left-0 right-0 p-6 pt-12 flex justify-between items-start z-20 pointer-events-none">
-                     <div className="flex flex-col pointer-events-auto bg-black/40 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/10">
+                     <div className="flex flex-col pointer-events-auto bg-black px-4 py-1.5 rounded-full border border-white/10">
                         <span className="text-white/80 font-mono text-[10px] font-bold">
                             {fullscreenImageIndex + 1} / {history.length}
                         </span>
@@ -271,8 +310,9 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix, 
                         >
                             <img 
                                 src={currentFullscreenItem?.url} 
-                                className="max-w-[95vw] max-h-[70vh] object-contain rounded-[2rem] shadow-2xl"
+                                className="max-w-[95vw] max-h-[85vh] object-contain rounded-[2rem] shadow-2xl"
                                 alt="fullscreen" 
+                                style={{ aspectRatio: `${currentFullscreenItem?.width}/${currentFullscreenItem?.height}` }}
                             />
                         </motion.div>
                     </AnimatePresence>
@@ -292,6 +332,12 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix, 
                                 <p className="text-[10px] text-white/30 uppercase font-black tracking-widest">Vision Data</p>
                                 <p className="text-sm text-white/90 leading-relaxed italic">"{currentFullscreenItem.prompt}"</p>
                             </div>
+                            {currentFullscreenItem.styleSuffix && (
+                                <div className="space-y-1 border-t border-white/5 pt-4">
+                                    <p className="text-[10px] text-white/30 uppercase font-black tracking-widest">Style Matrix</p>
+                                    <p className="text-[11px] text-white/50 leading-relaxed">{currentFullscreenItem.styleSuffix.replace(/^, /, '')}</p>
+                                </div>
+                            )}
                             <div className="grid grid-cols-2 gap-4 border-t border-white/5 pt-4">
                                 <div className="space-y-1">
                                     <p className="text-[10px] text-white/30 uppercase font-black tracking-widest">Seed</p>
@@ -307,7 +353,7 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix, 
                 </AnimatePresence>
 
                 <div 
-                    className="absolute bottom-0 left-0 right-0 p-8 pb-14 flex justify-center gap-6 z-20 bg-gradient-to-t from-black to-transparent" 
+                    className="absolute bottom-0 left-0 right-0 p-8 pb-14 flex justify-center gap-10 z-20 bg-black" 
                     onClick={(e) => e.stopPropagation()}
                 >
                     <button onClick={() => currentFullscreenItem && handleDownload(currentFullscreenItem.url)} className="flex flex-col items-center gap-1.5 group">
@@ -317,11 +363,11 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix, 
                         <span className="text-[8px] uppercase tracking-[0.3em] font-black text-white/40 group-hover:text-white/80">Save</span>
                     </button>
 
-                    <button onClick={handleUpscale} className="flex flex-col items-center gap-1.5 group">
+                    <button onClick={handleShare} className="flex flex-col items-center gap-1.5 group">
                         <div className="size-12 rounded-full bg-white/5 flex items-center justify-center mb-1 backdrop-blur-md border border-white/5 active:scale-90 transition-all group-hover:bg-white/10">
-                             <span className="material-symbols-outlined text-[20px] text-white/60 group-hover:text-white">high_quality</span>
+                            <Globe size={20} className="text-white/60 group-hover:text-white" />
                         </div>
-                        <span className="text-[8px] uppercase tracking-[0.3em] font-black text-white/40 group-hover:text-white/80">Upscale</span>
+                        <span className="text-[8px] uppercase tracking-[0.3em] font-black text-white/40 group-hover:text-white/80">Share</span>
                     </button>
 
                     {onRemix && currentFullscreenItem && (
@@ -335,7 +381,7 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix, 
 
                     <button onClick={() => setShowInfoPanel(!showInfoPanel)} className={`flex flex-col items-center gap-1.5 group ${showInfoPanel ? 'text-primary' : 'text-white/40'}`}>
                         <div className={`size-12 rounded-full flex items-center justify-center mb-1 backdrop-blur-md transition-all active:scale-90 border ${showInfoPanel ? 'bg-primary/20 border-primary/40' : 'bg-white/5 border-white/5 group-hover:bg-white/10'}`}>
-                             <span className={`material-symbols-outlined text-[20px] ${showInfoPanel ? 'text-primary' : 'text-white/60 group-hover:text-white'}`}>info</span>
+                             <span className={`material-symbols-outlined text-[20px] ${showInfoPanel ? 'text-primary' : 'text-white/60 group-hover:text-white'}`}>screenshot</span>
                         </div>
                         <span className={`text-[8px] uppercase tracking-[0.3em] font-black ${showInfoPanel ? 'text-primary' : 'text-white/40 group-hover:text-white/80'}`}>Info</span>
                     </button>
@@ -345,4 +391,6 @@ export const History: React.FC<HistoryProps> = ({ history, onNavigate, onRemix, 
       </AnimatePresence>
     </motion.div>
   );
-};
+});
+
+History.displayName = 'History';
