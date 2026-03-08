@@ -545,7 +545,7 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
                 </div>
             </div>
 
-            <div className="glass-panel-sub p-6 rounded-[2.5rem] flex flex-col gap-5">
+            <div className="glass-panel p-6 rounded-[2.5rem] flex flex-col gap-5">
                 <p className="text-[9px] text-white/20 font-black uppercase tracking-[0.2em]">Exclusion Architecture</p>
                 <div className="flex flex-wrap gap-2">
                     <AnimatePresence>
@@ -581,6 +581,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
   const [renderTime, setRenderTime] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [pendingImages, setPendingImages] = useState<Set<string>>(new Set());
+  const [batchTotal, setBatchTotal] = useState(0);
 
   const [telemetry, setTelemetry] = useState<{ avgDuration: number; count: number }>({ avgDuration: 8.0, count: 0 });
 
@@ -797,6 +798,9 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
     const pendingIds = new Set<string>();
     const now = Date.now();
 
+    setBatchTotal(localSettings.imageCount);
+    setPendingImages(new Set()); // Clear previous batch just in case
+
     for (let i = 0; i < localSettings.imageCount; i++) {
         const id = Date.now().toString() + i;
         const seed = localSettings.seed || getRandomSeed() + i;
@@ -938,7 +942,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                     mass: 1
                 }
             }} 
-            className="relative pointer-events-auto glass-panel shadow-liquid overflow-hidden cursor-pointer flex flex-col items-center will-change-transform" 
+            className="relative pointer-events-auto glass-card shadow-liquid overflow-hidden cursor-pointer flex flex-col items-center will-change-transform" 
             onClick={() => !isActuallyRendering && setIsIslandExpanded(!isIslandExpanded)}
           >
               <AnimatePresence>
@@ -965,7 +969,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                                     <div className="flex items-center gap-2">
                                         <div className="size-1.5 rounded-full bg-primary animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
                                         <span className="text-[10px] font-black uppercase tracking-widest text-primary/60">
-                                            {pendingImages.size > 0 ? `BATCH ${localSettings.imageCount - pendingImages.size}/${localSettings.imageCount}` : 'FINALIZING'}
+                                            {pendingImages.size > 0 ? `BATCH ${Math.max(1, batchTotal - pendingImages.size + 1)}/${batchTotal}` : 'FINALIZING'}
                                         </span>
                                     </div>
                                     <div className="w-[0.5px] h-3 bg-white/20" />
@@ -1107,7 +1111,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
               <motion.div 
                   layout 
                   transition={{ type: "spring", ...LIQUID_SPRING }} 
-                  className={`glass-panel overflow-hidden shadow-liquid w-full will-change-transform ${showSettings ? 'rounded-[2.5rem]' : 'rounded-[2rem]'}`}
+                  className={`glass-card overflow-hidden shadow-liquid w-full will-change-transform ${showSettings ? 'rounded-[2.5rem]' : 'rounded-[2rem]'}`}
               >
                   <div className="flex flex-col">
                       <div className={`flex p-2 ${isInputExpanded ? 'flex-col gap-3' : 'flex-row items-center gap-2'}`}>

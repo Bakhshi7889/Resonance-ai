@@ -6,23 +6,33 @@ export const getRandomSeed = () => Math.floor(Math.random() * 1000000);
 
 export const generateImageUrl = async (params: any) => {
     try {
+        // Try the proxy first (for paid features/private generations)
         const response = await fetch('/.netlify/functions/generate', {
             method: 'POST',
             body: JSON.stringify(params),
         });
 
         const contentType = response.headers.get("content-type");
-        if (!response.ok || !contentType || !contentType.includes("application/json")) {
-            addLog('error', 'Generation proxy unavailable or returned invalid response.');
-            return null;
+        if (response.ok && contentType && contentType.includes("application/json")) {
+            const data = await response.json();
+            return data.url;
         }
-
-        const data = await response.json();
-        return data.url;
     } catch (e) {
-        addLog('error', 'Generation proxy failed', e);
-        return null;
+        // Proxy failed, fall back to direct URL
+        addLog('warn', 'Generation proxy unavailable, falling back to direct URL');
     }
+
+    // Direct URL Fallback (Free Tier / No Proxy)
+    const { prompt, width, height, seed, model, nologo, negative_prompt, safe } = params;
+    const baseUrl = "https://image.pollinations.ai/prompt";
+    const encodedPrompt = encodeURIComponent(prompt);
+    
+    let url = `${baseUrl}/${encodedPrompt}?width=${width}&height=${height}&seed=${seed}&model=${model || 'flux'}`;
+    if (nologo) url += "&nologo=true";
+    if (negative_prompt) url += `&negative=${encodeURIComponent(negative_prompt)}`;
+    if (safe) url += "&safe=true";
+    
+    return url;
 };
 
 export const getAuthUrl = (redirectUri: string) => {
