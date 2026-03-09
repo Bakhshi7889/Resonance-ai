@@ -10,6 +10,12 @@
   --shadow-glow: 0 0 30px -5px rgba(59, 130, 246, 0.6);
   --shadow-liquid: 0 10px 50px -10px rgba(0,0,0,0.95);
   --animate-spin-slow: spin 3s linear infinite;
+  --animate-shimmer: shimmer 2s linear infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
 @keyframes spin {

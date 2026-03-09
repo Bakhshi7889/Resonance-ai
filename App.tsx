@@ -18,9 +18,9 @@ const STORAGE_KEY_SESSION_PROMPT = 'resonance_v4_session_prompt';
 const STORAGE_KEY_SESSION_IMAGES = 'resonance_v4_session_images';
 
 const DEFAULT_SETTINGS: AppSettings = {
-  model: 'zimage',
-  width: 1024,
-  height: 1024,
+  model: 'flux',
+  width: 1536,
+  height: 1536,
   enhance: true,
   privateMode: true,
   negativePrompt: '',
@@ -101,6 +101,10 @@ const App: React.FC = () => {
           }
           if (!storedSettings.apiKey || storedSettings.apiKey.trim() === '') {
             storedSettings.apiKey = 'sk_fH3vuxg5ULiDIzbVK7y6ejUg4eK1f0VF';
+          }
+          // Migration: Switch from zimage to flux as default
+          if (storedSettings.model === 'zimage') {
+            storedSettings.model = 'flux';
           }
           setSettings({ ...DEFAULT_SETTINGS, ...storedSettings });
         }

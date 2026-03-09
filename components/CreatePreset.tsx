@@ -52,7 +52,7 @@ export const CreatePreset: React.FC<CreatePresetProps> = memo(({ onNavigate }) =
                 
                 {[
                     { icon: 'neurology', label: 'Model Version', value: 'Flux Synthetic' },
-                    { icon: 'aspect_ratio', label: 'Dimensions', value: '1024x1024 (1:1)' },
+                    { icon: 'aspect_ratio', label: 'Dimensions', value: '1536x1536 (1:1)' },
                     { icon: 'tune', label: 'Guidance', value: '7.5' },
                     { icon: 'auto_awesome', label: 'Magic Words', value: '3 Active' }
                 ].map((item, idx) => (

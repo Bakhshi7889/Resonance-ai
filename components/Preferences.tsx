@@ -422,7 +422,7 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
                           <span className="text-[9px] text-white/30 uppercase font-black tracking-[0.2em] mt-2">Available Credits</span>
                         </div>
                         <div className="flex flex-col items-end">
-                          <span className="text-xl font-black text-white tracking-tighter">~{getEstimatedImagesLeft(accountState.balance)}</span>
+                          <span className="text-xl font-black text-white tracking-tighter">~{getEstimatedImagesLeft(accountState.balance, settings.model)}</span>
                           <span className="text-[9px] text-white/30 uppercase font-black tracking-widest mt-1">Render Potential</span>
                         </div>
                     </div>

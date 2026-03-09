@@ -100,7 +100,7 @@ const PromptHeader = memo(({ prompt, onClearBatch, batchId }: { prompt: string, 
     );
 });
 
-const GenerationCard = memo(({ item, index, visualSafety, onImageReady, onNavigate }: { item: HistoryItem, index: number, visualSafety: boolean, onImageReady?: (id: string) => void, onNavigate: (route: AppRoute) => void }) => {
+const GenerationCard = memo(({ item, index, visualSafety, onImageReady, onNavigate, showToast }: { item: HistoryItem, index: number, visualSafety: boolean, onImageReady?: (id: string) => void, onNavigate: (route: AppRoute) => void, showToast: (msg: string) => void }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [revealed, setRevealed] = useState(false);
@@ -126,16 +126,45 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady, onNaviga
       addLog('warn', 'Image element reported error', { id: item.id });
       
       try {
-          // Perform a diagnostic fetch to see WHY it failed (e.g. 429, 500, or text error message)
+          // Perform a diagnostic fetch to see WHY it failed
           const res = await fetch(item.url);
           if (!res.ok) {
               const text = await res.text();
-              addLog('error', `Generation Failed: ${res.status}`, { 
+              let errorMsg = `Generation Failed: ${res.status}`;
+              
+              // Specific error handling based on Pollinations API codes
+              if (res.status === 400) {
+                  errorMsg = "Bad Request: Invalid parameters or malformed prompt.";
+              } else if (res.status === 401) {
+                  errorMsg = "Unauthorized: Invalid or missing API key.";
+              } else if (res.status === 402) {
+                  errorMsg = "Out of Pollen: Please top up at checkout.pollinations.ai";
+              } else if (res.status === 403) {
+                  errorMsg = "Forbidden: You don't have permission for this model.";
+              } else if (res.status === 404) {
+                  errorMsg = "Not Found: The requested endpoint does not exist.";
+              } else if (res.status === 422) {
+                  errorMsg = "Unprocessable: Required fields are missing or invalid.";
+              } else if (res.status === 429) {
+                  const retryAfter = res.headers.get('retry-after');
+                  errorMsg = `Rate Limited: Please slow down.${retryAfter ? ` Retry in ${retryAfter}s.` : ''}`;
+              } else if (res.status === 502) {
+                  errorMsg = "Provider Error: Upstream AI service is unavailable.";
+              } else if (res.status === 500 || res.status === 503) {
+                  errorMsg = "Server Error: Pollinations is temporarily overloaded.";
+              }
+
+              addLog('error', errorMsg, { 
                   status: res.status,
                   statusText: res.statusText,
-                  response: text.substring(0, 200), // Log the first 200 chars of response
+                  response: text.substring(0, 200),
                   url: item.url 
               });
+              
+              // If it's a 402 or 429, we might want to show a toast
+              if (res.status === 402 || res.status === 429) {
+                  showToast(errorMsg);
+              }
           } else {
              // If fetch succeeds but img tag failed, it might be a content-type issue or decoding error
              const blob = await res.blob();
@@ -156,6 +185,13 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady, onNaviga
       // Force reload by appending timestamp
       const urlObj = new URL(item.url);
       urlObj.searchParams.set('retry', Date.now().toString());
+      
+      // Fallback: If zimage failed, try flux
+      if (urlObj.searchParams.get('model') === 'zimage') {
+          urlObj.searchParams.set('model', 'flux');
+          addLog('warn', 'Z-Image failed, retrying with Flux fallback', { id: item.id });
+      }
+      
       item.url = urlObj.toString();
       addLog('info', 'Retrying generation', { id: item.id });
   };
@@ -215,7 +251,7 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady, onNaviga
       initial={{ opacity: 0, scale: 0.8, y: 40 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={LIQUID_SPRING}
-      className="relative shrink-0 overflow-hidden bg-white/[0.02] border-[0.5px] border-white/10 shadow-liquid rounded-[2.5rem] flex items-center justify-center group/card w-full max-w-3xl will-change-transform"
+      className={`relative shrink-0 overflow-hidden bg-white/[0.02] border-[0.5px] border-white/10 shadow-liquid rounded-[2.5rem] flex items-center justify-center group/card w-full max-w-3xl will-change-transform ${!isLoaded ? 'animate-shimmer bg-gradient-to-r from-white/[0.02] via-white/[0.08] to-white/[0.02] bg-[length:200%_100%]' : ''}`}
       style={{ rotateX, rotateY, transformStyle: 'preserve-3d', aspectRatio: `${item.width}/${item.height}` }}
     >
       {!hasError ? (
@@ -262,8 +298,27 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady, onNaviga
       )}
 
       {(!isLoaded || isAuditing) && !hasError && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-md">
-          <div className="size-8 rounded-full border-2 border-white/5 border-t-primary animate-spin" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-md overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 animate-pulse" />
+          <div className="relative flex flex-col items-center gap-6">
+              <div className="relative">
+                  <div className="size-12 rounded-full border-2 border-white/5 border-t-primary animate-spin" />
+                  <div className="absolute inset-0 size-12 rounded-full border border-primary/20 animate-ping" />
+              </div>
+              <div className="flex flex-col items-center gap-2">
+                  <span className="text-[10px] font-black text-white/40 uppercase tracking-[0.4em] animate-pulse">
+                      {isAuditing ? 'Auditing Matrix' : 'Synthesizing'}
+                  </span>
+                  <div className="w-24 h-[1px] bg-white/10 relative overflow-hidden">
+                      <motion.div 
+                        initial={{ x: '-100%' }}
+                        animate={{ x: '100%' }}
+                        transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+                        className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/40 to-transparent"
+                      />
+                  </div>
+              </div>
+          </div>
         </div>
       )}
       {visualRisk && !revealed && isLoaded && !isAuditing && !hasError && (
@@ -337,17 +392,20 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
     const effectiveKey = useMemo(() => getEffectiveKey(localSettings.apiKey), [localSettings.apiKey]);
 
     const toggleStyle = (id: string) => {
-        const current = localSettings.activeStyles || [];
         if (id === 'none') {
             updateLocalSetting('activeStyles', ['none']);
             return;
         }
-        const filtered = current.filter(s => s !== 'none');
-        if (filtered.includes(id)) {
-            const next = filtered.filter(s => s !== id);
-            updateLocalSetting('activeStyles', next.length === 0 ? ['none'] : next);
+        updateLocalSetting('activeStyles', [id]);
+    };
+
+    const toggleFavorite = (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        const favorites = localSettings.favoriteStyleIds || [];
+        if (favorites.includes(id)) {
+            updateLocalSetting('favoriteStyleIds', favorites.filter(fid => fid !== id));
         } else {
-            updateLocalSetting('activeStyles', [...filtered, id]);
+            updateLocalSetting('favoriteStyleIds', [...favorites, id]);
         }
     };
 
@@ -365,16 +423,13 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
             if (a.id === 'none') return -1;
             if (b.id === 'none') return 1;
 
-            const aSelected = localSettings.activeStyles.includes(a.id);
-            const bSelected = localSettings.activeStyles.includes(b.id);
-            
-            // 2. Selected items bubble to the top (after 'none')
-            // This is the "Put them at the start" feature request
-            if (aSelected && !bSelected) return -1;
-            if (!aSelected && bSelected) return 1;
+            // 2. Favorites bubble to the top
+            const aFav = (localSettings.favoriteStyleIds || []).includes(a.id);
+            const bFav = (localSettings.favoriteStyleIds || []).includes(b.id);
+            if (aFav && !bFav) return -1;
+            if (!aFav && bFav) return 1;
 
-            // 3. Manual Order (styleOrder)
-            // This handles the "if unselected moved to original places"
+            // Manual Order (styleOrder) if available
             if (localSettings.styleOrder && localSettings.styleOrder.length > 0) {
                 let idxA = localSettings.styleOrder.indexOf(a.id);
                 let idxB = localSettings.styleOrder.indexOf(b.id);
@@ -383,7 +438,7 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
                 return idxA - idxB;
             }
 
-            // Fallback
+            // Fallback to alphabetical or default
             return 0;
         });
     }, [localSettings.hiddenStyleIds, allStyles, localSettings.activeStyles, localSettings.styleOrder]);
@@ -400,7 +455,7 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
     const meshData = useMemo(() => {
         if (selectedIndices.length < 2) return null;
         
-        const cardWidth = 112; 
+        const cardWidth = 128; 
         const gap = 16; 
         const containerPadding = 4; 
         
@@ -484,35 +539,53 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
                         </span>
                     )}
                 </div>
-                <div className="relative">
-                    <div className="flex gap-4 overflow-x-auto no-scrollbar px-1 pb-24 relative z-10">
+                <div className="relative -mx-5 px-5">
+                    <div className="flex gap-3 overflow-x-auto no-scrollbar pb-24 relative z-10">
                         {visibleStyles.map(style => {
                             const isSelected = localSettings.activeStyles.includes(style.id);
                             const isFavorite = (localSettings.favoriteStyleIds || []).includes(style.id);
                             // Append API key to preview images. Check if custom style image already has params, if so, append key.
                             // Custom styles usually have static URLs we generated, but appending key doesn't hurt.
                             const separator = style.image.includes('?') ? '&' : '?';
-                            const previewUrl = `${style.image}${separator}key=${effectiveKey}`;
+                            let previewUrl = `${style.image}${separator}key=${effectiveKey}`;
+                            
+                            // For 'none' style, use the current model for the preview
+                            if (style.id === 'none') {
+                                previewUrl = `https://gen.pollinations.ai/image/Clean%20minimalist%20void?model=${localSettings.model}&width=256&height=384&nologo=true&seed=0&safe=true&key=${effectiveKey}`;
+                            }
+
+                            const effectiveModelId = style.id === 'none' ? localSettings.model : style.modelId;
 
                             return (
                                 <motion.button 
                                     layout
                                     key={style.id} 
                                     onClick={() => toggleStyle(style.id)} 
-                                    className={`relative shrink-0 w-28 h-40 rounded-[1.8rem] overflow-hidden border transition-all duration-500 ${isSelected ? 'border-primary shadow-[0_4px_30px_rgba(59,130,246,0.4)] scale-105 z-10' : 'border-white/10 opacity-40 hover:opacity-100'}`}
+                                    className={`relative shrink-0 w-32 h-48 rounded-[2rem] overflow-hidden border transition-all duration-500 ${isSelected ? 'border-primary shadow-[0_4px_30px_rgba(59,130,246,0.4)] scale-105 z-10' : 'border-white/10 hover:border-white/20'}`}
                                 >
                                     <img src={previewUrl} alt={style.label} className="w-full h-full object-cover" loading="lazy" />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-3">
-                                        <p className={`text-[9px] font-black uppercase tracking-tighter text-center leading-tight ${isSelected ? 'text-primary' : 'text-white/80'}`}>{style.label}</p>
-                                    </div>
                                     
-                                    {/* Small Favorite Indicator in Generator */}
-                                    {isFavorite && (
-                                        <div className="absolute top-2 right-2 size-5 rounded-full bg-red-500 flex items-center justify-center shadow-lg">
-                                            <Heart size={10} fill="white" className="text-white" strokeWidth={0} />
+                                    {/* Like Button at Top Left */}
+                                    {style.id !== 'none' && (
+                                        <button 
+                                            onClick={(e) => toggleFavorite(e, style.id)}
+                                            className={`absolute top-3 left-3 size-7 rounded-full flex items-center justify-center transition-all z-30 ${isFavorite ? 'bg-red-500 text-white shadow-glow' : 'bg-black/40 backdrop-blur-md border border-white/10 text-white/40 hover:text-white'}`}
+                                        >
+                                            <Heart size={12} fill={isFavorite ? "currentColor" : "none"} />
+                                        </button>
+                                    )}
+
+                                    {/* Model Pill moved to Top Right */}
+                                    {effectiveModelId && (
+                                        <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 z-20">
+                                            <p className="text-[7px] font-black uppercase tracking-widest text-white/60">{effectiveModelId}</p>
                                         </div>
                                     )}
 
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-4">
+                                        <p className={`text-[10px] font-black uppercase tracking-tighter text-center leading-tight ${isSelected ? 'text-primary' : 'text-white/80'}`}>{style.label}</p>
+                                    </div>
+                                    
                                     {isSelected && style.id !== 'none' && (
                                         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-12 bg-primary/20 blur-2xl pointer-events-none" />
                                     )}
@@ -583,13 +656,18 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
   const [pendingImages, setPendingImages] = useState<Set<string>>(new Set());
   const [batchTotal, setBatchTotal] = useState(0);
 
-  const [telemetry, setTelemetry] = useState<{ avgDuration: number; count: number }>({ avgDuration: 8.0, count: 0 });
+  const [telemetry, setTelemetry] = useState<Record<string, { avgDuration: number; count: number }>>({
+    zimage: { avgDuration: 1.5, count: 0 },
+    flux: { avgDuration: 8.0, count: 0 },
+    'flux-2-dev': { avgDuration: 12.0, count: 0 }
+  });
 
   const [selectedImage, setSelectedImage] = useState<HistoryItem | null>(null);
 
-  const isActuallyRendering = useMemo(() => isProcessing || pendingImages.size > 0, [isProcessing, pendingImages]);
+  const isActuallyRendering = useMemo(() => pendingImages.size > 0, [pendingImages]);
 
-  const totalEstimatedTime = useMemo(() => Math.max(1, telemetry.avgDuration * localSettings.imageCount), [telemetry.avgDuration, localSettings.imageCount]);
+  const currentModelTelemetry = useMemo(() => telemetry[localSettings.model] || { avgDuration: 8.0, count: 0 }, [telemetry, localSettings.model]);
+  const totalEstimatedTime = useMemo(() => Math.max(1, currentModelTelemetry.avgDuration * localSettings.imageCount), [currentModelTelemetry.avgDuration, localSettings.imageCount]);
   const remainingTime = Math.max(0, totalEstimatedTime - renderTime);
   
   const progressMotionValue = useMotionValue(0);
@@ -611,8 +689,13 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
       try {
         const storedTelemetry = await storage.get<any>(STORAGE_KEY_TELEMETRY);
         if (storedTelemetry) {
-          if (storedTelemetry.avgDuration > 100) {
-            setTelemetry({ avgDuration: 8.0, count: 0 });
+          // Migration/Safety check: if it's the old format (single object), reset to default
+          if (storedTelemetry.avgDuration !== undefined) {
+            setTelemetry({
+              zimage: { avgDuration: 1.5, count: 0 },
+              flux: { avgDuration: 8.0, count: 0 },
+              'flux-2-dev': { avgDuration: 12.0, count: 0 }
+            });
           } else {
             setTelemetry(storedTelemetry);
           }
@@ -673,10 +756,10 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
   const showToast = (message: string) => { setToastMessage(message); setTimeout(() => setToastMessage(null), 3000); };
 
   const fetchAccount = useCallback(async () => {
-      const data = await getAccountDetails();
+      const data = await getAccountDetails(globalSettings.apiKey);
       setAccountState(prev => ({ ...prev, ...data }));
       storage.set('resonance_cached_account', data);
-  }, []);
+  }, [globalSettings.apiKey]);
 
   useEffect(() => {
       // fetchAccount(); // Removed to avoid checking on mount
@@ -694,10 +777,12 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
           }
       } else {
           if (renderTime > 1.0) {
+            const model = localSettings.model;
             setTelemetry(prev => {
-                const nextCount = prev.count + 1;
-                const nextAvg = (prev.avgDuration * prev.count + renderTime) / nextCount;
-                const nextData = { avgDuration: nextAvg, count: nextCount };
+                const current = prev[model] || { avgDuration: 8.0, count: 0 };
+                const nextCount = current.count + 1;
+                const nextAvg = (current.avgDuration * current.count + renderTime) / nextCount;
+                const nextData = { ...prev, [model]: { avgDuration: nextAvg, count: nextCount } };
                 storage.set(STORAGE_KEY_TELEMETRY, nextData);
                 return nextData;
             });
@@ -724,12 +809,14 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
       const item = sessionImages.find(img => img.id === id);
       if (item && item.startTime) {
           const duration = (Date.now() - item.startTime) / 1000;
-          // Only count if under 20s to keep average realistic for turbo models
-          if (duration > 0.5 && duration < 20) {
+          const model = item.model;
+          // Only count if under 30s to keep average realistic
+          if (duration > 0.2 && duration < 30) {
               setTelemetry(prev => {
-                  const nextCount = prev.count + 1;
-                  const nextAvg = (prev.avgDuration * prev.count + duration) / nextCount;
-                  const nextData = { avgDuration: nextAvg, count: nextCount };
+                  const current = prev[model] || { avgDuration: 8.0, count: 0 };
+                  const nextCount = current.count + 1;
+                  const nextAvg = (current.avgDuration * current.count + duration) / nextCount;
+                  const nextData = { ...prev, [model]: { avgDuration: nextAvg, count: nextCount } };
                   storage.set(STORAGE_KEY_TELEMETRY, nextData);
                   return nextData;
               });
@@ -747,8 +834,9 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
       if (!sessionPrompt || isEnhancing) return;
       setIsEnhancing(true);
       try {
-          const enhanced = await enhancePrompt(sessionPrompt, localSettings.model, globalSettings.apiKey);
-          setSessionPrompt(enhanced);
+          await enhancePrompt(sessionPrompt, localSettings.model, globalSettings.apiKey, (chunk) => {
+              setSessionPrompt(chunk);
+          });
           showToast("Prompt Enhanced");
       } catch (error: any) {
           showToast("Enhancement Failed");
@@ -758,19 +846,36 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
   };
 
   const handleGenerate = async () => {
-    if (!sessionPrompt || isActuallyRendering) return;
-    setShowSettings(false); 
+    if (!sessionPrompt) return;
+    // setShowSettings(false); // REMOVED: Keep settings open as requested
     setIsProcessing(true);
     
     addLog('info', 'Generation Session Started', { count: localSettings.imageCount, prompt: sessionPrompt });
 
     const batchId = crypto.randomUUID();
     
-    // RESOLUTION LOGIC: Using hardcoded dimensions from presets for maximum quality
-    const isHD = localSettings.quality === 'hd';
+    // RESOLUTION LOGIC: Optimized for Pollinations v2.36MP limit
+    const MAX_PIXELS = 2359296;
+    let targetWidth = localSettings.width;
+    let targetHeight = localSettings.height;
+
     // If quality is low, we downscale to roughly 480p/720p equivalent
-    const targetWidth = isHD ? localSettings.width : Math.round(localSettings.width * 0.5);
-    const targetHeight = isHD ? localSettings.height : Math.round(localSettings.height * 0.5);
+    if (localSettings.quality !== 'hd') {
+        targetWidth = Math.round(targetWidth * 0.5);
+        targetHeight = Math.round(targetHeight * 0.5);
+    }
+
+    // Ensure we don't exceed the 2.3MP limit
+    const currentPixels = targetWidth * targetHeight;
+    if (currentPixels > MAX_PIXELS) {
+        const scale = Math.sqrt(MAX_PIXELS / currentPixels);
+        targetWidth = Math.floor(targetWidth * scale);
+        targetHeight = Math.floor(targetHeight * scale);
+        addLog('warn', 'Resolution exceeded limit, downscaling', { 
+            original: `${localSettings.width}x${localSettings.height}`,
+            new: `${targetWidth}x${targetHeight}` 
+        });
+    }
 
     // MERGE BUILT-IN AND CUSTOM STYLES
     const allStyles = [...MODEL_STYLES, ...(localSettings.customStyles || [])];
@@ -808,7 +913,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
         // IMPORTANT: Safe=true as requested
         const params = { 
             prompt: promptWithStyles, 
-            model: localSettings.model || 'zimage', 
+            model: localSettings.model || 'flux', 
             width: targetWidth, 
             height: targetHeight, 
             seed, 
@@ -822,7 +927,17 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
         };
         
         const imageUrl = await generateImageUrl(params);
-        const item: HistoryItem = { ...params, id, batchId, timestamp: now, startTime: now, url: imageUrl, prompt: sessionPrompt, styleSuffix };
+        const item: HistoryItem = { 
+            ...params, 
+            id, 
+            batchId, 
+            timestamp: now, 
+            startTime: now, 
+            url: imageUrl, 
+            prompt: sessionPrompt, 
+            styleSuffix,
+            styleName: activeStyleObjects.map(s => s.label).join(', ')
+        };
         newBatch.push(item);
         pendingIds.add(id);
         onAddToHistory(item);
@@ -990,7 +1105,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                                     </div>
                                     <div className="w-[0.5px] h-3 bg-white/20" />
                                     <span className="text-[10px] font-bold font-mono text-white/40 tracking-tight">
-                                        ~{getEstimatedImagesLeft(accountState.balance)}
+                                        ~{getEstimatedImagesLeft(accountState.balance, localSettings.model)}
                                     </span>
                                 </>
                             )}
@@ -1018,7 +1133,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                                 </div>
                                 <div className="bg-white/5 rounded-3xl p-4 border border-white/5 flex flex-col items-center">
                                     <p className="text-[8px] font-bold text-white/20 uppercase tracking-widest mb-1">Avg. Speed</p>
-                                    <p className="text-xs font-mono font-bold text-white/80">{telemetry.avgDuration.toFixed(1)}s</p>
+                                    <p className="text-xs font-mono font-bold text-white/80">{currentModelTelemetry.avgDuration.toFixed(1)}s</p>
                                 </div>
                             </div>
 
@@ -1094,6 +1209,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                                               visualSafety={localSettings.visualSafety} 
                                               onImageReady={handleImageLoaded}
                                               onNavigate={onNavigate}
+                                              showToast={showToast}
                                             />
                                         </div>
                                       ))}
@@ -1131,7 +1247,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                                       <textarea 
                                         value={sessionPrompt} 
                                         onChange={(e) => setSessionPrompt(e.target.value)} 
-                                        className="w-full bg-transparent border-none text-white text-[15px] focus:ring-0 placeholder:text-white/10 min-h-[200px] max-h-[600px] resize-none p-0 leading-relaxed" 
+                                        className={`w-full bg-transparent border-none text-white text-[15px] focus:ring-0 placeholder:text-white/10 min-h-[200px] max-h-[600px] resize-none p-0 leading-relaxed transition-all ${isEnhancing ? 'animate-pulse text-primary/60' : ''}`} 
                                         placeholder="Architect your reality..." 
                                         autoFocus
                                       />
@@ -1282,10 +1398,13 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                     initial={{ scale: 0.9, y: 20 }}
                     animate={{ scale: 1, y: 0 }}
                     exit={{ scale: 0.9, y: 20 }}
-                    className="relative w-full max-w-4xl aspect-[2/3] sm:aspect-auto sm:h-[80vh] rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10"
+                    className="relative w-full max-w-5xl max-h-[90vh] rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10 flex flex-col bg-black"
                     onClick={(e) => e.stopPropagation()}
+                    style={{ aspectRatio: selectedImage.width / selectedImage.height }}
                   >
-                      <img src={selectedImage.url} alt={selectedImage.prompt} className="w-full h-full object-contain bg-black/40" />
+                      <div className="flex-1 min-h-0 relative">
+                        <img src={selectedImage.url} alt={selectedImage.prompt} className="w-full h-full object-contain" />
+                      </div>
                       
                       <div className="absolute top-6 right-6 flex gap-3">
                           <button 
@@ -1295,10 +1414,10 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                               <X size={20} />
                           </button>
                       </div>
-
-                      <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black via-black/60 to-transparent">
+ 
+                      <div className="p-8 bg-gradient-to-t from-black via-black/90 to-black/40">
                           <p className="text-xs text-white/60 font-medium leading-relaxed mb-6 line-clamp-3">{selectedImage.prompt}</p>
-                          <div className="flex flex-wrap gap-4">
+                          <div className="flex flex-wrap gap-3">
                               <div className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 flex items-center gap-2">
                                   <Hash size={12} className="text-primary" />
                                   <span className="text-[10px] font-mono text-white/80">{selectedImage.seed}</span>
@@ -1307,6 +1426,12 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                                   <Layers size={12} className="text-primary" />
                                   <span className="text-[10px] font-mono text-white/80 uppercase">{selectedImage.model}</span>
                               </div>
+                              {selectedImage.styleName && (
+                                  <div className="px-4 py-2 rounded-xl bg-primary/10 border border-primary/20 flex items-center gap-2">
+                                      <Sparkles size={12} className="text-primary" />
+                                      <span className="text-[10px] font-black text-primary uppercase tracking-widest">{selectedImage.styleName}</span>
+                                  </div>
+                              )}
                               <button 
                                 onClick={() => {
                                     const link = document.createElement('a');
