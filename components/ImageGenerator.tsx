@@ -106,6 +106,17 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady, onNaviga
   const [revealed, setRevealed] = useState(false);
   const [visualRisk, setVisualRisk] = useState(false);
   const [isAuditing, setIsAuditing] = useState(false);
+  const [showOverlay, setShowOverlay] = useState(false);
+
+  // Delay the "Synthesizing" overlay to prevent flickering on fast loads
+  useEffect(() => {
+      if (!isLoaded) {
+          const timer = setTimeout(() => setShowOverlay(true), 600);
+          return () => clearTimeout(timer);
+      } else {
+          setShowOverlay(false);
+      }
+  }, [isLoaded]);
   
   const handleImageLoad = async () => {
       if (visualSafety) {
@@ -251,9 +262,24 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady, onNaviga
       initial={{ opacity: 0, scale: 0.8, y: 40 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={LIQUID_SPRING}
-      className={`relative shrink-0 overflow-hidden bg-white/[0.02] border-[0.5px] border-white/10 shadow-liquid rounded-[2.5rem] flex items-center justify-center group/card w-full max-w-3xl will-change-transform ${!isLoaded ? 'animate-shimmer bg-gradient-to-r from-white/[0.02] via-white/[0.08] to-white/[0.02] bg-[length:200%_100%]' : ''}`}
+      className={`relative shrink-0 overflow-hidden bg-white/[0.02] border-[0.5px] border-white/10 shadow-liquid rounded-[2.5rem] flex items-center justify-center group/card w-full max-w-3xl will-change-transform ${!isLoaded ? 'bg-white/[0.03]' : ''}`}
       style={{ rotateX, rotateY, transformStyle: 'preserve-3d', aspectRatio: `${item.width}/${item.height}` }}
     >
+      {/* Skeleton Shimmer Layer */}
+      {!isLoaded && (
+          <div className="absolute inset-0 overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.05] to-transparent -translate-x-full animate-shimmer" style={{ backgroundSize: '200% 100%' }} />
+              <div className="absolute inset-0 flex flex-col p-8 gap-4">
+                  <div className="w-1/3 h-4 bg-white/5 rounded-full animate-pulse" />
+                  <div className="w-2/3 h-3 bg-white/5 rounded-full animate-pulse delay-75" />
+                  <div className="mt-auto flex justify-between">
+                      <div className="size-10 rounded-full bg-white/5 animate-pulse" />
+                      <div className="size-10 rounded-full bg-white/5 animate-pulse" />
+                  </div>
+              </div>
+          </div>
+      )}
+
       {!hasError ? (
           <img 
             src={item.url} 
@@ -297,8 +323,12 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady, onNaviga
         </div>
       )}
 
-      {(!isLoaded || isAuditing) && !hasError && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-md overflow-hidden">
+      {(!isLoaded || isAuditing) && !hasError && showOverlay && (
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-md overflow-hidden z-20"
+        >
           <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 animate-pulse" />
           <div className="relative flex flex-col items-center gap-6">
               <div className="relative">
@@ -319,7 +349,7 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady, onNaviga
                   </div>
               </div>
           </div>
-        </div>
+        </motion.div>
       )}
       {visualRisk && !revealed && isLoaded && !isAuditing && !hasError && (
         <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center z-20 bg-black/80 backdrop-blur-3xl">
@@ -667,7 +697,14 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
   const isActuallyRendering = useMemo(() => pendingImages.size > 0, [pendingImages]);
 
   const currentModelTelemetry = useMemo(() => telemetry[localSettings.model] || { avgDuration: 8.0, count: 0 }, [telemetry, localSettings.model]);
-  const totalEstimatedTime = useMemo(() => Math.max(1, currentModelTelemetry.avgDuration * localSettings.imageCount), [currentModelTelemetry.avgDuration, localSettings.imageCount]);
+  // FIX: Adaptive timer should estimate based on parallel loading, not sequential.
+  // We add a small 10% buffer per additional image for overhead.
+  const totalEstimatedTime = useMemo(() => {
+      const base = currentModelTelemetry.avgDuration;
+      const overhead = Math.max(0, (localSettings.imageCount - 1) * 0.5); // 0.5s overhead per extra image
+      return Math.max(1, base + overhead);
+  }, [currentModelTelemetry.avgDuration, localSettings.imageCount]);
+  
   const remainingTime = Math.max(0, totalEstimatedTime - renderTime);
   
   const progressMotionValue = useMotionValue(0);
