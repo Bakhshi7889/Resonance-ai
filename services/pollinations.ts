@@ -33,7 +33,7 @@ export const getAccountDetails = async (apiKey?: string) => {
     const effectiveKey = getEffectiveKey(apiKey);
     try {
         addLog('info', 'Initiating account sync via Pollinations API...');
-        const response = await fetch('https://gen.pollinations.ai/account/balance', {
+        const response = await fetch(`https://gen.pollinations.ai/account/balance?key=${effectiveKey}`, {
             headers: {
                 'Authorization': `Bearer ${effectiveKey}`
             }

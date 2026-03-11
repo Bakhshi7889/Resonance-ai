@@ -73,7 +73,7 @@ export const enhancePrompt = async (
     }
 
     try {
-        const response = await fetch('https://gen.pollinations.ai/v1/chat/completions', {
+        const response = await fetch(`https://gen.pollinations.ai/v1/chat/completions?key=${effectiveKey}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

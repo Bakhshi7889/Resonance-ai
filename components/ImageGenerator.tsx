@@ -74,6 +74,8 @@ interface ImageGeneratorProps {
   setSessionPrompt: (prompt: string) => void;
   sessionImages: HistoryItem[];
   setSessionImages: React.Dispatch<React.SetStateAction<HistoryItem[]>>;
+  accountState: AccountState;
+  refreshAccount: () => void;
 }
 
 const PromptHeader = memo(({ prompt, onClearBatch, batchId }: { prompt: string, onClearBatch: (id: string) => void, batchId: string }) => {
@@ -679,7 +681,7 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, 
 });
 
 export const ImageGenerator: React.FC<ImageGeneratorProps> = ({ 
-    settings: globalSettings, styles, onNavigate, onAddToHistory, updateSettings, sessionPrompt, setSessionPrompt, sessionImages, setSessionImages
+    settings: globalSettings, styles, onNavigate, onAddToHistory, updateSettings, sessionPrompt, setSessionPrompt, sessionImages, setSessionImages, accountState, refreshAccount
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [localSettings, setLocalSettings] = useState({ ...globalSettings });
@@ -735,9 +737,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
 
   const [scope, animate] = useAnimate();
 
-  const [accountState, setAccountState] = useState<AccountState>({ profile: null, balance: null, usage: [], isLoading: false, error: null, user: null });
-
-  // Load telemetry and account cache from IndexedDB
+  // Load telemetry cache from IndexedDB
   useEffect(() => {
     const loadCache = async () => {
       try {
@@ -754,28 +754,11 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
             setTelemetry(storedTelemetry);
           }
         }
-
-        const cachedAccount = await storage.get<any>('resonance_cached_account');
-        if (cachedAccount) {
-          setAccountState(prev => ({ ...prev, ...cachedAccount }));
-        }
       } catch (e) {
         console.error('Cache Load Error:', e);
       }
     };
     loadCache();
-  }, []);
-
-  // Sync Supabase user to account state
-  useEffect(() => {
-      if (!supabase) return;
-      supabase.auth.getSession().then(({ data: { session } }) => {
-          setAccountState(prev => ({ ...prev, user: session?.user ?? null }));
-      });
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-          setAccountState(prev => ({ ...prev, user: session?.user ?? null }));
-      });
-      return () => subscription.unsubscribe();
   }, []);
 
   const getRedirectUrl = () => {
@@ -808,16 +791,6 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
   const timerRef = useRef<any>(null);
 
   const showToast = (message: string) => { setToastMessage(message); setTimeout(() => setToastMessage(null), 3000); };
-
-  const fetchAccount = useCallback(async () => {
-      const data = await getAccountDetails(globalSettings.apiKey);
-      setAccountState(prev => ({ ...prev, ...data }));
-      storage.set('resonance_cached_account', data);
-  }, [globalSettings.apiKey]);
-
-  useEffect(() => {
-      fetchAccount();
-  }, [fetchAccount]);
 
   useEffect(() => {
     // Progress is now calculated directly from renderTime in the render cycle
@@ -880,9 +853,9 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
 
   useEffect(() => {
       if (pendingImages.size === 0 && !isProcessing && renderTime > 0) {
-          fetchAccount();
+          refreshAccount();
       }
-  }, [pendingImages.size, isProcessing, fetchAccount, renderTime]);
+  }, [pendingImages.size, isProcessing, refreshAccount, renderTime]);
 
   const handleEnhance = async () => {
       if (!sessionPrompt || isEnhancing) return;

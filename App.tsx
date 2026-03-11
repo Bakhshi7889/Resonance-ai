@@ -8,10 +8,11 @@ import { CreateStyle } from './components/CreateStyle';
 import { CommunityFeed } from './components/CommunityFeed';
 import { Leaderboard } from './components/Leaderboard';
 import { Messages } from './components/Messages';
-import { AppSettings, AppRoute, HistoryItem, CustomStyle } from './types';
+import { AppSettings, AppRoute, HistoryItem, CustomStyle, AccountState } from './types';
 import { supabase } from './services/supabase';
 import { storage } from './services/storage';
 import { styleService } from './services/styleService';
+import { getAccountDetails } from './services/pollinations';
 
 const STORAGE_KEY_SETTINGS = 'resonance_v4_settings';
 const STORAGE_KEY_HISTORY = 'resonance_v4_history';
@@ -48,6 +49,22 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [sessionPrompt, setSessionPrompt] = useState('');
   const [sessionImages, setSessionImages] = useState<HistoryItem[]>([]);
+  const [accountState, setAccountState] = useState<AccountState>({ 
+    profile: null, 
+    balance: null, 
+    usage: [], 
+    isLoading: false, 
+    error: null,
+    user: null
+  });
+
+  const fetchAccount = useCallback(async () => {
+    setAccountState(prev => ({ ...prev, isLoading: true }));
+    const data = await getAccountDetails(settings.apiKey);
+    const newState = { ...accountState, ...data, isLoading: false };
+    setAccountState(newState);
+    storage.set('resonance_cached_account', data);
+  }, [settings.apiKey]);
 
   // Load from IndexedDB (with localStorage migration)
   useEffect(() => {
@@ -118,6 +135,11 @@ const App: React.FC = () => {
         if (storedPrompt) setSessionPrompt(storedPrompt);
         if (storedImages) setSessionImages(storedImages);
 
+        const cachedAccount = await storage.get<AccountState>('resonance_cached_account');
+        if (cachedAccount) {
+          setAccountState(prev => ({ ...prev, ...cachedAccount }));
+        }
+
       } catch (e) {
         console.error('Storage Load Error:', e);
       } finally {
@@ -133,15 +155,26 @@ const App: React.FC = () => {
     if (!supabase) return;
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+      const user = session?.user ?? null;
+      setUser(user);
+      setAccountState(prev => ({ ...prev, user }));
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      const user = session?.user ?? null;
+      setUser(user);
+      setAccountState(prev => ({ ...prev, user }));
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Initial account fetch
+  useEffect(() => {
+    if (isStorageLoaded) {
+      fetchAccount();
+    }
+  }, [isStorageLoaded, fetchAccount]);
 
   // PWA Install Prompt Logic
   useEffect(() => {
@@ -276,6 +309,8 @@ const App: React.FC = () => {
             setSessionPrompt={handleSetSessionPrompt}
             sessionImages={sessionImages}
             setSessionImages={handleSetSessionImages}
+            accountState={accountState}
+            refreshAccount={fetchAccount}
           />
         );
       case AppRoute.HISTORY:
@@ -290,6 +325,7 @@ const App: React.FC = () => {
                 setCurrentRoute(AppRoute.GENERATOR);
             }}
             onDelete={handleDeleteHistory}
+            accountState={accountState}
           />
         );
       case AppRoute.PREFERENCES:
@@ -301,6 +337,8 @@ const App: React.FC = () => {
             onNavigate={setCurrentRoute}
             canInstall={!!deferredPrompt}
             onInstallApp={handleInstallApp}
+            accountState={accountState}
+            refreshAccount={fetchAccount}
           />
         );
       case AppRoute.STYLE_LIBRARY:

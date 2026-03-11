@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, memo } from 'react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
-import { HistoryItem, AppRoute } from '../types';
+import { HistoryItem, AppRoute, AccountState } from '../types';
 import { Header } from './Header';
 import { supabase } from '../services/supabase';
 import { Globe, Share2 } from 'lucide-react';
@@ -10,6 +10,7 @@ interface HistoryProps {
   onNavigate: (route: AppRoute) => void;
   onRemix?: (item: HistoryItem) => void;
   onDelete?: (ids: string[]) => void;
+  accountState: AccountState;
 }
 
 const swipeVariants = {
@@ -32,7 +33,7 @@ const swipeVariants = {
   })
 };
 
-export const History: React.FC<HistoryProps> = memo(({ history, onNavigate, onRemix, onDelete }) => {
+export const History: React.FC<HistoryProps> = memo(({ history, onNavigate, onRemix, onDelete, accountState }) => {
   const [fullscreenImageIndex, setFullscreenImageIndex] = useState<number | null>(null);
   const [slideDirection, setSlideDirection] = useState(0);
   const [showInfoPanel, setShowInfoPanel] = useState(false);

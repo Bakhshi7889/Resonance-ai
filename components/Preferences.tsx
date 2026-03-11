@@ -13,10 +13,11 @@ interface PreferencesProps {
   onNavigate: (route: AppRoute) => void;
   canInstall?: boolean;
   onInstallApp?: () => void;
+  accountState: AccountState;
+  refreshAccount: () => void;
 }
 
-export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateSettings, onNavigate, canInstall, onInstallApp }) => {
-  const [accountState, setAccountState] = useState<AccountState>({ profile: null, balance: null, usage: [], isLoading: false, error: null, user: null });
+export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateSettings, onNavigate, canInstall, onInstallApp, accountState, refreshAccount }) => {
   const [localLogs, setLocalLogs] = useState<LogEntry[]>([]);
   const [showLogs, setShowLogs] = useState(false);
   const [authEmail, setAuthEmail] = useState('');
@@ -33,12 +34,6 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
   const [unreadCount, setUnreadCount] = useState(0);
 
   const isDeveloper = accountState.user?.email === 'herobakhshi@gmail.com';
-
-  const fetchDetails = useCallback(async () => {
-    setAccountState(prev => ({ ...prev, isLoading: true }));
-    const data = await getAccountDetails();
-    setAccountState(prev => ({ ...prev, ...data, isLoading: false }));
-  }, []);
 
   const refreshLogs = useCallback(() => {
       const logs = getLogs();
@@ -62,19 +57,19 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
   }, [isDeveloper]);
 
   useEffect(() => {
-    fetchDetails();
     refreshLogs();
     
     // Get current user
-    if (supabase) {
+    if (supabase && !accountState.user) {
         supabase.auth.getUser().then(({ data: { user } }) => {
-            setAccountState(prev => ({ ...prev, user }));
             if (user?.user_metadata?.display_name) {
                 setDisplayName(user.user_metadata.display_name);
             }
         });
+    } else if (accountState.user?.user_metadata?.display_name) {
+        setDisplayName(accountState.user.user_metadata.display_name);
     }
-  }, [fetchDetails, refreshLogs]);
+  }, [refreshLogs, accountState.user]);
 
   useEffect(() => {
     if (isDeveloper) {
@@ -155,8 +150,6 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
               data: { display_name: displayName }
           });
           if (error) throw error;
-          const { data: { user } } = await supabase.auth.getUser();
-          setAccountState(prev => ({ ...prev, user }));
           alert('Profile updated successfully');
       } catch (err) {
           console.error('Profile Update Error:', err);
@@ -179,8 +172,6 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
                   data: { avatar_url: base64 }
               });
               if (error) throw error;
-              const { data: { user } } = await supabase.auth.getUser();
-              setAccountState(prev => ({ ...prev, user }));
           } catch (err) {
               console.error('Avatar Upload Error:', err);
               alert('Failed to upload avatar');
@@ -194,7 +185,6 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
   const handleLogout = async () => {
       if (!supabase) return;
       await supabase.auth.signOut();
-      setAccountState(prev => ({ ...prev, user: null }));
   };
 
   const handleConnectExternal = () => {
@@ -482,7 +472,7 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
                             BYOP SYNC
                         </button>
                         <button 
-                            onClick={fetchDetails}
+                            onClick={refreshAccount}
                             className="py-4 rounded-2xl bg-white/10 text-white text-[10px] font-black uppercase tracking-[0.2em] border border-white/10 active:scale-95 transition-all flex items-center justify-center gap-2"
                         >
                             <RefreshCw size={14} className={accountState.isLoading ? 'animate-spin' : ''} />
