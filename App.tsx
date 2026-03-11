@@ -201,13 +201,36 @@ const App: React.FC = () => {
     storage.set(STORAGE_KEY_SESSION_PROMPT, prompt);
   }, []);
 
-  const handleAddToHistory = useCallback((item: HistoryItem) => {
+  const handleAddToHistory = useCallback(async (item: HistoryItem) => {
     setHistory(prev => {
       const updated = [item, ...prev].slice(0, 500);
       storage.set(STORAGE_KEY_HISTORY, updated);
       return updated;
     });
-  }, []);
+
+    // Save to Supabase if user is logged in
+    if (supabase && user) {
+      try {
+        const { error } = await supabase
+          .from('generations')
+          .insert([{
+            user_id: user.id,
+            prompt: item.prompt,
+            url: item.url,
+            model: item.model,
+            width: item.width,
+            height: item.height,
+            seed: item.seed,
+            style_suffix: item.styleSuffix,
+            is_public: !settings.privateMode // Use privateMode setting to determine visibility
+          }]);
+        
+        if (error) console.error('Resonance: Supabase Save Error', error);
+      } catch (err) {
+        console.error('Resonance: Supabase Save Exception', err);
+      }
+    }
+  }, [user, settings.privateMode]);
 
   const handleDeleteHistory = useCallback((ids: string[]) => {
     setHistory(prev => {
@@ -304,6 +327,7 @@ const App: React.FC = () => {
             <CommunityFeed 
                 key="community"
                 onNavigate={setCurrentRoute}
+                user={user}
             />
         );
       case AppRoute.LEADERBOARD:

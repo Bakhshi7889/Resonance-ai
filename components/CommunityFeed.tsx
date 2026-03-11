@@ -7,27 +7,37 @@ import { Sparkles, Globe, Heart, Share2 } from 'lucide-react';
 
 interface CommunityFeedProps {
     onNavigate: (route: AppRoute) => void;
+    user: any;
 }
 
-export const CommunityFeed: React.FC<CommunityFeedProps> = ({ onNavigate }) => {
+export const CommunityFeed: React.FC<CommunityFeedProps> = ({ onNavigate, user }) => {
     const [images, setImages] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+
+    const isDeveloper = user?.email === 'herobakhshi@gmail.com';
 
     useEffect(() => {
         const fetchFeed = async () => {
             if (!supabase) return;
-            const { data, error } = await supabase
+            
+            let query = supabase
                 .from('generations')
                 .select('*')
-                .eq('is_public', true)
                 .order('created_at', { ascending: false })
-                .limit(50);
+                .limit(100);
+            
+            // If not developer, only show public ones
+            if (!isDeveloper) {
+                query = query.eq('is_public', true);
+            }
+            
+            const { data, error } = await query;
             
             if (!error && data) setImages(data);
             setIsLoading(false);
         };
         fetchFeed();
-    }, []);
+    }, [isDeveloper]);
 
     return (
         <motion.div 

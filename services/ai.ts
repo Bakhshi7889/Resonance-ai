@@ -103,19 +103,25 @@ export const enhancePrompt = async (
             
             const decoder = new TextDecoder();
             let fullText = "";
+            let buffer = "";
             
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
                 
-                const chunk = decoder.decode(value);
-                const lines = chunk.split('\n').filter(line => line.trim() !== '');
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                
+                // Keep the last partial line in the buffer
+                buffer = lines.pop() || "";
                 
                 for (const line of lines) {
-                    if (line.includes('[DONE]')) break;
-                    if (line.startsWith('data: ')) {
+                    const trimmedLine = line.trim();
+                    if (!trimmedLine || trimmedLine === 'data: [DONE]') continue;
+                    
+                    if (trimmedLine.startsWith('data: ')) {
                         try {
-                            const data = JSON.parse(line.substring(6));
+                            const data = JSON.parse(trimmedLine.substring(6));
                             const content = data.choices?.[0]?.delta?.content || "";
                             if (content) {
                                 fullText += content;
@@ -124,9 +130,24 @@ export const enhancePrompt = async (
                                 if (stripped) onChunk(stripped);
                             }
                         } catch (e) {
-                            console.error('Error parsing stream chunk', e);
+                            // Only log if it's not a partial JSON error, but since we have a buffer now, 
+                            // any error here is likely a real issue with the chunk content.
+                            console.error('Error parsing stream chunk', e, trimmedLine);
                         }
                     }
+                }
+            }
+            
+            // Process any remaining data in buffer if it looks like a complete line
+            if (buffer.trim().startsWith('data: ') && buffer.trim() !== 'data: [DONE]') {
+                try {
+                    const data = JSON.parse(buffer.trim().substring(6));
+                    const content = data.choices?.[0]?.delta?.content || "";
+                    if (content) {
+                        fullText += content;
+                    }
+                } catch (e) {
+                    // Ignore errors for the very last bit if it's still incomplete
                 }
             }
             return fullText.replace(/<think>[\s\S]*?<\/think>/g, '').trim();

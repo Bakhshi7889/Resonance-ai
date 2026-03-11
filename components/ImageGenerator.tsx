@@ -265,16 +265,19 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady, onNaviga
       className={`relative shrink-0 overflow-hidden bg-white/[0.02] border-[0.5px] border-white/10 shadow-liquid rounded-[2.5rem] flex items-center justify-center group/card w-full max-w-3xl will-change-transform ${!isLoaded ? 'bg-white/[0.03]' : ''}`}
       style={{ rotateX, rotateY, transformStyle: 'preserve-3d', aspectRatio: `${item.width}/${item.height}` }}
     >
-      {/* Skeleton Shimmer Layer */}
+      {/* Skeleton Shimmer Layer - Always visible until loaded */}
       {!isLoaded && (
-          <div className="absolute inset-0 overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.05] to-transparent -translate-x-full animate-shimmer" style={{ backgroundSize: '200% 100%' }} />
-              <div className="absolute inset-0 flex flex-col p-8 gap-4">
-                  <div className="w-1/3 h-4 bg-white/5 rounded-full animate-pulse" />
-                  <div className="w-2/3 h-3 bg-white/5 rounded-full animate-pulse delay-75" />
-                  <div className="mt-auto flex justify-between">
-                      <div className="size-10 rounded-full bg-white/5 animate-pulse" />
-                      <div className="size-10 rounded-full bg-white/5 animate-pulse" />
+          <div className="absolute inset-0 z-10 overflow-hidden bg-black/20">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.08] to-transparent -translate-x-full animate-shimmer" style={{ backgroundSize: '200% 100%' }} />
+              <div className="absolute inset-0 flex flex-col p-10 gap-6">
+                  <div className="w-1/2 h-5 bg-white/10 rounded-full animate-pulse" />
+                  <div className="w-3/4 h-4 bg-white/10 rounded-full animate-pulse delay-150" />
+                  <div className="mt-auto flex justify-between items-end">
+                      <div className="flex flex-col gap-3">
+                          <div className="w-32 h-3 bg-white/5 rounded-full animate-pulse" />
+                          <div className="w-24 h-3 bg-white/5 rounded-full animate-pulse delay-75" />
+                      </div>
+                      <div className="size-14 rounded-3xl bg-white/10 animate-pulse" />
                   </div>
               </div>
           </div>
@@ -327,7 +330,7 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady, onNaviga
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-md overflow-hidden z-20"
+          className="absolute inset-0 flex flex-col items-center justify-center bg-black/20 backdrop-blur-sm overflow-hidden z-20"
         >
           <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 animate-pulse" />
           <div className="relative flex flex-col items-center gap-6">
@@ -521,12 +524,12 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
             </div>
 
             <div className="space-y-3">
-                <p className="text-[8px] text-white/20 font-black uppercase tracking-[0.2em] pl-1">Aspect Geometry</p>
-                <div className="grid grid-cols-5 gap-1.5 bg-white/5 p-1.5 rounded-2xl border border-white/5">
+                <p className="text-[8px] text-white/40 font-black uppercase tracking-[0.2em] pl-1">Aspect Geometry</p>
+                <div className="grid grid-cols-5 gap-1.5 bg-white/10 p-1.5 rounded-2xl border border-white/10">
                     {ASPECT_RATIOS.map(ratio => {
                         const isSelected = localSettings.width === ratio.width && localSettings.height === ratio.height;
                         return (
-                            <button key={ratio.label} onClick={() => setAspectRatio(ratio.width, ratio.height)} className={`h-12 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all ${isSelected ? 'bg-white/10 text-white shadow-lg' : 'text-white/20 hover:text-white/40'}`}>
+                            <button key={ratio.label} onClick={() => setAspectRatio(ratio.width, ratio.height)} className={`h-12 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all ${isSelected ? 'bg-white/20 text-white shadow-lg' : 'text-white/30 hover:text-white/50'}`}>
                                 <RatioIcon width={ratio.width} height={ratio.height} isSelected={isSelected} />
                                 <span className="text-[7px] font-black">{ratio.label}</span>
                             </button>
@@ -536,22 +539,22 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
             </div>
 
             <div className="space-y-3">
-                <p className="text-[8px] text-white/20 font-black uppercase tracking-[0.2em] pl-1">Batch Capacity</p>
-                <div className="grid grid-cols-4 gap-1.5 bg-white/5 p-1.5 rounded-2xl border border-white/5">
+                <p className="text-[8px] text-white/40 font-black uppercase tracking-[0.2em] pl-1">Batch Capacity</p>
+                <div className="grid grid-cols-4 gap-1.5 bg-white/10 p-1.5 rounded-2xl border border-white/10">
                     {[1, 2, 4, 8].map(n => (
-                        <button key={n} onClick={() => updateLocalSetting('imageCount', n)} className={`h-12 rounded-xl text-[9px] font-black transition-all ${localSettings.imageCount === n ? 'bg-primary text-white shadow-glow' : 'text-white/20 hover:text-white/40'}`}>{n}x</button>
+                        <button key={n} onClick={() => updateLocalSetting('imageCount', n)} className={`h-12 rounded-xl text-[9px] font-black transition-all ${localSettings.imageCount === n ? 'bg-primary text-white shadow-glow' : 'text-white/30 hover:text-white/50'}`}>{n}x</button>
                     ))}
                 </div>
             </div>
 
             <div className="space-y-3">
-                <p className="text-[8px] text-white/20 font-black uppercase tracking-[0.2em] pl-1">Neural Model</p>
-                <div className="grid grid-cols-3 gap-2 bg-white/5 p-1.5 rounded-2xl border border-white/5">
+                <p className="text-[8px] text-white/40 font-black uppercase tracking-[0.2em] pl-1">Neural Model</p>
+                <div className="grid grid-cols-3 gap-2 bg-white/10 p-1.5 rounded-2xl border border-white/10">
                     {AVAILABLE_MODELS.map(m => (
                         <button 
                             key={m.id} 
                             onClick={() => updateLocalSetting('model', m.id)} 
-                            className={`h-12 rounded-xl text-[8px] font-black transition-all flex flex-col items-center justify-center gap-1 ${localSettings.model === m.id ? 'bg-primary text-white shadow-glow' : 'text-white/20 hover:text-white/40'}`}
+                            className={`h-12 rounded-xl text-[8px] font-black transition-all flex flex-col items-center justify-center gap-1 ${localSettings.model === m.id ? 'bg-primary text-white shadow-glow' : 'text-white/30 hover:text-white/50'}`}
                         >
                             {m.id === 'zimage' ? <Zap size={10} /> : <Sparkles size={10} />}
                             <span className="truncate w-full px-1">{m.name}</span>
@@ -587,11 +590,11 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
                             const effectiveModelId = style.id === 'none' ? localSettings.model : style.modelId;
 
                             return (
-                                <motion.button 
+                                <motion.div 
                                     layout
                                     key={style.id} 
                                     onClick={() => toggleStyle(style.id)} 
-                                    className={`relative shrink-0 w-32 h-48 rounded-[2rem] overflow-hidden border transition-all duration-500 ${isSelected ? 'border-primary shadow-[0_4px_30px_rgba(59,130,246,0.4)] scale-105 z-10' : 'border-white/10 hover:border-white/20'}`}
+                                    className={`relative shrink-0 w-32 h-48 rounded-[2rem] overflow-hidden border transition-all duration-500 cursor-pointer ${isSelected ? 'border-primary shadow-[0_4px_30px_rgba(59,130,246,0.4)] scale-105 z-10' : 'border-white/10 hover:border-white/20'}`}
                                 >
                                     <img src={previewUrl} alt={style.label} className="w-full h-full object-cover" loading="lazy" />
                                     
@@ -619,7 +622,7 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
                                     {isSelected && style.id !== 'none' && (
                                         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-12 bg-primary/20 blur-2xl pointer-events-none" />
                                     )}
-                                </motion.button>
+                                </motion.div>
                             );
                         })}
                         
@@ -701,11 +704,21 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
   // We add a small 10% buffer per additional image for overhead.
   const totalEstimatedTime = useMemo(() => {
       const base = currentModelTelemetry.avgDuration;
-      const overhead = Math.max(0, (localSettings.imageCount - 1) * 0.5); // 0.5s overhead per extra image
-      return Math.max(1, base + overhead);
+      // Parallel overhead: 0.8s per extra image as network/processing overhead
+      const overhead = Math.max(0, (localSettings.imageCount - 1) * 0.8); 
+      return Math.max(2, base + overhead);
   }, [currentModelTelemetry.avgDuration, localSettings.imageCount]);
   
-  const remainingTime = Math.max(0, totalEstimatedTime - renderTime);
+  // Adaptive: if images are finishing faster, we nudge the timer
+  const adaptiveRemainingTime = useMemo(() => {
+      const baseRemaining = Math.max(0.1, totalEstimatedTime - renderTime);
+      if (batchTotal > 0 && pendingImages.size > 0) {
+          // Weight the remaining time by the percentage of images left
+          const ratioLeft = pendingImages.size / batchTotal;
+          return Math.max(0.1, baseRemaining * ratioLeft + (ratioLeft * 2));
+      }
+      return baseRemaining;
+  }, [totalEstimatedTime, renderTime, pendingImages.size, batchTotal]);
   
   const progressMotionValue = useMotionValue(0);
   useEffect(() => {
@@ -936,25 +949,25 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
 
     const promptWithStyles = `${basePrompt}${styleSuffix}${activeStyleObjects.length > 0 ? ', ultra detailed, 8k' : ''}`;
 
-    const newBatch: HistoryItem[] = [];
-    const pendingIds = new Set<string>();
     const now = Date.now();
 
     setBatchTotal(localSettings.imageCount);
-    setPendingImages(new Set()); // Clear previous batch just in case
+    setPendingImages(new Set()); 
 
+    // Prepare all items first to avoid UI flickering
+    const newBatch: HistoryItem[] = [];
+    const pendingIds = new Set<string>();
+    
     for (let i = 0; i < localSettings.imageCount; i++) {
-        const id = Date.now().toString() + i;
+        const id = crypto.randomUUID();
         const seed = localSettings.seed || getRandomSeed() + i;
         
-        // IMPORTANT: Safe=true as requested
         const params = { 
             prompt: promptWithStyles, 
             model: localSettings.model || 'flux', 
             width: targetWidth, 
             height: targetHeight, 
             seed, 
-            // We set enhance to false because we already enhanced it with our custom logic if it was enabled
             enhance: false, 
             nologo: true, 
             negative_prompt: localSettings.negativePrompt || SILENT_NEGATIVE, 
@@ -963,6 +976,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
             apiKey: globalSettings.apiKey 
         };
         
+        // generateImageUrl is async but returns immediately
         const imageUrl = await generateImageUrl(params);
         const item: HistoryItem = { 
             ...params, 
@@ -977,31 +991,14 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
         };
         newBatch.push(item);
         pendingIds.add(id);
-        onAddToHistory(item);
     }
     
+    // Update all at once to trigger parallel rendering of GenerationCards
     setPendingImages(pendingIds);
     setSessionImages(prev => [...prev, ...newBatch]);
-
-    // PERSIST TO SUPABASE IF LOGGED IN
-    if (accountState.user && supabase) {
-        const dbItems = newBatch.map(item => ({
-            user_id: accountState.user.id,
-            prompt: item.prompt,
-            url: item.url,
-            model: item.model,
-            width: item.width,
-            height: item.height,
-            seed: item.seed,
-            style_suffix: item.styleSuffix,
-            is_public: false
-        }));
-        
-        supabase.from('generations').insert(dbItems).then(({ error }) => {
-            if (error) addLog('error', 'Supabase Save Failed', error);
-            else addLog('info', 'Batch Synced to Cloud');
-        });
-    }
+    
+    // Add to history sequentially to maintain order
+    newBatch.forEach(item => onAddToHistory(item));
     
     setIsProcessing(false);
 
@@ -1128,7 +1125,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                                     <div className="flex items-center gap-2 text-white/80">
                                         <Clock size={12} className="opacity-40"/>
                                         <span className="text-[10px] font-mono font-black">
-                                            {isActuallyRendering ? `${remainingTime.toFixed(1)}s` : `${renderTime.toFixed(1)}s`}
+                                            {isActuallyRendering ? `${adaptiveRemainingTime.toFixed(1)}s` : `${renderTime.toFixed(1)}s`}
                                         </span>
                                     </div>
                                 </div>
@@ -1284,7 +1281,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                                       <textarea 
                                         value={sessionPrompt} 
                                         onChange={(e) => setSessionPrompt(e.target.value)} 
-                                        className={`w-full bg-transparent border-none text-white text-[15px] focus:ring-0 placeholder:text-white/10 min-h-[200px] max-h-[600px] resize-none p-0 leading-relaxed transition-all ${isEnhancing ? 'animate-pulse text-primary/60' : ''}`} 
+                                        className={`w-full bg-transparent border-none text-white text-[15px] focus:ring-0 placeholder:text-white/40 min-h-[200px] max-h-[600px] resize-none p-0 leading-relaxed transition-all ${isEnhancing ? 'animate-pulse text-primary/60' : ''}`} 
                                         placeholder="Architect your reality..." 
                                         autoFocus
                                       />
@@ -1293,7 +1290,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                                         value={sessionPrompt} 
                                         onChange={(e) => setSessionPrompt(e.target.value)} 
                                         onKeyDown={(e) => e.key === 'Enter' && handleGenerate()} 
-                                        className="w-full bg-transparent border-none text-white text-[14px] focus:ring-0 placeholder:text-white/10 h-6 p-0" 
+                                        className="w-full bg-transparent border-none text-white text-[14px] focus:ring-0 placeholder:text-white/40 h-6 p-0" 
                                         placeholder="Seed your imagination..." 
                                       />
                                   )}
@@ -1428,14 +1425,14 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex flex-col items-center justify-center p-4 sm:p-10"
+                className="fixed inset-0 z-[500] bg-black/95 backdrop-blur-xl flex flex-col items-center justify-center p-2 sm:p-6"
                 onClick={() => setSelectedImage(null)}
               >
                   <motion.div 
                     initial={{ scale: 0.9, y: 20 }}
                     animate={{ scale: 1, y: 0 }}
                     exit={{ scale: 0.9, y: 20 }}
-                    className="relative w-full max-w-5xl max-h-[90vh] rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10 flex flex-col bg-black"
+                    className="relative w-full max-w-[95vw] max-h-[95vh] rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10 flex flex-col bg-black"
                     onClick={(e) => e.stopPropagation()}
                     style={{ aspectRatio: selectedImage.width / selectedImage.height }}
                   >
