@@ -2,13 +2,18 @@ import React, { useState, useEffect, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppRoute, AppSettings, CustomStyle } from '../types';
 import { Header } from './Header';
-import { generateImageUrl, getRandomSeed, getEffectiveKey } from '../services/pollinations';
-import { Check, Wand2, Image as ImageIcon, Save, RefreshCw } from 'lucide-react';
+import { generateImageUrl, getRandomSeed } from '../services/pollinations';
+import { Check, Wand2, Image as ImageIcon, Save, RefreshCw, Star, Hash } from 'lucide-react';
+import { styleService } from '../services/styleService';
+import { AVAILABLE_MODELS } from '../types';
 
 interface CreateStyleProps {
   onNavigate: (route: AppRoute) => void;
   settings: AppSettings;
+  styles: CustomStyle[];
+  setStyles: React.Dispatch<React.SetStateAction<CustomStyle[]>>;
   updateSettings: (newSettings: Partial<AppSettings>) => void;
+  user: any;
 }
 
 const PREVIEW_SUBJECTS = [
@@ -18,12 +23,18 @@ const PREVIEW_SUBJECTS = [
     "A magical forest"
 ];
 
-export const CreateStyle: React.FC<CreateStyleProps> = memo(({ onNavigate, settings, updateSettings }) => {
+export const CreateStyle: React.FC<CreateStyleProps> = memo(({ onNavigate, settings, styles, setStyles, updateSettings, user }) => {
   const [name, setName] = useState('');
   const [suffix, setSuffix] = useState('');
+  const [selectedModel, setSelectedModel] = useState('flux');
+  const [isFeatured, setIsFeatured] = useState(false);
+  const [order, setOrder] = useState(0);
   const [coverImage, setCoverImage] = useState<string | null>(null);
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const isDeveloper = user?.email === 'herobakhshi@gmail.com';
   
   const handleGenerate = async () => {
     if (!suffix.trim()) return;
@@ -33,17 +44,16 @@ export const CreateStyle: React.FC<CreateStyleProps> = memo(({ onNavigate, setti
     
     // Generate 4 unique variations
     const promises = PREVIEW_SUBJECTS.map(async (subject, index) => {
-        // Use a semi-deterministic seed offset to ensure variety but consistency during generation batch
         const seed = getRandomSeed() + index; 
         const prompt = `${subject}${suffix}`;
         
         const url = await generateImageUrl({
             prompt,
-            model: 'zimage',
-            width: 512, // Slightly larger for better cover quality
+            model: selectedModel,
+            width: 512, 
             height: 768, 
             seed,
-            enhance: true, // Enable enhance for better style adherence
+            enhance: true, 
             nologo: true,
             safe: true,
             private: true,
@@ -71,25 +81,35 @@ export const CreateStyle: React.FC<CreateStyleProps> = memo(({ onNavigate, setti
     }
   };
 
-  const handleSave = () => {
-    if (!name || !suffix || !coverImage) return;
+  const handleSave = async () => {
+    if (!name || !suffix || !coverImage || isSaving || !user) return;
     
-    const newStyle: CustomStyle = {
-        id: `custom-${Date.now()}`,
-        label: name,
-        category: 'Custom',
-        suffix: suffix,
-        image: coverImage
-    };
-    
-    const currentCustoms = settings.customStyles || [];
-    updateSettings({ customStyles: [newStyle, ...currentCustoms] });
-    onNavigate(AppRoute.STYLE_LIBRARY);
+    setIsSaving(true);
+    try {
+        const newStyle = await styleService.addStyle({
+            label: name,
+            category: 'Custom',
+            suffix: suffix,
+            image: coverImage,
+            modelId: selectedModel,
+            isFeatured: isFeatured,
+            order: order
+        }, user.id);
+
+        if (newStyle) {
+            setStyles(prev => [newStyle, ...prev]);
+            onNavigate(AppRoute.STYLE_LIBRARY);
+        }
+    } catch (error) {
+        console.error("Failed to save style:", error);
+    } finally {
+        setIsSaving(false);
+    }
   };
 
   return (
     <motion.div 
-      className="flex flex-col h-full bg-background-dark w-full"
+      className="flex flex-col h-full bg-black w-full"
       initial={{ x: '100%' }}
       animate={{ x: 0 }}
       exit={{ x: '100%' }}
@@ -107,13 +127,19 @@ export const CreateStyle: React.FC<CreateStyleProps> = memo(({ onNavigate, setti
         <div className="flex-1 overflow-y-auto no-scrollbar p-6 space-y-8 pb-32">
             
             {/* Top Space: Cover Image Selection */}
-            <div className="w-full aspect-[2/3] md:aspect-[16/9] rounded-[2.5rem] bg-surface-dark border border-white/10 overflow-hidden relative group shadow-2xl flex items-center justify-center">
+            <div className={`w-full aspect-[2/3] md:aspect-[16/9] rounded-[2.5rem] bg-white/5 backdrop-blur-xl border overflow-hidden relative group shadow-2xl flex items-center justify-center transition-all ${isFeatured ? 'border-yellow-400 ring-2 ring-yellow-400/20' : 'border-white/10'}`}>
                 {coverImage ? (
                     <img src={coverImage} alt="Cover" className="w-full h-full object-cover animate-in fade-in duration-500" />
                 ) : (
                     <div className="flex flex-col items-center gap-4 text-white/20">
                         <ImageIcon size={48} strokeWidth={1} />
                         <span className="text-xs font-black uppercase tracking-widest">No Cover Selected</span>
+                    </div>
+                )}
+                {isFeatured && (
+                    <div className="absolute top-6 left-6 z-10 bg-yellow-400 text-black px-3 py-1 rounded-full flex items-center gap-1.5 shadow-lg">
+                        <Star size={12} fill="currentColor" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Featured</span>
                     </div>
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
@@ -163,7 +189,7 @@ export const CreateStyle: React.FC<CreateStyleProps> = memo(({ onNavigate, setti
             </div>
 
             {/* Bottom Inputs */}
-            <div className="glass-panel p-6 rounded-[2rem] space-y-6">
+            <div className="bg-white/5 backdrop-blur-xl p-6 rounded-[2rem] border border-white/10 space-y-6">
                 <div className="space-y-2">
                     <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-2">Style Identity</label>
                     <input 
@@ -183,6 +209,42 @@ export const CreateStyle: React.FC<CreateStyleProps> = memo(({ onNavigate, setti
                         className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white placeholder:text-white/20 focus:ring-1 focus:ring-primary/50 min-h-[100px] text-sm leading-relaxed resize-none"
                     />
                 </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-2">Target Model</label>
+                        <select 
+                            value={selectedModel}
+                            onChange={(e) => setSelectedModel(e.target.value)}
+                            className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white text-sm font-bold appearance-none focus:ring-1 focus:ring-primary/50"
+                        >
+                            {AVAILABLE_MODELS.map(m => (
+                                <option key={m.id} value={m.id} className="bg-black">{m.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    {isDeveloper && (
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-2">Priority Order</label>
+                            <input 
+                                type="number"
+                                value={order}
+                                onChange={(e) => setOrder(parseInt(e.target.value))}
+                                className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white text-sm font-bold focus:ring-1 focus:ring-primary/50"
+                            />
+                        </div>
+                    )}
+                </div>
+
+                {isDeveloper && (
+                    <button 
+                        onClick={() => setIsFeatured(!isFeatured)}
+                        className={`w-full h-14 rounded-2xl border transition-all flex items-center justify-center gap-3 font-black uppercase tracking-widest text-[10px] ${isFeatured ? 'bg-yellow-400/10 border-yellow-400 text-yellow-400 shadow-glow' : 'bg-white/5 border-white/10 text-white/40 hover:text-white hover:border-white/30'}`}
+                    >
+                        <Star size={16} fill={isFeatured ? 'currentColor' : 'none'} />
+                        {isFeatured ? 'Featured Style Active' : 'Mark as Featured'}
+                    </button>
+                )}
 
                 <div className="pt-2 flex gap-4">
                      <button 

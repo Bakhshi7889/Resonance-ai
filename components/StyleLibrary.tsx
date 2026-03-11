@@ -1,13 +1,16 @@
 
 import React, { useState, memo, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AppRoute, MODEL_STYLES, AppSettings, CustomStyle } from '../types';
+import { AppRoute, AppSettings, CustomStyle } from '../types';
 import { Header } from './Header';
-import { Trash2, Eye, EyeOff, Check, Heart, ChevronUp, ChevronDown } from 'lucide-react';
+import { Trash2, Eye, EyeOff, Check, Heart, ChevronUp, ChevronDown, Star } from 'lucide-react';
+import { styleService } from '../services/styleService';
 
 interface StyleLibraryProps {
   onNavigate: (route: AppRoute) => void;
   settings: AppSettings;
+  styles: CustomStyle[];
+  setStyles: React.Dispatch<React.SetStateAction<CustomStyle[]>>;
   updateSettings: (newSettings: Partial<AppSettings>) => void;
 }
 
@@ -25,7 +28,7 @@ const StyleCard = memo(({
     isFirst,
     isLast
 }: {
-    style: { id: string, label: string, category: string, image: string, suffix: string },
+    style: CustomStyle,
     onToggleVisibility: (id: string) => void,
     onToggleFavorite: (id: string) => void,
     onMove: (id: string, direction: -1 | 1) => void,
@@ -45,8 +48,9 @@ const StyleCard = memo(({
             exit={{ opacity: 0, scale: 0.9 }}
             whileHover={{ y: -5 }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className={`bg-surface-dark rounded-3xl border overflow-hidden group relative flex flex-col will-change-transform ${
+            className={`bg-surface-dark/80 backdrop-blur-xl rounded-3xl border overflow-hidden group relative flex flex-col transition-all duration-500 will-change-transform ${
                 isActive ? 'border-primary shadow-[0_0_20px_rgba(59,130,246,0.3)]' : 
+                style.isFeatured ? 'golden-outline' :
                 isHidden ? 'border-red-500/20 opacity-50 grayscale' : 
                 'border-white/5 hover:border-white/20 hover:shadow-2xl'
             }`}
@@ -60,9 +64,19 @@ const StyleCard = memo(({
                     loading="lazy"
                 />
                 
+                {/* Featured Badge */}
+                {style.isFeatured && (
+                    <div className="absolute top-3 left-3 z-10 pointer-events-none">
+                         <div className="featured-badge flex items-center gap-1">
+                            <Star size={10} fill="currentColor" />
+                            Featured
+                         </div>
+                    </div>
+                )}
+
                 {/* Active Badge */}
                 {isActive && (
-                    <div className="absolute top-3 left-3 z-10 pointer-events-none">
+                    <div className={`absolute z-10 pointer-events-none ${style.isFeatured ? 'top-10 left-3' : 'top-3 left-3'}`}>
                          <div className="bg-primary/90 backdrop-blur-md px-2.5 py-1 rounded-lg shadow-lg flex items-center gap-1.5 border border-white/20">
                             <Check size={10} className="text-white stroke-[4]" />
                             <span className="text-[9px] font-black text-white uppercase tracking-wider">Active</span>
@@ -150,7 +164,7 @@ const StyleCard = memo(({
     );
 });
 
-export const StyleLibrary: React.FC<StyleLibraryProps> = memo(({ onNavigate, settings, updateSettings }) => {
+export const StyleLibrary: React.FC<StyleLibraryProps> = memo(({ onNavigate, settings, styles, setStyles, updateSettings }) => {
   const toggleVisibility = useCallback((styleId: string) => {
       const currentHidden = settings.hiddenStyleIds || [];
       let newHidden;
@@ -187,33 +201,37 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = memo(({ onNavigate, set
       updateSettings({ favoriteStyleIds: newFavs });
   }, [settings.favoriteStyleIds, updateSettings]);
 
-  const handleDeleteCustom = useCallback((styleId: string) => {
-      const currentCustoms = settings.customStyles || [];
-      const newCustoms = currentCustoms.filter(s => s.id !== styleId);
-      updateSettings({ customStyles: newCustoms });
-      
-      // Cleanup
-      if (settings.activeStyles.includes(styleId)) {
-           const newActive = settings.activeStyles.filter(s => s !== styleId);
-           updateSettings({ activeStyles: newActive.length ? newActive : ['none'] });
+  const handleDeleteCustom = useCallback(async (styleId: string) => {
+      try {
+          const success = await styleService.deleteStyle(styleId);
+          if (success) {
+              setStyles(prev => prev.filter(s => s.id !== styleId));
+              
+              // Cleanup settings
+              if (settings.activeStyles.includes(styleId)) {
+                   const newActive = settings.activeStyles.filter(s => s !== styleId);
+                   updateSettings({ activeStyles: newActive.length ? newActive : ['none'] });
+              }
+              if (settings.hiddenStyleIds.includes(styleId)) {
+                  const newHidden = settings.hiddenStyleIds.filter(id => id !== styleId);
+                  updateSettings({ hiddenStyleIds: newHidden });
+              }
+              if ((settings.favoriteStyleIds || []).includes(styleId)) {
+                  const newFavs = (settings.favoriteStyleIds || []).filter(id => id !== styleId);
+                  updateSettings({ favoriteStyleIds: newFavs });
+              }
+              if ((settings.styleOrder || []).includes(styleId)) {
+                  const newOrder = (settings.styleOrder || []).filter(id => id !== styleId);
+                  updateSettings({ styleOrder: newOrder });
+              }
+          }
+      } catch (error) {
+          console.error("Failed to delete style:", error);
       }
-      if (settings.hiddenStyleIds.includes(styleId)) {
-          const newHidden = settings.hiddenStyleIds.filter(id => id !== styleId);
-          updateSettings({ hiddenStyleIds: newHidden });
-      }
-      if ((settings.favoriteStyleIds || []).includes(styleId)) {
-          const newFavs = (settings.favoriteStyleIds || []).filter(id => id !== styleId);
-          updateSettings({ favoriteStyleIds: newFavs });
-      }
-      if ((settings.styleOrder || []).includes(styleId)) {
-          const newOrder = (settings.styleOrder || []).filter(id => id !== styleId);
-          updateSettings({ styleOrder: newOrder });
-      }
-
-  }, [settings, updateSettings]);
+  }, [settings, updateSettings, setStyles]);
 
   const moveStyle = useCallback((styleId: string, direction: -1 | 1) => {
-      const all = [...MODEL_STYLES, ...(settings.customStyles || [])];
+      const all = styles;
       // Get current effective order or default if empty
       let currentOrder = [...(settings.styleOrder && settings.styleOrder.length > 0 ? settings.styleOrder : all.map(s => s.id))];
       
@@ -233,11 +251,11 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = memo(({ onNavigate, set
       currentOrder[index] = temp;
 
       updateSettings({ styleOrder: currentOrder });
-  }, [settings.styleOrder, settings.customStyles, updateSettings]);
+  }, [settings.styleOrder, styles, updateSettings]);
 
   // MANUAL SORTING: Use styleOrder as the source of truth
   const sortedStyles = useMemo(() => {
-      const all = [...MODEL_STYLES, ...(settings.customStyles || [])];
+      const all = [...styles];
       
       // If no custom order, return default
       if (!settings.styleOrder || settings.styleOrder.length === 0) return all;
@@ -253,7 +271,7 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = memo(({ onNavigate, set
 
           return idxA - idxB;
       });
-  }, [settings.customStyles, settings.styleOrder]);
+  }, [styles, settings.styleOrder]);
 
   const hiddenCount = (settings.hiddenStyleIds || []).length;
   const favCount = (settings.favoriteStyleIds || []).length;
@@ -301,7 +319,6 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = memo(({ onNavigate, set
             <motion.div layout className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 pb-24">
                 <AnimatePresence>
                     {sortedStyles.map((style, index) => {
-                        const isCustom = (settings.customStyles || []).some(s => s.id === style.id);
                         const isActive = settings.activeStyles.includes(style.id);
                         const isFavorite = (settings.favoriteStyleIds || []).includes(style.id);
                         return (
@@ -311,9 +328,9 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = memo(({ onNavigate, set
                                 onToggleVisibility={toggleVisibility}
                                 onToggleFavorite={toggleFavorite}
                                 onMove={moveStyle}
-                                onDelete={isCustom ? handleDeleteCustom : undefined}
+                                onDelete={handleDeleteCustom}
                                 isHidden={(settings.hiddenStyleIds || []).includes(style.id)}
-                                isCustom={isCustom}
+                                isCustom={true} // Now all styles are custom/database-driven
                                 isActive={isActive}
                                 isFavorite={isFavorite}
                                 isFirst={index === 0}

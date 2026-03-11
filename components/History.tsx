@@ -326,7 +326,7 @@ export const History: React.FC<HistoryProps> = memo(({ history, onNavigate, onRe
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: 20 }}
                             onClick={(e) => e.stopPropagation()}
-                            className="absolute bottom-40 left-6 right-6 z-30 glass-panel p-6 rounded-[2rem] border border-white/10 space-y-4"
+                            className="absolute bottom-40 left-6 right-6 z-30 glass-panel backdrop-blur-2xl p-6 rounded-[2rem] border border-white/10 space-y-4"
                         >
                             <div className="space-y-1">
                                 <p className="text-[10px] text-white/30 uppercase font-black tracking-widest">Vision Data</p>

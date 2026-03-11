@@ -5,12 +5,13 @@ import { History } from './components/History';
 import { Preferences } from './components/Preferences';
 import { StyleLibrary } from './components/StyleLibrary';
 import { CreateStyle } from './components/CreateStyle';
-import { CreatePreset } from './components/CreatePreset';
 import { CommunityFeed } from './components/CommunityFeed';
 import { Leaderboard } from './components/Leaderboard';
-import { AppSettings, AppRoute, HistoryItem, MODEL_STYLES } from './types';
+import { Messages } from './components/Messages';
+import { AppSettings, AppRoute, HistoryItem, CustomStyle } from './types';
 import { supabase } from './services/supabase';
 import { storage } from './services/storage';
+import { styleService } from './services/styleService';
 
 const STORAGE_KEY_SETTINGS = 'resonance_v4_settings';
 const STORAGE_KEY_HISTORY = 'resonance_v4_history';
@@ -21,15 +22,14 @@ const DEFAULT_SETTINGS: AppSettings = {
   model: 'flux',
   width: 1536,
   height: 1536,
-  enhance: true,
+  enhance: false,
   privateMode: true,
   negativePrompt: '',
   imageCount: 1,
   activeStyles: ['none'],
   hiddenStyleIds: [],
   favoriteStyleIds: [],
-  styleOrder: MODEL_STYLES.map(s => s.id), // Initialize with default order
-  customStyles: [], 
+  styleOrder: [], 
   apiKey: 'sk_fH3vuxg5ULiDIzbVK7y6ejUg4eK1f0VF',
   quality: 'hd',
   infiniteMode: false,
@@ -44,6 +44,7 @@ const App: React.FC = () => {
   const [isStorageLoaded, setIsStorageLoaded] = useState(false);
   
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [styles, setStyles] = useState<CustomStyle[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [sessionPrompt, setSessionPrompt] = useState('');
   const [sessionImages, setSessionImages] = useState<HistoryItem[]>([]);
@@ -52,6 +53,10 @@ const App: React.FC = () => {
   useEffect(() => {
     const loadStorage = async () => {
       try {
+        // Fetch dynamic styles first
+        const fetchedStyles = await styleService.getStyles();
+        setStyles(fetchedStyles);
+
         // 1. Try IndexedDB first
         let storedSettings = await storage.get<AppSettings>(STORAGE_KEY_SETTINGS);
         let storedHistory = await storage.get<HistoryItem[]>(STORAGE_KEY_HISTORY);
@@ -97,7 +102,7 @@ const App: React.FC = () => {
         // 3. Apply settings with defaults/migrations
         if (storedSettings) {
           if (!storedSettings.styleOrder || storedSettings.styleOrder.length === 0) {
-            storedSettings.styleOrder = MODEL_STYLES.map(s => s.id);
+            storedSettings.styleOrder = fetchedStyles.map(s => s.id);
           }
           if (!storedSettings.apiKey || storedSettings.apiKey.trim() === '') {
             storedSettings.apiKey = 'sk_fH3vuxg5ULiDIzbVK7y6ejUg4eK1f0VF';
@@ -263,6 +268,7 @@ const App: React.FC = () => {
           <ImageGenerator 
             key="generator"
             settings={settings} 
+            styles={styles}
             updateSettings={handleUpdateSettings}
             onNavigate={setCurrentRoute}
             onAddToHistory={handleAddToHistory}
@@ -302,6 +308,8 @@ const App: React.FC = () => {
           <StyleLibrary
             key="style-library"
             settings={settings}
+            styles={styles}
+            setStyles={setStyles}
             updateSettings={handleUpdateSettings}
             onNavigate={setCurrentRoute}
           />
@@ -311,15 +319,11 @@ const App: React.FC = () => {
             <CreateStyle 
                 key="create-style"
                 settings={settings}
+                styles={styles}
+                setStyles={setStyles}
                 updateSettings={handleUpdateSettings}
                 onNavigate={setCurrentRoute}
-            />
-        );
-      case AppRoute.CREATE_PRESET:
-        return (
-            <CreatePreset 
-                key="create-preset"
-                onNavigate={setCurrentRoute}
+                user={user}
             />
         );
       case AppRoute.COMMUNITY:
@@ -335,6 +339,14 @@ const App: React.FC = () => {
             <Leaderboard 
                 key="leaderboard"
                 onNavigate={setCurrentRoute}
+            />
+        );
+      case AppRoute.MESSAGES:
+        return (
+            <Messages 
+                key="messages"
+                onNavigate={setCurrentRoute}
+                user={user}
             />
         );
       default:

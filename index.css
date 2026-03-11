@@ -39,18 +39,15 @@
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   
   .glass-panel {
-    @apply bg-white/10 backdrop-blur-[40px] border-[0.5px] border-white/20 shadow-liquid;
-    -webkit-backdrop-filter: blur(40px);
+    @apply bg-white/10 backdrop-blur-xl border-[0.5px] border-white/20 shadow-liquid;
   }
   
   .glass-card {
-    @apply bg-white/15 backdrop-blur-[60px] border-[0.5px] border-white/30 shadow-glow rounded-[2.5rem];
-    -webkit-backdrop-filter: blur(60px);
+    @apply bg-white/15 backdrop-blur-2xl border-[0.5px] border-white/30 shadow-glow rounded-[2.5rem];
   }
   
   .glass-pill {
-    @apply bg-white/[0.15] backdrop-blur-[24px] border-[0.5px] border-white/20 rounded-full px-4 py-2;
-    -webkit-backdrop-filter: blur(24px);
+    @apply bg-white/[0.15] backdrop-blur-md border-[0.5px] border-white/20 rounded-full px-4 py-2;
   }
   
   .liquid-text {
@@ -67,6 +64,15 @@
   .logo-text {
     @apply tracking-[-0.05em];
     text-shadow: 0 0 40px rgba(59, 130, 246, 0.3);
+  }
+
+  .golden-outline {
+    @apply border-yellow-500/60 shadow-[0_0_25px_rgba(234,179,8,0.3)];
+    background: linear-gradient(to bottom right, rgba(234,179,8,0.05), transparent);
+  }
+
+  .featured-badge {
+    @apply bg-gradient-to-r from-yellow-600 to-yellow-400 text-black text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(234,179,8,0.4)];
   }
 }
 

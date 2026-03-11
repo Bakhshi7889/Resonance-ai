@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DownloadCloud, Smartphone, Share, PlusSquare, ArrowLeft, ExternalLink, RefreshCw, Layers, Download, PlusCircle, Trash2, Wand2, Terminal, Copy, Globe, Trophy, Github, Mail, LogIn, LogOut, User, MessageSquare, Check } from 'lucide-react';
-import { AppSettings, AppRoute, AccountState } from '../types';
+import { DownloadCloud, Smartphone, Share, PlusSquare, ArrowLeft, ExternalLink, RefreshCw, Layers, Download, PlusCircle, Trash2, Wand2, Terminal, Copy, Globe, Trophy, Github, Mail, LogIn, LogOut, User, MessageSquare, Check, Send, Inbox } from 'lucide-react';
+import { AppSettings, AppRoute, AccountState, DirectMessage } from '../types';
 import { getAccountDetails, getEstimatedImagesLeft, getAuthUrl } from '../services/pollinations';
 import { getLogs, clearLogs, LogEntry } from '../services/logger';
 import { supabase } from '../services/supabase';
+import { messageService } from '../services/messageService';
 
 interface PreferencesProps {
   settings: AppSettings;
@@ -24,6 +25,14 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
   const [isAccountExpanded, setIsAccountExpanded] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+  
+  // Messaging state
+  const [messageContent, setMessageContent] = useState('');
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [messageSent, setMessageSent] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const isDeveloper = accountState.user?.email === 'herobakhshi@gmail.com';
 
   const fetchDetails = useCallback(async () => {
     setAccountState(prev => ({ ...prev, isLoading: true }));
@@ -38,6 +47,19 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
           setShowLogs(true);
       }
   }, []);
+
+  const fetchUnreadCount = useCallback(async () => {
+    if (!isDeveloper) return;
+    try {
+        const { count, error } = await supabase
+            .from('messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('is_read', false);
+        if (!error) setUnreadCount(count || 0);
+    } catch (e) {
+        console.error("Failed to fetch unread count", e);
+    }
+  }, [isDeveloper]);
 
   useEffect(() => {
     fetchDetails();
@@ -54,9 +76,34 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
     }
   }, [fetchDetails, refreshLogs]);
 
+  useEffect(() => {
+    if (isDeveloper) {
+        fetchUnreadCount();
+    }
+  }, [isDeveloper, fetchUnreadCount]);
+
+  const handleSendMessage = async () => {
+    if (!messageContent.trim() || !accountState.user) return;
+    setIsSendingMessage(true);
+    try {
+        await messageService.sendMessage(
+            accountState.user.id,
+            accountState.user.email,
+            messageContent
+        );
+        setMessageSent(true);
+        setMessageContent('');
+        setTimeout(() => setMessageSent(false), 3000);
+    } catch (error) {
+        console.error("Failed to send message:", error);
+        alert("Failed to transmit message. Neural link unstable.");
+    } finally {
+        setIsSendingMessage(false);
+    }
+  };
+
   const getRedirectUrl = () => {
-      const envUrl = (import.meta as any).env.VITE_APP_URL;
-      if (envUrl) return envUrl;
+      // Prefer window.location.origin for dynamic redirects (works on Netlify, etc.)
       return window.location.origin;
   };
 
@@ -450,21 +497,7 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
             <p className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-2">Platform Matrix</p>
             <div className="bg-white/[0.03] backdrop-blur-[40px] rounded-[2.5rem] p-6 border-[0.5px] border-white/12 space-y-4">
                 
-                <div className="flex items-center justify-between px-2 pb-4 border-b border-white/5">
-                    <div className="flex flex-col">
-                        <span className="text-sm font-bold text-white">Generation Preset</span>
-                        <span className="text-[9px] text-white/30 uppercase font-black tracking-widest">Save Config Matrix</span>
-                    </div>
-                    <button 
-                        onClick={() => onNavigate(AppRoute.CREATE_PRESET)}
-                        className="text-[10px] font-black text-white uppercase tracking-widest bg-white/10 px-4 py-2 rounded-xl border border-white/20 flex items-center gap-2 hover:bg-white/20 transition-all active:scale-95"
-                    >
-                        <PlusSquare size={12} />
-                        New
-                    </button>
-                </div>
-
-                <div className="flex items-center justify-between px-2 pb-4 border-b border-white/5">
+                <div className="flex items-center justify-between px-2">
                     <div className="flex flex-col">
                         <span className="text-sm font-bold text-white">Custom Style</span>
                         <span className="text-[9px] text-white/30 uppercase font-black tracking-widest">Create & Define</span>
@@ -475,20 +508,6 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
                     >
                         <Wand2 size={12} />
                         Create
-                    </button>
-                </div>
-
-                <div className="flex items-center justify-between px-2">
-                    <div className="flex flex-col">
-                        <span className="text-sm font-bold text-white">Style Studio</span>
-                        <span className="text-[9px] text-white/30 uppercase font-black tracking-widest">Manage Presets</span>
-                    </div>
-                    <button 
-                        onClick={() => onNavigate(AppRoute.STYLE_LIBRARY)}
-                        className="text-[10px] font-black text-primary uppercase tracking-widest bg-primary/10 px-4 py-2 rounded-xl border border-primary/20 flex items-center gap-2 hover:bg-primary/20 transition-all active:scale-95"
-                    >
-                        <Layers size={12} />
-                        Open
                     </button>
                 </div>
             </div>
@@ -554,13 +573,66 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
         {/* Contact Developer Section */}
         <section className="space-y-4 pb-12 will-change-transform">
             <p className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-2">Neural Support</p>
-            <div className="bg-white/[0.03] backdrop-blur-[40px] rounded-[2.5rem] p-8 border-[0.5px] border-white/12 space-y-6">
+            <div className="bg-white/[0.03] backdrop-blur-[40px] rounded-[2.5rem] p-8 border-[0.5px] border-white/12 space-y-8">
                 <div className="flex flex-col gap-1">
-                    <h4 className="text-sm font-bold text-white">Contact Developer</h4>
+                    <h4 className="text-sm font-bold text-white">Direct Transmission</h4>
                     <p className="text-[10px] text-white/30 uppercase font-black tracking-widest leading-relaxed">Advice, suggestions, and bug reports.</p>
                 </div>
                 
-                <div className="grid grid-cols-1 gap-3">
+                {/* Direct Message Form */}
+                <div className="space-y-4">
+                    <div className="relative">
+                        <textarea 
+                            value={messageContent}
+                            onChange={(e) => setMessageContent(e.target.value)}
+                            placeholder={accountState.user ? "Type your message to the developer..." : "Please login to send messages"}
+                            disabled={!accountState.user || isSendingMessage}
+                            className="w-full bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:ring-1 focus:ring-primary/40 transition-all placeholder:text-white/10 min-h-[120px] resize-none"
+                        />
+                        <button 
+                            onClick={handleSendMessage}
+                            disabled={!messageContent.trim() || isSendingMessage || !accountState.user}
+                            className={`absolute bottom-4 right-4 size-10 rounded-xl flex items-center justify-center transition-all ${messageContent.trim() && !isSendingMessage ? 'bg-primary text-white shadow-glow' : 'bg-white/5 text-white/20'}`}
+                        >
+                            {isSendingMessage ? <RefreshCw size={16} className="animate-spin" /> : <Send size={16} />}
+                        </button>
+                    </div>
+                    {messageSent && (
+                        <motion.div 
+                            initial={{ opacity: 0, y: 5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="text-[10px] font-black text-emerald-400 uppercase tracking-widest text-center"
+                        >
+                            Message Transmitted Successfully
+                        </motion.div>
+                    )}
+                </div>
+
+                {isDeveloper && (
+                    <div className="pt-6 border-t border-white/5">
+                        <button 
+                            onClick={() => onNavigate(AppRoute.MESSAGES)}
+                            className="w-full h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between px-6 hover:bg-white/10 transition-all group"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                                    <Inbox size={18} />
+                                </div>
+                                <div className="flex flex-col items-start">
+                                    <span className="text-xs font-bold text-white">Incoming Transmissions</span>
+                                    <span className="text-[8px] text-white/30 uppercase font-black tracking-widest">Developer Inbox</span>
+                                </div>
+                            </div>
+                            {unreadCount > 0 && (
+                                <div className="bg-primary text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-glow">
+                                    {unreadCount}
+                                </div>
+                            )}
+                        </button>
+                    </div>
+                )}
+                
+                <div className="grid grid-cols-1 gap-3 pt-4">
                     <a href="mailto:nexacoreofficial@gmail.com" className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all group">
                         <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
                             <Mail size={18} />

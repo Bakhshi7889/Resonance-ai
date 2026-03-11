@@ -73,7 +73,7 @@ export const Leaderboard: React.FC<{ onNavigate: (route: AppRoute) => void }> = 
     return (
         <div className="min-h-screen bg-black text-white pb-20">
             {/* Header */}
-            <div className="fixed top-0 left-0 right-0 z-50 glass-panel border-b border-white/5 px-6 py-6 flex items-center justify-between">
+            <div className="fixed top-0 left-0 right-0 z-50 glass-panel backdrop-blur-xl border-b border-white/5 px-6 py-6 flex items-center justify-between">
                 <button 
                     onClick={() => onNavigate(AppRoute.PREFERENCES)}
                     className="size-10 rounded-full bg-white/5 flex items-center justify-center text-white/60 active:scale-90 transition-all"

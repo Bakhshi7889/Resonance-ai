@@ -7,7 +7,7 @@ import {
     Sparkles, Loader2, Camera, Plus, X, LogIn, LogOut, User, Globe, Download, Share2
 } from 'lucide-react';
 import { generateImageUrl, getRandomSeed, getAccountDetails, getEstimatedImagesLeft, getEffectiveKey } from '../services/pollinations';
-import { AppRoute, AppSettings, HistoryItem, MODEL_STYLES, ASPECT_RATIOS, AccountState, AVAILABLE_MODELS } from '../types';
+import { AppRoute, AppSettings, HistoryItem, ASPECT_RATIOS, AccountState, AVAILABLE_MODELS, CustomStyle } from '../types';
 import { addLog } from '../services/logger';
 import { enhancePrompt } from '../services/ai';
 import { supabase } from '../services/supabase';
@@ -66,6 +66,7 @@ const RatioIcon = ({ width, height, isSelected }: { width: number, height: numbe
 
 interface ImageGeneratorProps {
   settings: AppSettings;
+  styles: CustomStyle[];
   onNavigate: (route: AppRoute) => void;
   onAddToHistory: (item: HistoryItem) => void;
   updateSettings?: (s: Partial<AppSettings>) => void;
@@ -82,7 +83,7 @@ const PromptHeader = memo(({ prompt, onClearBatch, batchId }: { prompt: string, 
             <div className="flex items-center gap-3">
                 <div 
                     onClick={() => setIsExpanded(!isExpanded)}
-                    className="flex-1 flex items-center gap-3 px-6 py-4 rounded-[1.8rem] glass-panel cursor-pointer hover:bg-white/5 transition-all overflow-hidden shadow-sm"
+                    className="flex-1 flex items-center gap-3 px-6 py-4 rounded-[1.8rem] glass-panel backdrop-blur-xl cursor-pointer hover:bg-white/5 transition-all overflow-hidden shadow-sm"
                 >
                     <Camera size={14} className="text-primary shrink-0" />
                     <p className={`text-xs font-medium text-white/70 tracking-tight leading-relaxed ${isExpanded ? '' : 'truncate'}`}>
@@ -418,8 +419,8 @@ const NeuralMesh = memo(({ meshData, visibleStylesCount }: { meshData: any, visi
     );
 });
 
-const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }: { 
-    localSettings: AppSettings, updateLocalSetting: (k: keyof AppSettings, v: any) => void, setAspectRatio: (w: number, h: number) => void
+const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, styles }: { 
+    localSettings: AppSettings, updateLocalSetting: (k: keyof AppSettings, v: any) => void, setAspectRatio: (w: number, h: number) => void, styles: CustomStyle[]
 }) => {
     // Get effective key for previews
     const effectiveKey = useMemo(() => getEffectiveKey(localSettings.apiKey), [localSettings.apiKey]);
@@ -444,8 +445,8 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
 
     // MERGE BUILT-IN AND CUSTOM STYLES
     const allStyles = useMemo(() => {
-        return [...MODEL_STYLES, ...(localSettings.customStyles || [])];
-    }, [localSettings.customStyles]);
+        return styles;
+    }, [styles]);
 
     // FILTER, SORT, AND GROUP STYLES
     const visibleStyles = useMemo(() => {
@@ -512,12 +513,15 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
     return (
         <div className="px-5 py-6 flex flex-col gap-6 overflow-y-auto no-scrollbar max-h-[60vh] pb-24">
             <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => updateLocalSetting('enhance', !localSettings.enhance)} className={`relative h-12 rounded-2xl flex items-center justify-center gap-2 transition-all border ${localSettings.enhance ? 'bg-primary/20 border-primary/40 text-primary shadow-glow' : 'bg-white/5 border-transparent text-white/20'}`}>
+                <button onClick={() => updateLocalSetting('enhance', !localSettings.enhance)} className={`relative h-12 rounded-2xl flex items-center justify-center gap-2 transition-all border backdrop-blur-md ${localSettings.enhance ? 'bg-primary/20 border-primary/40 text-primary shadow-glow' : 'bg-white/5 border-transparent text-white/20'}`}>
                     <Wand2 size={14} />
                     <span className="text-[9px] font-black uppercase tracking-widest">Neural {localSettings.enhance ? 'ON' : 'OFF'}</span>
                     <span className="absolute -top-1 -right-1 bg-black/80 text-[7px] px-1.5 py-0.5 rounded-full border border-white/10 font-bold text-white/40">+~3s</span>
+                    <div className="absolute -bottom-6 left-0 right-0 text-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        <p className="text-[6px] text-white/20 uppercase font-black tracking-tighter">AI Prompt Expansion</p>
+                    </div>
                 </button>
-                <button onClick={() => updateLocalSetting('visualSafety', !localSettings.visualSafety)} className={`h-12 rounded-2xl flex items-center justify-center gap-2 transition-all border ${localSettings.visualSafety ? 'bg-blue-500/20 border-blue-500/40 text-blue-400 shadow-glow' : 'bg-white/5 border-transparent text-white/20'}`}>
+                <button onClick={() => updateLocalSetting('visualSafety', !localSettings.visualSafety)} className={`h-12 rounded-2xl flex items-center justify-center gap-2 transition-all border backdrop-blur-md ${localSettings.visualSafety ? 'bg-blue-500/20 border-blue-500/40 text-blue-400 shadow-glow' : 'bg-white/5 border-transparent text-white/20'}`}>
                     <ShieldCheck size={14} />
                     <span className="text-[9px] font-black uppercase tracking-widest">Audit {localSettings.visualSafety ? 'ON' : 'OFF'}</span>
                 </button>
@@ -525,7 +529,7 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
 
             <div className="space-y-3">
                 <p className="text-[8px] text-white/40 font-black uppercase tracking-[0.2em] pl-1">Aspect Geometry</p>
-                <div className="grid grid-cols-5 gap-1.5 bg-white/10 p-1.5 rounded-2xl border border-white/10">
+                <div className="grid grid-cols-5 gap-1.5 bg-white/10 backdrop-blur-md p-1.5 rounded-2xl border border-white/10">
                     {ASPECT_RATIOS.map(ratio => {
                         const isSelected = localSettings.width === ratio.width && localSettings.height === ratio.height;
                         return (
@@ -540,7 +544,7 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
 
             <div className="space-y-3">
                 <p className="text-[8px] text-white/40 font-black uppercase tracking-[0.2em] pl-1">Batch Capacity</p>
-                <div className="grid grid-cols-4 gap-1.5 bg-white/10 p-1.5 rounded-2xl border border-white/10">
+                <div className="grid grid-cols-4 gap-1.5 bg-white/10 backdrop-blur-md p-1.5 rounded-2xl border border-white/10">
                     {[1, 2, 4, 8].map(n => (
                         <button key={n} onClick={() => updateLocalSetting('imageCount', n)} className={`h-12 rounded-xl text-[9px] font-black transition-all ${localSettings.imageCount === n ? 'bg-primary text-white shadow-glow' : 'text-white/30 hover:text-white/50'}`}>{n}x</button>
                     ))}
@@ -549,7 +553,7 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
 
             <div className="space-y-3">
                 <p className="text-[8px] text-white/40 font-black uppercase tracking-[0.2em] pl-1">Neural Model</p>
-                <div className="grid grid-cols-3 gap-2 bg-white/10 p-1.5 rounded-2xl border border-white/10">
+                <div className="grid grid-cols-3 gap-2 bg-white/10 backdrop-blur-md p-1.5 rounded-2xl border border-white/10">
                     {AVAILABLE_MODELS.map(m => (
                         <button 
                             key={m.id} 
@@ -675,7 +679,7 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio }
 });
 
 export const ImageGenerator: React.FC<ImageGeneratorProps> = ({ 
-    settings: globalSettings, onNavigate, onAddToHistory, updateSettings, sessionPrompt, setSessionPrompt, sessionImages, setSessionImages
+    settings: globalSettings, styles, onNavigate, onAddToHistory, updateSettings, sessionPrompt, setSessionPrompt, sessionImages, setSessionImages
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [localSettings, setLocalSettings] = useState({ ...globalSettings });
@@ -812,7 +816,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
   }, [globalSettings.apiKey]);
 
   useEffect(() => {
-      // fetchAccount(); // Removed to avoid checking on mount
+      fetchAccount();
   }, [fetchAccount]);
 
   useEffect(() => {
@@ -928,7 +932,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
     }
 
     // MERGE BUILT-IN AND CUSTOM STYLES
-    const allStyles = [...MODEL_STYLES, ...(localSettings.customStyles || [])];
+    const allStyles = styles;
     const activeStyleObjects = allStyles.filter(s => localSettings.activeStyles.includes(s.id) && s.id !== 'none');
     
     const styleSuffix = activeStyleObjects.map(s => s.suffix).join('');
@@ -1275,13 +1279,13 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                           )}
 
                           {/* Prompt Input Area */}
-                          <div className={`flex-1 bg-white/[0.03] rounded-2xl border border-white/5 flex transition-all focus-within:border-primary/30 focus-within:bg-white/[0.05] ${isInputExpanded ? 'p-5 min-h-[250px]' : 'items-center px-3 min-h-[50px] flex-row gap-2'}`}>
+                          <div className={`flex-1 bg-white/[0.08] rounded-2xl border border-white/10 flex transition-all focus-within:border-primary/50 focus-within:bg-white/[0.12] ${isInputExpanded ? 'p-5 min-h-[250px]' : 'items-center px-3 min-h-[50px] flex-row gap-2'}`}>
                               <div className="flex-1">
                                   {isInputExpanded ? (
                                       <textarea 
                                         value={sessionPrompt} 
                                         onChange={(e) => setSessionPrompt(e.target.value)} 
-                                        className={`w-full bg-transparent border-none text-white text-[15px] focus:ring-0 placeholder:text-white/40 min-h-[200px] max-h-[600px] resize-none p-0 leading-relaxed transition-all ${isEnhancing ? 'animate-pulse text-primary/60' : ''}`} 
+                                        className={`w-full bg-transparent border-none text-white text-[15px] focus:ring-0 placeholder:text-white/60 min-h-[200px] max-h-[600px] resize-none p-0 leading-relaxed transition-all ${isEnhancing ? 'animate-pulse text-primary/60' : ''}`} 
                                         placeholder="Architect your reality..." 
                                         autoFocus
                                       />
@@ -1290,7 +1294,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                                         value={sessionPrompt} 
                                         onChange={(e) => setSessionPrompt(e.target.value)} 
                                         onKeyDown={(e) => e.key === 'Enter' && handleGenerate()} 
-                                        className="w-full bg-transparent border-none text-white text-[14px] focus:ring-0 placeholder:text-white/40 h-6 p-0" 
+                                        className="w-full bg-transparent border-none text-white text-[14px] focus:ring-0 placeholder:text-white/60 h-6 p-0 font-medium" 
                                         placeholder="Seed your imagination..." 
                                       />
                                   )}
@@ -1408,6 +1412,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                                       localSettings={localSettings} 
                                       updateLocalSetting={updateLocalSetting} 
                                       setAspectRatio={(w, h) => { updateLocalSetting('width', w); updateLocalSetting('height', h); }} 
+                                      styles={styles}
                                   />
                               </motion.div>
                           )}
@@ -1417,7 +1422,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
           </div>
       </div>
 
-      <AnimatePresence>{toastMessage && <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed bottom-36 left-1/2 -translate-x-1/2 px-8 py-3 rounded-full glass-panel border-white/20 text-[10px] font-black uppercase tracking-widest">{toastMessage}</motion.div>}</AnimatePresence>
+      <AnimatePresence>{toastMessage && <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed bottom-36 left-1/2 -translate-x-1/2 px-8 py-3 rounded-full glass-panel backdrop-blur-xl border-white/20 text-[10px] font-black uppercase tracking-widest">{toastMessage}</motion.div>}</AnimatePresence>
 
       <AnimatePresence>
           {selectedImage && (
@@ -1425,47 +1430,82 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[500] bg-black/95 backdrop-blur-xl flex flex-col items-center justify-center p-2 sm:p-6"
+                className="fixed inset-0 z-[500] bg-black flex items-center justify-center p-0"
                 onClick={() => setSelectedImage(null)}
               >
+                  {/* Full Screen Image Background */}
                   <motion.div 
-                    initial={{ scale: 0.9, y: 20 }}
-                    animate={{ scale: 1, y: 0 }}
-                    exit={{ scale: 0.9, y: 20 }}
-                    className="relative w-full max-w-[95vw] max-h-[95vh] rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10 flex flex-col bg-black"
-                    onClick={(e) => e.stopPropagation()}
-                    style={{ aspectRatio: selectedImage.width / selectedImage.height }}
+                    initial={{ scale: 1.1, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 1.1, opacity: 0 }}
+                    className="absolute inset-0 z-0 flex items-center justify-center overflow-hidden"
                   >
-                      <div className="flex-1 min-h-0 relative">
-                        <img src={selectedImage.url} alt={selectedImage.prompt} className="w-full h-full object-contain" />
-                      </div>
-                      
-                      <div className="absolute top-6 right-6 flex gap-3">
-                          <button 
-                            onClick={() => setSelectedImage(null)}
-                            className="size-12 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center text-white hover:bg-white/10 transition-all"
-                          >
-                              <X size={20} />
-                          </button>
-                      </div>
- 
-                      <div className="p-8 bg-gradient-to-t from-black via-black/90 to-black/40">
-                          <p className="text-xs text-white/60 font-medium leading-relaxed mb-6 line-clamp-3">{selectedImage.prompt}</p>
-                          <div className="flex flex-wrap gap-3">
-                              <div className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 flex items-center gap-2">
-                                  <Hash size={12} className="text-primary" />
-                                  <span className="text-[10px] font-mono text-white/80">{selectedImage.seed}</span>
-                              </div>
-                              <div className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 flex items-center gap-2">
-                                  <Layers size={12} className="text-primary" />
-                                  <span className="text-[10px] font-mono text-white/80 uppercase">{selectedImage.model}</span>
-                              </div>
-                              {selectedImage.styleName && (
-                                  <div className="px-4 py-2 rounded-xl bg-primary/10 border border-primary/20 flex items-center gap-2">
-                                      <Sparkles size={12} className="text-primary" />
-                                      <span className="text-[10px] font-black text-primary uppercase tracking-widest">{selectedImage.styleName}</span>
+                      <img 
+                          src={selectedImage.url} 
+                          alt={selectedImage.prompt} 
+                          className="w-full h-full object-contain sm:object-cover sm:scale-105 sm:blur-3xl sm:opacity-50 absolute inset-0" 
+                      />
+                      <img 
+                          src={selectedImage.url} 
+                          alt={selectedImage.prompt} 
+                          className="relative z-10 max-w-full max-h-full object-contain shadow-2xl" 
+                      />
+                  </motion.div>
+
+                  {/* Close Button */}
+                  <button 
+                      onClick={() => setSelectedImage(null)}
+                      className="absolute top-8 right-8 size-14 rounded-full bg-black/20 backdrop-blur-2xl border border-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-all z-50 active:scale-90"
+                  >
+                      <X size={24} />
+                  </button>
+
+                  {/* Floating Info Panel (Bottom) - Compact White Frost */}
+                  <motion.div 
+                      initial={{ y: 50, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      exit={{ y: 50, opacity: 0 }}
+                      className="absolute bottom-8 left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-3xl z-50"
+                      onClick={(e) => e.stopPropagation()}
+                  >
+                      <div className="backdrop-blur-3xl bg-white/10 border border-white/20 rounded-[2rem] p-3 sm:p-4 shadow-2xl flex flex-col sm:flex-row items-center gap-4">
+                          {/* Prompt & Metadata Group */}
+                          <div className="flex-1 min-w-0 flex flex-col gap-1.5 px-3">
+                              <div className="flex items-center gap-2">
+                                  <div className="size-1.5 rounded-full bg-primary" />
+                                  <div className="flex gap-2 text-[8px] font-black text-white/40 uppercase tracking-widest">
+                                      <span>{selectedImage.model}</span>
+                                      <span>•</span>
+                                      <span>{selectedImage.seed}</span>
                                   </div>
-                              )}
+                              </div>
+                              <p className="text-[11px] sm:text-xs text-white/90 font-medium line-clamp-1 leading-none">{selectedImage.prompt}</p>
+                          </div>
+
+                          {/* Action Group */}
+                          <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+                              <button 
+                                onClick={async (e) => {
+                                    e.stopPropagation();
+                                    if (!supabase) return;
+                                    const { data: { session } } = await supabase.auth.getSession();
+                                    if (!session) {
+                                        showToast("Login to share");
+                                        return;
+                                    }
+                                    const { error } = await supabase
+                                        .from('generations')
+                                        .update({ is_public: true })
+                                        .eq('url', selectedImage.url)
+                                        .eq('user_id', session.user.id);
+                                    if (error) showToast("Share failed");
+                                    else showToast("Shared to Community!");
+                                }}
+                                className="flex-1 sm:flex-none h-10 px-5 rounded-full bg-white/10 border border-white/10 text-white text-[9px] font-black uppercase tracking-widest hover:bg-white/20 transition-all flex items-center justify-center gap-2"
+                              >
+                                  <Share2 size={12} />
+                                  FEED
+                              </button>
                               <button 
                                 onClick={() => {
                                     const link = document.createElement('a');
@@ -1473,9 +1513,10 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                                     link.download = `resonance-${selectedImage.id}.png`;
                                     link.click();
                                 }}
-                                className="px-6 py-2 rounded-xl bg-primary text-white text-[10px] font-black uppercase tracking-widest shadow-glow ml-auto"
+                                className="flex-1 sm:flex-none h-10 px-6 rounded-full bg-primary text-white text-[9px] font-black uppercase tracking-widest shadow-glow active:scale-95 transition-all flex items-center justify-center gap-2"
                               >
-                                  Download
+                                  <Download size={12} />
+                                  DOWNLOAD
                               </button>
                           </div>
                       </div>
