@@ -332,7 +332,7 @@ export const History: React.FC<HistoryProps> = memo(({ history, onNavigate, onRe
                                 <p className="text-[10px] text-white/30 uppercase font-black tracking-widest">Vision Data</p>
                                 <p className="text-sm text-white/90 leading-relaxed italic">"{currentFullscreenItem.prompt}"</p>
                             </div>
-                            {currentFullscreenItem.styleSuffix && (
+                            {typeof currentFullscreenItem.styleSuffix === 'string' && currentFullscreenItem.styleSuffix.trim() !== '' && (
                                 <div className="space-y-1 border-t border-white/5 pt-4">
                                     <p className="text-[10px] text-white/30 uppercase font-black tracking-widest">Style Matrix</p>
                                     <p className="text-[11px] text-white/50 leading-relaxed">{currentFullscreenItem.styleSuffix.replace(/^, /, '')}</p>

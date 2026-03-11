@@ -54,8 +54,9 @@ export const getAccountDetails = async (apiKey?: string) => {
             error: null 
         };
     } catch (e: any) {
-        addLog('error', 'Critical sync error', e.message);
-        return { profile: null, balance: null, usage: [], isLoading: false, error: e.message };
+        const errorMsg = e instanceof Error ? e.message : String(e || 'Unknown error');
+        addLog('error', 'Critical sync error', errorMsg);
+        return { profile: null, balance: null, usage: [], isLoading: false, error: errorMsg };
     }
 };
 
