@@ -141,21 +141,11 @@ root.render(
   </React.StrictMode>
 );
 
-// SERVICE WORKER CLEANUP
-// Aggressively remove any old service workers to prevent cache poisoning or 404s
-if ('serviceWorker' in navigator) {
-  const killSW = () => {
-    navigator.serviceWorker.getRegistrations().then(function(registrations) {
-      for(let registration of registrations) {
-        registration.unregister().catch(e => console.warn('SW Unregister Warning:', e));
-      }
-    }).catch(e => console.warn('SW Access Warning:', e));
-  };
-
-  // Run cleanup if document is ready, otherwise wait for load
-  if (document.readyState === 'complete') {
-    killSW();
-  } else {
-    window.addEventListener('load', killSW);
-  }
+// SERVICE WORKER REGISTRATION
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(error => {
+      console.error('SW registration failed:', error);
+    });
+  });
 }
