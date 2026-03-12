@@ -61,9 +61,12 @@ export const getAccountDetails = async (apiKey?: string) => {
 };
 
 export const MODEL_PRICING: Record<string, number> = {
-    'zimage': 0.002,
     'flux': 0.001,
-    'flux-2-dev': 0.001
+    'flux-2-dev': 0.001,
+    'dirtberry': 0.001,
+    'zimage': 0.002,
+    'imagen-4': 0.0025,
+    'grok-imagine': 0.0025
 };
 
 export const getEstimatedImagesLeft = (balance: number | null, model: string = 'flux') => {

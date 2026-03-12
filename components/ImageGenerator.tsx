@@ -7,6 +7,7 @@ import {
     Sparkles, Loader2, Camera, Plus, X, LogIn, LogOut, User, Globe, Download, Share2
 } from 'lucide-react';
 import { generateImageUrl, getRandomSeed, getAccountDetails, getEstimatedImagesLeft, getEffectiveKey } from '../services/pollinations';
+import { downloadImage } from '../services/utils';
 import { AppRoute, AppSettings, HistoryItem, ASPECT_RATIOS, AccountState, AVAILABLE_MODELS, CustomStyle } from '../types';
 import { addLog } from '../services/logger';
 import { enhancePrompt } from '../services/ai';
@@ -232,20 +233,7 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady, onNaviga
 
   const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    try {
-        const response = await fetch(item.url);
-        const blob = await response.blob();
-        const blobUrl = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = `resonance-${item.width}x${item.height}-${Date.now()}.jpg`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(blobUrl);
-    } catch (e) {
-        window.open(item.url, '_blank');
-    }
+    await downloadImage(item.url, `resonance-${item.width}x${item.height}-${Date.now()}.jpg`);
   };
 
   const x = useMotionValue(0);
@@ -547,7 +535,7 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, 
             <div className="space-y-3">
                 <p className="text-[8px] text-white/40 font-black uppercase tracking-[0.2em] pl-1">Batch Capacity</p>
                 <div className="grid grid-cols-4 gap-1.5 bg-white/10 backdrop-blur-md p-1.5 rounded-2xl border border-white/10">
-                    {[1, 2, 4, 8].map(n => (
+                    {[1, 2, 3, 4].map(n => (
                         <button key={n} onClick={() => updateLocalSetting('imageCount', n)} className={`h-12 rounded-xl text-[9px] font-black transition-all ${localSettings.imageCount === n ? 'bg-primary text-white shadow-glow' : 'text-white/30 hover:text-white/50'}`}>{n}x</button>
                     ))}
                 </div>
@@ -1481,10 +1469,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                               </button>
                               <button 
                                 onClick={() => {
-                                    const link = document.createElement('a');
-                                    link.href = selectedImage.url;
-                                    link.download = `resonance-${selectedImage.id}.png`;
-                                    link.click();
+                                    downloadImage(selectedImage.url, `resonance-${selectedImage.id}.png`);
                                 }}
                                 className="flex-1 sm:flex-none h-10 px-6 rounded-full bg-primary text-white text-[9px] font-black uppercase tracking-widest shadow-glow active:scale-95 transition-all flex items-center justify-center gap-2"
                               >

@@ -4,6 +4,7 @@ import { HistoryItem, AppRoute, AccountState } from '../types';
 import { Header } from './Header';
 import { supabase } from '../services/supabase';
 import { Globe, Share2 } from 'lucide-react';
+import { downloadImage } from '../services/utils';
 
 interface HistoryProps {
   history: HistoryItem[];
@@ -117,20 +118,7 @@ export const History: React.FC<HistoryProps> = memo(({ history, onNavigate, onRe
   };
 
   const handleDownload = async (url: string) => {
-    try {
-        const response = await fetch(url);
-        const blob = await response.blob();
-        const blobUrl = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = `resonance-${currentFullscreenItem?.width}x${currentFullscreenItem?.height}-${Date.now()}.jpg`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(blobUrl);
-    } catch (e) {
-        window.open(url, '_blank');
-    }
+    await downloadImage(url, `resonance-${currentFullscreenItem?.width}x${currentFullscreenItem?.height}-${Date.now()}.jpg`);
   };
 
   const handleShare = async () => {

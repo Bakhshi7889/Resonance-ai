@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DownloadCloud, Smartphone, Share, PlusSquare, ArrowLeft, ExternalLink, RefreshCw, Layers, Download, PlusCircle, Trash2, Wand2, Terminal, Copy, Globe, Trophy, Github, Mail, LogIn, LogOut, User, MessageSquare, Check, Send, Inbox } from 'lucide-react';
+import { DownloadCloud, Smartphone, Share, PlusSquare, ArrowLeft, ExternalLink, RefreshCw, Layers, Download, PlusCircle, Trash2, Wand2, Terminal, Copy, Globe, Trophy, Github, Mail, LogIn, LogOut, User, MessageSquare, Check, Send, Inbox, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { AppSettings, AppRoute, AccountState, DirectMessage } from '../types';
 import { getAccountDetails, getEstimatedImagesLeft, getAuthUrl } from '../services/pollinations';
 import { getLogs, clearLogs, LogEntry } from '../services/logger';
@@ -21,11 +21,16 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
   const [localLogs, setLocalLogs] = useState<LogEntry[]>([]);
   const [showLogs, setShowLogs] = useState(false);
   const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [isAccountExpanded, setIsAccountExpanded] = useState(false);
   const [displayName, setDisplayName] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   
   // Messaging state
   const [messageContent, setMessageContent] = useState('');
@@ -142,6 +147,44 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
       }
   };
 
+  const handlePasswordAuth = async () => {
+      if (!supabase) {
+          alert("Neural Database (Supabase) not configured. Check environment variables.");
+          return;
+      }
+      if (!authEmail || !authPassword) return;
+      setIsAuthLoading(true);
+      try {
+          if (isSignUp) {
+              const { error } = await supabase.auth.signUp({
+                  email: authEmail,
+                  password: authPassword,
+                  options: {
+                      emailRedirectTo: getRedirectUrl(),
+                  }
+              });
+              if (error) throw error;
+              alert('Verification email sent! Please check your inbox.');
+          } else {
+              const { error } = await supabase.auth.signInWithPassword({
+                  email: authEmail,
+                  password: authPassword,
+              });
+              if (error) {
+                  if (error.message === 'Invalid login credentials') {
+                      throw new Error('Invalid credentials. If you are new, please toggle to "Initialize Account" below.');
+                  }
+                  throw error;
+              }
+          }
+      } catch (err: any) {
+          console.error('Auth Error:', err);
+          alert(err?.message || 'Authentication failed.');
+      } finally {
+          setIsAuthLoading(false);
+      }
+  };
+
   const handleUpdateProfile = async () => {
       if (!supabase || !accountState.user) return;
       setIsUpdatingProfile(true);
@@ -156,6 +199,24 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
           alert('Failed to update profile');
       } finally {
           setIsUpdatingProfile(false);
+      }
+  };
+
+  const handleUpdatePassword = async () => {
+      if (!supabase || !newPassword) return;
+      setIsUpdatingPassword(true);
+      try {
+          const { error } = await supabase.auth.updateUser({
+              password: newPassword
+          });
+          if (error) throw error;
+          alert('Password updated successfully');
+          setNewPassword('');
+      } catch (err) {
+          console.error('Password Update Error:', err);
+          alert(err instanceof Error ? err.message : 'Failed to update password');
+      } finally {
+          setIsUpdatingPassword(false);
       }
   };
 
@@ -266,6 +327,33 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
                                         </div>
 
                                         <div className="flex flex-col gap-2">
+                                            <label className="text-[10px] text-white/30 uppercase font-black tracking-widest ml-2">Security Key</label>
+                                            <div className="flex gap-2">
+                                                <input 
+                                                    type={showPassword ? "text" : "password"}
+                                                    value={newPassword}
+                                                    onChange={(e) => setNewPassword(e.target.value)}
+                                                    placeholder="Set New Password"
+                                                    className="flex-1 bg-white/[0.03] border border-white/10 rounded-2xl px-4 py-3 text-xs text-white focus:ring-1 focus:ring-primary/40 transition-all"
+                                                />
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => setShowPassword(!showPassword)}
+                                                    className="px-2 text-white/20 hover:text-white/40 transition-colors"
+                                                >
+                                                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                                </button>
+                                                <button 
+                                                    onClick={handleUpdatePassword}
+                                                    disabled={isUpdatingPassword || !newPassword}
+                                                    className="px-4 rounded-2xl bg-white/10 border border-white/20 text-white text-[9px] font-black uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50"
+                                                >
+                                                    Update
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-col gap-2">
                                             <label className="text-[10px] text-white/30 uppercase font-black tracking-widest ml-2">Avatar Matrix</label>
                                             <div className="grid grid-cols-2 gap-2">
                                                 <label className="h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center gap-2 text-white/60 hover:bg-white/10 transition-all cursor-pointer">
@@ -301,23 +389,60 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
                             ) : (
                                 <div className="space-y-6">
                                     <div className="space-y-4">
-                                        <div className="relative">
-                                            <input 
-                                                type="email"
-                                                value={authEmail}
-                                                onChange={(e) => setAuthEmail(e.target.value)}
-                                                placeholder="Enter your email"
-                                                className="w-full bg-white/[0.03] border border-white/10 rounded-2xl px-10 py-3 text-xs text-white focus:ring-1 focus:ring-primary/40 transition-all placeholder:text-white/10"
-                                            />
-                                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20" size={16} />
+                                        <div className="space-y-3">
+                                            <div className="relative">
+                                                <input 
+                                                    type="email"
+                                                    value={authEmail}
+                                                    onChange={(e) => setAuthEmail(e.target.value)}
+                                                    placeholder="Neural ID (Email)"
+                                                    className="w-full bg-white/[0.03] border border-white/10 rounded-2xl px-10 py-3 text-xs text-white focus:ring-1 focus:ring-primary/40 transition-all placeholder:text-white/10"
+                                                />
+                                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20" size={16} />
+                                            </div>
+                                            
+                                            <div className="relative">
+                                                <input 
+                                                    type={showPassword ? "text" : "password"}
+                                                    value={authPassword}
+                                                    onChange={(e) => setAuthPassword(e.target.value)}
+                                                    placeholder="Access Key (Password)"
+                                                    className="w-full bg-white/[0.03] border border-white/10 rounded-2xl px-10 py-3 text-xs text-white focus:ring-1 focus:ring-primary/40 transition-all placeholder:text-white/10"
+                                                />
+                                                <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20" size={16} />
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => setShowPassword(!showPassword)}
+                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/40 transition-colors"
+                                                >
+                                                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button 
+                                                onClick={handlePasswordAuth}
+                                                disabled={isAuthLoading || !authEmail || !authPassword}
+                                                className="h-12 rounded-2xl bg-primary text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-50 active:scale-95 transition-all"
+                                            >
+                                                {isAuthLoading ? 'Processing...' : (isSignUp ? 'Initialize' : 'Access')}
+                                            </button>
                                             <button 
                                                 onClick={handleEmailLogin}
                                                 disabled={isAuthLoading || !authEmail}
-                                                className="absolute right-1.5 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-xl bg-primary text-white text-[8px] font-black uppercase tracking-widest disabled:opacity-50"
+                                                className="h-12 rounded-2xl bg-white/5 border border-white/10 text-white/60 text-[10px] font-black uppercase tracking-widest disabled:opacity-50 active:scale-95 transition-all"
                                             >
-                                                {isAuthLoading ? '...' : 'Send'}
+                                                Magic Link
                                             </button>
                                         </div>
+
+                                        <button 
+                                            onClick={() => setIsSignUp(!isSignUp)}
+                                            className="w-full text-[9px] text-white/30 uppercase font-black tracking-widest hover:text-white/50 transition-colors"
+                                        >
+                                            {isSignUp ? 'Already have a link? Access' : 'New Architect? Initialize Account'}
+                                        </button>
 
                                         {otpSent && (
                                             <motion.div 

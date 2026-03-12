@@ -64,6 +64,87 @@ export const enhancePrompt = async (
         - Focus on high-impact visual details rather than microscopic technical lists.
         - Output ONLY the final enhanced prompt.
         `;
+    } else if (model === 'imagen-4') {
+        instructions = `
+        Model: Imagen 4 (Google's latest high-fidelity vision model).
+        Style: Absolute photorealism, "real camera shots".
+        Goal: Follow the OFFICIAL Google Prompt Structure for maximum realism.
+        
+        Official Formula:
+        "A photo of [detailed subject + action], [composition], [lens + settings], [lighting], [film style], 4K HDR beautiful photo taken by a professional photographer"
+        
+        Key Requirements:
+        - START: Always start the prompt with exactly "A photo of ...".
+        - STRUCTURE: Subject + Action/Description + Location/Context + Composition + Photography Modifiers.
+        - MODIFIERS (Use 2-4 max from this official list):
+            * 35mm portrait, depth of field, black and white film
+            * macro lens, 60mm, high detail, precise focusing, controlled lighting
+            * wide angle 10mm, long exposure, sharp focus
+            * fast shutter speed, movement tracking
+            * low angle shot with a shallow depth of field (f/1.8)
+            * Fujifilm, pronounced grain, cinematic lighting effect
+            * natural lighting, golden hour backlighting creating long shadows
+            * medium-full shot, center-framed, studio photo, bokeh
+            * polaroid portrait, soft focus
+            * 4K HDR beautiful photo, taken by a professional photographer
+        
+        Pro Tips:
+        - Be specific and positive (e.g., "empty road" instead of "no people").
+        - Keep total length under 150 words.
+        - For products/cars: use "studio photo, controlled lighting" + "medium-full shot, center-framed".
+        
+        Rules:
+        - Output ONLY the final enhanced prompt.
+        `;
+    } else if (model === 'grok-imagine') {
+        instructions = `
+        Model: Grok Imagine (X.AI's creative vision engine).
+        Style: Natural, photorealistic, and cinematic.
+        Goal: Follow the PROVEN Grok Imagine formula for best results.
+        
+        Official Formula:
+        "[Subject + action/pose in one natural sentence], [environment and mood], [lighting and atmosphere details]. Shot on [specific camera], [lens], [framing and depth of field], [film or photo style], photorealistic, natural textures, subtle film grain, sharp focus, no AI artifacts."
+        
+        Key Requirements:
+        - NATURAL LANGUAGE: Use full, natural English sentences. Avoid keyword spam.
+        - CAMERA GEAR (Pick one): Canon EOS R5, Sony A7R IV, Fujifilm XT5, iPhone 16 Pro.
+        - MAGIC CLOSER: You MUST ALWAYS end the prompt with exactly: "photorealistic, natural textures, subtle film grain, sharp focus, no AI artifacts."
+        - FOR CARS/PRODUCTS: Add "professional automotive photography" or "studio product shot" immediately after the camera gear.
+        
+        Pro Tips:
+        - Keep the whole prompt to 1-2 sentences max (under 150 words).
+        - Focus on subtle imperfections to remove "AI gloss".
+        - Use specific lighting (e.g., "soft window light", "dramatic sunset reflections").
+        
+        Rules:
+        - Output ONLY the final enhanced prompt.
+        `;
+    } else if (model === 'dirtberry') {
+        instructions = `
+        Model: Dirtberry (Alpha model for quick realistic image generation).
+        Style: RAW, candid, professional DSLR photography.
+        Goal: Follow the battle-tested r/StableDiffusion photorealism formula.
+        
+        Official Formula:
+        [STYLE OF PHOTO] photo of a [SUBJECT + key details], [IMPORTANT FEATURES], [MORE DETAILS], [POSE OR ACTION], [FRAMING], [SETTING/BACKGROUND], [LIGHTING], [CAMERA ANGLE], [CAMERA PROPERTIES + LENS], [QUALITY BOOSTERS]
+        
+        Step-by-Step Recipe:
+        1. STYLE: RAW photo / candid photograph / professional photograph / cinematic film still.
+        2. SUBJECT: Extremely specific (e.g., "red Ferrari 488 GTB sports car with carbon fiber accents").
+        3. FEATURES: Material, color, condition (e.g., "glossy paint, chrome exhaust").
+        4. DETAILS: Textures, reflections, small elements.
+        5. POSE/ACTION: What the subject is doing.
+        6. FRAMING: Close-up, wide angle, three-quarter view, etc.
+        7. SETTING: Specific background and time of day.
+        8. LIGHTING: Natural sunlight, dramatic side lighting, etc.
+        9. ANGLE: Low angle, eye level, overhead.
+        10. CAMERA: Shot on Canon EOS R5, 50mm f/1.8 lens, 1/1000s, f/2.8.
+        11. BOOSTERS: 8K, UHD, natural lighting, sharp focus, film grain, RAW photo.
+        
+        Rules:
+        - Emphasize raw, unpolished, and visceral details.
+        - Output ONLY the final enhanced prompt.
+        `;
     } else {
         instructions = `
         Goal: Transform the simple idea into a hyper-detailed, evocative, and technically precise image prompt.

@@ -102,9 +102,12 @@ export enum AppRoute {
 }
 
 export const AVAILABLE_MODELS = [
-  { id: 'zimage', name: 'Z-Image', description: 'Poly-modal Synthesis' },
   { id: 'flux', name: 'Flux Schnell', description: 'High-speed Latent Diffusion' },
   { id: 'flux-2-dev', name: 'Flux.2 Dev', description: 'Alpha Neural Architecture' },
+  { id: 'dirtberry', name: 'Dirtberry', description: 'Organic Texture Synthesis' },
+  { id: 'zimage', name: 'Z-Image Turbo', description: 'Poly-modal Synthesis' },
+  { id: 'imagen-4', name: 'Imagen 4', description: 'Google DeepMind Vision' },
+  { id: 'grok-imagine', name: 'Grok Imagine', description: 'X.AI Creative Engine' },
 ];
 
 export const ASPECT_RATIOS = [
