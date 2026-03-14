@@ -12,6 +12,10 @@ interface LeaderboardItem {
     url: string;
     likes_count: number;
     rank: number;
+    author?: {
+        name: string;
+        avatar_url: string;
+    };
 }
 
 export const Leaderboard: React.FC<{ onNavigate: (route: AppRoute) => void }> = ({ onNavigate }) => {
@@ -27,12 +31,24 @@ export const Leaderboard: React.FC<{ onNavigate: (route: AppRoute) => void }> = 
 
                 // Mocking leaderboard data for now since we don't have a real 'likes' system yet
                 // In a real app, you'd query a view or a table that aggregates likes
-                const { data, error } = await supabase
+                let { data, error } = await supabase
                     .from('generations')
-                    .select('*')
+                    .select('*, author:profiles(name, avatar_url)')
                     .eq('is_public', true)
                     .order('created_at', { ascending: false })
                     .limit(20);
+
+                if (error && error.message.includes('profiles')) {
+                    console.warn('Profiles table not found, falling back to basic query.');
+                    const fallbackResult = await supabase
+                        .from('generations')
+                        .select('*')
+                        .eq('is_public', true)
+                        .order('created_at', { ascending: false })
+                        .limit(20);
+                    data = fallbackResult.data;
+                    error = fallbackResult.error;
+                }
 
                 if (error) throw error;
 
@@ -180,12 +196,17 @@ export const Leaderboard: React.FC<{ onNavigate: (route: AppRoute) => void }> = 
                                     <div className="w-8 flex justify-center">
                                         {getRankIcon(item.rank)}
                                     </div>
-                                    <div className="size-12 rounded-xl overflow-hidden bg-black/40 border border-white/10">
+                                    <div className="size-12 rounded-xl overflow-hidden bg-black/40 border border-white/10 relative">
                                         <img src={item.url} className="w-full h-full object-cover" />
+                                        {item.author?.avatar_url && (
+                                            <div className="absolute bottom-1 right-1 size-4 rounded-full overflow-hidden border border-white/20 shadow-lg">
+                                                <img src={item.author.avatar_url} className="size-full object-cover" />
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-xs font-bold text-white/80 truncate">User_{item.user_id.slice(0, 4)}</span>
+                                            <span className="text-xs font-bold text-white/80 truncate">{item.author?.name || `User_${item.user_id.slice(0, 4)}`}</span>
                                             <span className={`text-[8px] font-black uppercase tracking-widest ${tier.color}`}>{tier.label}</span>
                                         </div>
                                         <p className="text-[10px] text-white/30 truncate mt-0.5 italic">"{item.prompt}"</p>

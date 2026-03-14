@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../services/supabase';
+import { storage } from '../services/storage';
 import { AppRoute, HistoryItem } from '../types';
 import { Header } from './Header';
-import { Sparkles, Globe, Heart, Share2, Info, User, X } from 'lucide-react';
+import { Sparkles, Globe, Heart, Share2, Info, User, X, ThumbsUp, MessageSquare } from 'lucide-react';
 
 interface CommunityFeedProps {
     onNavigate: (route: AppRoute) => void;
@@ -16,49 +17,64 @@ export const CommunityFeed: React.FC<CommunityFeedProps> = ({ onNavigate, user }
     const [selectedImage, setSelectedImage] = useState<any | null>(null);
     const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
     const [filter, setFilter] = useState<'recent' | 'top'>('recent');
-    const [page, setPage] = useState(0);
-    const [hasMore, setHasMore] = useState(true);
 
     const isDeveloper = user?.email === 'herobakhshi@gmail.com';
 
-    const fetchFeed = async (reset = false) => {
+    const fetchFeed = async () => {
         if (!supabase) return;
         setIsLoading(true);
-        const currentPage = reset ? 0 : page;
-        const pageSize = 20;
         
         let query = supabase
             .from('generations')
-            .select('*, author:profiles(name, avatar_url)')
-            .range(currentPage * pageSize, (currentPage + 1) * pageSize - 1);
+            .select('*, author:profiles(name, avatar_url)');
         
         if (filter === 'recent') {
             query = query.order('created_at', { ascending: false });
         } else {
-            query = query.order('likes_count', { ascending: false }).order('created_at', { ascending: false });
+            query = query.order('created_at', { ascending: false });
         }
         
         if (!isDeveloper) {
             query = query.eq('is_public', true);
         }
         
-        const { data, error } = await query;
+        let { data, error } = await query;
+        
+        // Fallback if profiles table doesn't exist yet
+        if (error && error.message.includes('profiles')) {
+            console.warn('Profiles table not found, falling back to basic query.');
+            let fallbackQuery = supabase
+                .from('generations')
+                .select('*')
+                .order('created_at', { ascending: false });
+                
+            if (!isDeveloper) {
+                fallbackQuery = fallbackQuery.eq('is_public', true);
+            }
+            
+            const fallbackResult = await fallbackQuery;
+            data = fallbackResult.data;
+            error = fallbackResult.error;
+        }
         
         if (error) {
             console.error('Resonance: Feed Fetch Error:', error);
         } else if (data) {
-            if (reset) {
-                setImages(data);
-            } else {
-                setImages(prev => [...prev, ...data]);
-            }
-            setHasMore(data.length === pageSize);
-            setPage(currentPage + 1);
+            setImages(data);
+            storage.set('community_feed_images', data);
         }
         setIsLoading(false);
     };
 
     useEffect(() => {
+        const loadInitial = async () => {
+            const cached = await storage.get<any[]>('community_feed_images');
+            if (cached) {
+                setImages(cached);
+            }
+            fetchFeed();
+        };
+
         const fetchLikes = async () => {
             if (!supabase || !user) return;
             const { data } = await supabase
@@ -71,7 +87,7 @@ export const CommunityFeed: React.FC<CommunityFeedProps> = ({ onNavigate, user }
             }
         };
 
-        fetchFeed(true);
+        loadInitial();
         fetchLikes();
     }, [isDeveloper, user, filter]);
 
@@ -201,17 +217,7 @@ export const CommunityFeed: React.FC<CommunityFeedProps> = ({ onNavigate, user }
                             ))}
                         </div>
 
-                        {hasMore && (
-                            <div className="py-12 flex justify-center">
-                                <button 
-                                    onClick={() => fetchFeed()}
-                                    disabled={isLoading}
-                                    className="px-8 py-3 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white/60 hover:bg-white/10 hover:text-white transition-all disabled:opacity-50"
-                                >
-                                    {isLoading ? 'Syncing...' : 'Load More Transmissions'}
-                                </button>
-                            </div>
-                        )}
+                        
                     </>
                 )}
 
@@ -248,35 +254,40 @@ export const CommunityFeed: React.FC<CommunityFeedProps> = ({ onNavigate, user }
                                 >
                                     <X size={20} />
                                 </button>
+                                <button className="absolute top-6 left-6 size-10 rounded-full bg-black/40 border border-white/10 flex items-center justify-center text-white/60 hover:text-primary transition-colors">
+                                    <ThumbsUp size={20} />
+                                </button>
                             </div>
-                            <div className="p-8 space-y-6">
-                                <div className="flex items-center gap-3">
-                                    <div className="size-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
-                                        {selectedImage.author?.avatar_url ? (
-                                            <img src={selectedImage.author.avatar_url} className="size-full object-cover" alt="avatar" />
-                                        ) : (
-                                            <User size={20} className="text-white/20" />
-                                        )}
+                            <div className="p-6 space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="size-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
+                                            {selectedImage.author?.avatar_url ? (
+                                                <img src={selectedImage.author.avatar_url} className="size-full object-cover" alt="avatar" />
+                                            ) : (
+                                                <User size={16} className="text-white/20" />
+                                            )}
+                                        </div>
+                                        <p className="text-xs font-bold text-white">{selectedImage.author?.name || 'Anonymous Creator'}</p>
                                     </div>
-                                    <div>
-                                        <p className="text-sm font-bold text-white">{selectedImage.author?.name || 'Anonymous Creator'}</p>
-                                        <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">Resonance Architect</p>
-                                    </div>
+                                    <button className="text-white/60 hover:text-primary transition-colors">
+                                        <MessageSquare size={20} />
+                                    </button>
                                 </div>
                                 
-                                <div className="space-y-2">
-                                    <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Neural Seed</p>
-                                    <p className="text-sm text-white/80 leading-relaxed italic">"{selectedImage.prompt}"</p>
+                                <div className="space-y-1">
+                                    <p className="text-[9px] font-black text-primary uppercase tracking-[0.2em]">Neural Seed</p>
+                                    <p className="text-xs text-white/80 leading-relaxed italic line-clamp-3">"{selectedImage.prompt}"</p>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-1">
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div className="p-3 rounded-xl bg-white/5 border border-white/5">
                                         <p className="text-[8px] font-bold text-white/30 uppercase tracking-widest">Model</p>
-                                        <p className="text-xs font-bold text-white uppercase">{selectedImage.model}</p>
+                                        <p className="text-[10px] font-bold text-white uppercase">{selectedImage.model}</p>
                                     </div>
-                                    <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-1">
+                                    <div className="p-3 rounded-xl bg-white/5 border border-white/5">
                                         <p className="text-[8px] font-bold text-white/30 uppercase tracking-widest">Resolution</p>
-                                        <p className="text-xs font-bold text-white">{selectedImage.width} × {selectedImage.height}</p>
+                                        <p className="text-[10px] font-bold text-white">{selectedImage.width} × {selectedImage.height}</p>
                                     </div>
                                 </div>
                             </div>

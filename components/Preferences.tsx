@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DownloadCloud, Smartphone, Share, PlusSquare, ArrowLeft, ExternalLink, RefreshCw, Layers, Download, PlusCircle, Trash2, Wand2, Terminal, Copy, Globe, Trophy, Github, Mail, LogIn, LogOut, User, MessageSquare, Check, Send, Inbox, ShieldCheck, Eye, EyeOff } from 'lucide-react';
-import { AppSettings, AppRoute, AccountState, DirectMessage } from '../types';
-import { getAccountDetails, getEstimatedImagesLeft, getAuthUrl } from '../services/pollinations';
+import { AppSettings, AppRoute, AccountState, DirectMessage, HistoryItem } from '../types';
+import { getAccountDetails, getEstimatedImagesLeft, getAuthUrl, MODEL_PRICING } from '../services/pollinations';
 import { getLogs, clearLogs, LogEntry } from '../services/logger';
 import { supabase } from '../services/supabase';
 import { messageService } from '../services/messageService';
@@ -15,9 +15,10 @@ interface PreferencesProps {
   onInstallApp?: () => void;
   accountState: AccountState;
   refreshAccount: () => void;
+  history: HistoryItem[];
 }
 
-export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateSettings, onNavigate, canInstall, onInstallApp, accountState, refreshAccount }) => {
+export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateSettings, onNavigate, canInstall, onInstallApp, accountState, refreshAccount, history }) => {
   const [localLogs, setLocalLogs] = useState<LogEntry[]>([]);
   const [showLogs, setShowLogs] = useState(false);
   const [authEmail, setAuthEmail] = useState('');
@@ -576,16 +577,18 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
                 </div>
 
                 <div className="flex flex-col gap-8 pt-8 border-t border-white/5">
-                    <div className="flex justify-between items-end px-1">
+                    <div className="grid grid-cols-2 gap-4">
                         <div className="flex flex-col">
                           <span className="text-4xl font-black font-mono tracking-tighter text-blue-400">
-                            ${accountState.balance?.toFixed(4) || '0.0000'}
+                            ${accountState.balance?.toFixed(3) || '0.000'}
                           </span>
                           <span className="text-[9px] text-white/30 uppercase font-black tracking-[0.2em] mt-2">Available Credits</span>
                         </div>
                         <div className="flex flex-col items-end">
-                          <span className="text-xl font-black text-white tracking-tighter">~{getEstimatedImagesLeft(accountState.balance, settings.model)}</span>
-                          <span className="text-[9px] text-white/30 uppercase font-black tracking-widest mt-1">Render Potential</span>
+                          <span className="text-4xl font-black font-mono tracking-tighter text-emerald-400">
+                            {history.reduce((sum, item) => sum + (MODEL_PRICING[item.model] || 0.001), 0).toFixed(4)}
+                          </span>
+                          <span className="text-[9px] text-white/30 uppercase font-black tracking-widest mt-2">Total Pollen Used</span>
                         </div>
                     </div>
                     

@@ -24,7 +24,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   width: 1536,
   height: 1536,
   enhance: false,
-  privateMode: true,
+  privateMode: false,
   negativePrompt: '',
   imageCount: 1,
   activeStyles: ['none'],
@@ -339,6 +339,7 @@ const App: React.FC = () => {
             onInstallApp={handleInstallApp}
             accountState={accountState}
             refreshAccount={fetchAccount}
+            history={history}
           />
         );
       case AppRoute.STYLE_LIBRARY:
