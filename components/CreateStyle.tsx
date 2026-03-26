@@ -1,11 +1,10 @@
 import React, { useState, useEffect, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AppRoute, AppSettings, CustomStyle } from '../types';
+import { AppRoute, AppSettings, CustomStyle, ModelInfo } from '../types';
 import { Header } from './Header';
 import { generateImageUrl, getRandomSeed } from '../services/pollinations';
 import { Check, Wand2, Image as ImageIcon, Save, RefreshCw, Star, Hash } from 'lucide-react';
 import { styleService } from '../services/styleService';
-import { AVAILABLE_MODELS } from '../types';
 
 interface CreateStyleProps {
   onNavigate: (route: AppRoute) => void;
@@ -14,6 +13,7 @@ interface CreateStyleProps {
   setStyles: React.Dispatch<React.SetStateAction<CustomStyle[]>>;
   updateSettings: (newSettings: Partial<AppSettings>) => void;
   user: any;
+  models: ModelInfo[];
 }
 
 const PREVIEW_SUBJECTS = [
@@ -23,7 +23,7 @@ const PREVIEW_SUBJECTS = [
     "A magical forest"
 ];
 
-export const CreateStyle: React.FC<CreateStyleProps> = memo(({ onNavigate, settings, styles, setStyles, updateSettings, user }) => {
+export const CreateStyle: React.FC<CreateStyleProps> = memo(({ onNavigate, settings, styles, setStyles, updateSettings, user, models }) => {
   const [name, setName] = useState('');
   const [suffix, setSuffix] = useState('');
   const [selectedModel, setSelectedModel] = useState('flux');
@@ -218,7 +218,7 @@ export const CreateStyle: React.FC<CreateStyleProps> = memo(({ onNavigate, setti
                             onChange={(e) => setSelectedModel(e.target.value)}
                             className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white text-sm font-bold appearance-none focus:ring-1 focus:ring-primary/50"
                         >
-                            {AVAILABLE_MODELS.map(m => (
+                            {models.map(m => (
                                 <option key={m.id} value={m.id} className="bg-black">{m.name}</option>
                             ))}
                         </select>

@@ -98,17 +98,20 @@ export enum AppRoute {
   CREATE_PRESET = 'create_preset',
   COMMUNITY = 'community',
   LEADERBOARD = 'leaderboard',
-  MESSAGES = 'messages'
+  MESSAGES = 'messages',
+  WHATS_NEW = 'whats_new'
 }
 
-export const AVAILABLE_MODELS = [
-  { id: 'flux', name: 'Flux Schnell', description: 'High-speed Latent Diffusion' },
-  { id: 'flux-2-dev', name: 'Flux.2 Dev', description: 'Alpha Neural Architecture' },
-  { id: 'dirtberry', name: 'Dirtberry', description: 'Organic Texture Synthesis' },
-  { id: 'zimage', name: 'Z-Image Turbo', description: 'Poly-modal Synthesis' },
-  { id: 'imagen-4', name: 'Imagen 4', description: 'Google DeepMind Vision' },
-  { id: 'grok-imagine', name: 'Grok Imagine', description: 'X.AI Creative Engine' },
-];
+export interface ModelInfo {
+  id: string;
+  name: string;
+  description: string;
+  paid_only: boolean;
+  price: number;
+  base_model?: string;
+  type?: string;
+  url?: string;
+}
 
 export const ASPECT_RATIOS = [
   { label: '1:1', width: 1536, height: 1536 },

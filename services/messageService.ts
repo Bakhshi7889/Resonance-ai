@@ -3,7 +3,7 @@ import { DirectMessage } from '../types';
 
 export const messageService = {
   async sendMessage(userId: string, email: string, content: string) {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('messages')
       .insert([
         { 
@@ -11,12 +11,10 @@ export const messageService = {
           user_email: email, 
           content: content 
         }
-      ])
-      .select()
-      .single();
+      ]);
 
     if (error) throw error;
-    return data as DirectMessage;
+    return { id: 'sent', user_id: userId, user_email: email, content, is_read: false, created_at: new Date().toISOString() } as DirectMessage;
   },
 
   async getMessages() {

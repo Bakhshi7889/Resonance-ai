@@ -3,8 +3,9 @@ import React, { useState, memo, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppRoute, AppSettings, CustomStyle } from '../types';
 import { Header } from './Header';
-import { Trash2, Eye, EyeOff, Check, Heart, ChevronUp, ChevronDown, Star } from 'lucide-react';
+import { Trash2, Eye, EyeOff, Check, Heart, ChevronUp, ChevronDown, Star, Edit2, RotateCcw, Save, X } from 'lucide-react';
 import { styleService } from '../services/styleService';
+import { supabase } from '../services/supabase';
 
 interface StyleLibraryProps {
   onNavigate: (route: AppRoute) => void;
@@ -21,6 +22,7 @@ const StyleCard = memo(({
     onToggleFavorite,
     onMove,
     onDelete,
+    onEdit,
     isHidden,
     isCustom,
     isActive,
@@ -33,6 +35,7 @@ const StyleCard = memo(({
     onToggleFavorite: (id: string) => void,
     onMove: (id: string, direction: -1 | 1) => void,
     onDelete?: (id: string) => void,
+    onEdit?: (style: CustomStyle) => void,
     isHidden: boolean,
     isCustom?: boolean,
     isActive: boolean,
@@ -122,6 +125,16 @@ const StyleCard = memo(({
                             {isHidden ? <Eye size={18} /> : <EyeOff size={18} />}
                         </button>
                         
+                        {isCustom && onEdit && (
+                            <button 
+                                onClick={() => onEdit(style)}
+                                className="size-10 rounded-full bg-blue-500/20 backdrop-blur-md border border-blue-500/30 text-blue-400 flex items-center justify-center hover:bg-blue-500 hover:text-white transition-all shadow-lg active:scale-90"
+                                title="Edit Style"
+                            >
+                                <Edit2 size={18} />
+                            </button>
+                        )}
+                        
                         {isCustom && onDelete && (
                             <button 
                                 onClick={() => onDelete(style.id)}
@@ -165,6 +178,9 @@ const StyleCard = memo(({
 });
 
 export const StyleLibrary: React.FC<StyleLibraryProps> = memo(({ onNavigate, settings, styles, setStyles, updateSettings }) => {
+  const [editingStyle, setEditingStyle] = useState<CustomStyle | null>(null);
+  const [isRestoring, setIsRestoring] = useState(false);
+
   const toggleVisibility = useCallback((styleId: string) => {
       const currentHidden = settings.hiddenStyleIds || [];
       let newHidden;
@@ -253,6 +269,41 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = memo(({ onNavigate, set
       updateSettings({ styleOrder: currentOrder });
   }, [settings.styleOrder, styles, updateSettings]);
 
+  const handleRestoreDefaults = useCallback(async () => {
+      if (!confirm('Are you sure you want to restore all default styles? This will re-add any missing default styles.')) return;
+      
+      setIsRestoring(true);
+      try {
+          const { data: { user } } = await supabase!.auth.getUser();
+          if (user) {
+              const newStyles = await styleService.restoreDefaults(user.id);
+              setStyles(newStyles);
+          } else {
+              alert("Please log in to restore styles.");
+          }
+      } catch (error) {
+          console.error('Failed to restore defaults:', error);
+          alert("Failed to restore defaults. Neural link unstable.");
+      } finally {
+          setIsRestoring(false);
+      }
+  }, [setStyles]);
+
+  const handleUpdateStyle = useCallback(async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!editingStyle) return;
+
+      try {
+          const success = await styleService.updateStyle(editingStyle.id, editingStyle);
+          if (success) {
+              setStyles(prev => prev.map(s => s.id === editingStyle.id ? editingStyle : s));
+              setEditingStyle(null);
+          }
+      } catch (error) {
+          console.error("Failed to update style:", error);
+      }
+  }, [editingStyle, setStyles]);
+
   // MANUAL SORTING: Use styleOrder as the source of truth
   const sortedStyles = useMemo(() => {
       const all = [...styles];
@@ -313,6 +364,15 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = memo(({ onNavigate, set
                         )}
                     </div>
                 </div>
+
+                <button 
+                    onClick={handleRestoreDefaults}
+                    disabled={isRestoring}
+                    className="px-6 py-3 rounded-2xl bg-white/5 border border-white/10 text-white/60 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-white/10 hover:text-white transition-all disabled:opacity-50"
+                >
+                    <RotateCcw size={14} className={isRestoring ? 'animate-spin' : ''} />
+                    {isRestoring ? 'Restoring...' : 'Restore Defaults'}
+                </button>
             </div>
 
             {/* Grid */}
@@ -329,6 +389,7 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = memo(({ onNavigate, set
                                 onToggleFavorite={toggleFavorite}
                                 onMove={moveStyle}
                                 onDelete={handleDeleteCustom}
+                                onEdit={setEditingStyle}
                                 isHidden={(settings.hiddenStyleIds || []).includes(style.id)}
                                 isCustom={true} // Now all styles are custom/database-driven
                                 isActive={isActive}
@@ -341,6 +402,87 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = memo(({ onNavigate, set
                 </AnimatePresence>
             </motion.div>
         </div>
+
+        {/* Edit Modal */}
+        <AnimatePresence>
+            {editingStyle && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                    <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setEditingStyle(null)}
+                        className="absolute inset-0 bg-black/80 backdrop-blur-md"
+                    />
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                        className="relative w-full max-w-lg bg-surface-dark border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl"
+                    >
+                        <div className="p-8 space-y-6">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-xl font-black text-white uppercase tracking-tight">Edit Style</h3>
+                                <button onClick={() => setEditingStyle(null)} className="text-white/40 hover:text-white transition-colors">
+                                    <X size={24} />
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleUpdateStyle} className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] text-white/30 uppercase font-black tracking-widest ml-2">Label</label>
+                                    <input 
+                                        type="text"
+                                        value={editingStyle.label}
+                                        onChange={(e) => setEditingStyle({...editingStyle, label: e.target.value})}
+                                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm text-white focus:ring-1 focus:ring-primary transition-all"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[10px] text-white/30 uppercase font-black tracking-widest ml-2">Suffix (Prompt Modifiers)</label>
+                                    <textarea 
+                                        value={editingStyle.suffix}
+                                        onChange={(e) => setEditingStyle({...editingStyle, suffix: e.target.value})}
+                                        rows={3}
+                                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm text-white focus:ring-1 focus:ring-primary transition-all resize-none"
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] text-white/30 uppercase font-black tracking-widest ml-2">Category</label>
+                                        <input 
+                                            type="text"
+                                            value={editingStyle.category}
+                                            onChange={(e) => setEditingStyle({...editingStyle, category: e.target.value})}
+                                            className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm text-white focus:ring-1 focus:ring-primary transition-all"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] text-white/30 uppercase font-black tracking-widest ml-2">Image URL</label>
+                                        <input 
+                                            type="text"
+                                            value={editingStyle.image}
+                                            onChange={(e) => setEditingStyle({...editingStyle, image: e.target.value})}
+                                            className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm text-white focus:ring-1 focus:ring-primary transition-all"
+                                        />
+                                    </div>
+                                </div>
+
+                                <button 
+                                    type="submit"
+                                    className="w-full py-5 rounded-3xl bg-primary text-white text-[10px] font-black uppercase tracking-[0.3em] shadow-glow flex items-center justify-center gap-2 active:scale-95 transition-all mt-4"
+                                >
+                                    <Save size={16} />
+                                    Update Style Matrix
+                                </button>
+                            </form>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
+        </AnimatePresence>
       </div>
     </motion.div>
   );

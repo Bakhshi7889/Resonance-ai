@@ -19,20 +19,26 @@ export const generateImageUrl = async (params: any) => {
     if (negative_prompt) url += `&negative=${encodeURIComponent(negative_prompt)}`;
     if (safe) url += "&safe=true";
     
-    // Pollinations allows passing the API key as a query param
+    // User's personal key for generation (if provided) or the default app API key
     url += `&key=${effectiveKey}`;
     
     return url;
 };
 
 export const getAuthUrl = (redirectUri: string) => {
-    return `https://enter.pollinations.ai/authorize?redirect_url=${encodeURIComponent(redirectUri)}`;
+    const params = new URLSearchParams({
+        redirect_url: redirectUri,
+        app_key: 'pk_2yctpceb1LwUL1Vr', // Updated app key
+        models: 'flux,openai,gptimage,zimage,imagen-4,grok-imagine', // Suggested models
+    });
+    return `https://enter.pollinations.ai/authorize?${params.toString()}`;
 };
 
 export const getAccountDetails = async (apiKey?: string) => {
     const effectiveKey = getEffectiveKey(apiKey);
     try {
         addLog('info', 'Initiating account sync via Pollinations API...');
+        // Use the gen.pollinations.ai API for account details
         const response = await fetch(`https://gen.pollinations.ai/account/balance?key=${effectiveKey}`, {
             headers: {
                 'Authorization': `Bearer ${effectiveKey}`
@@ -62,15 +68,57 @@ export const getAccountDetails = async (apiKey?: string) => {
 
 export const MODEL_PRICING: Record<string, number> = {
     'flux': 0.001,
-    'flux-2-dev': 0.001,
-    'dirtberry': 0.001,
     'zimage': 0.002,
-    'imagen-4': 0.0025,
-    'grok-imagine': 0.0025
+    'klein': 0.01
 };
 
-export const getEstimatedImagesLeft = (balance: number | null, model: string = 'flux') => {
+export const IMAGE_MODELS: ModelInfo[] = [
+    { 
+        id: 'flux', 
+        name: 'Flux Schnell', 
+        description: '1K Speed Optimized', 
+        paid_only: false, 
+        price: 0.001, 
+        type: 'image',
+        url: 'https://blackforestlabs.ai/'
+    },
+    { 
+        id: 'zimage', 
+        name: 'Z-Image Turbo', 
+        description: '500 Neural Synthesis', 
+        paid_only: true, 
+        price: 0.002, 
+        type: 'image',
+        url: 'https://pollinations.ai/'
+    },
+    { 
+        id: 'klein', 
+        name: 'FLUX.2 Klein 4B', 
+        description: 'ALPHA 100 Precision', 
+        paid_only: true, 
+        price: 0.01, 
+        type: 'image',
+        url: 'https://blackforestlabs.ai/'
+    }
+];
+
+export interface ModelInfo {
+    id: string;
+    name: string;
+    description: string;
+    paid_only: boolean;
+    price: number;
+    base_model?: string;
+    type?: string;
+    url?: string;
+}
+
+export const getImageModels = async (hasCustomKey: boolean = false, apiKey?: string): Promise<ModelInfo[]> => {
+    return IMAGE_MODELS;
+};
+
+export const getEstimatedImagesLeft = (balance: number | null, model: string = 'flux', customPrice?: number) => {
     if (balance === null) return 0;
-    const price = MODEL_PRICING[model] || 0.001;
+    const price = customPrice !== undefined ? customPrice : (MODEL_PRICING[model] || 0.001);
     return Math.floor(balance / price);
 };

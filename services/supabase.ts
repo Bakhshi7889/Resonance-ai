@@ -4,7 +4,15 @@ const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL;
 const supabaseAnonKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY;
 
 export const supabase = (supabaseUrl && supabaseAnonKey) 
-  ? createClient(supabaseUrl, supabaseAnonKey) 
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storage: window.localStorage,
+        storageKey: 'resonance_supabase_auth_token'
+      }
+    }) 
   : null;
 
 export const isSupabaseConfigured = () => !!supabase;
@@ -68,6 +76,7 @@ export const isSupabaseConfigured = () => !!supabase;
  *   seed bigint,
  *   style_suffix text,
  *   is_public boolean default false,
+ *   visual_audit_passed boolean default false,
  *   likes_count integer default 0,
  *   created_at timestamp with time zone default timezone('utc'::text, now()) not null
  * );
@@ -96,4 +105,28 @@ export const isSupabaseConfigured = () => !!supabase;
  * create policy "Users can like once." on likes for insert with check (auth.uid() = user_id);
  * create policy "Users can unlike." on likes for delete using (auth.uid() = user_id);
  * create policy "Likes are public." on likes for select using (true);
+ */
+
+/**
+ * RPC FUNCTIONS (Run this in Supabase SQL Editor):
+ * 
+ * -- Increment likes_count
+ * create or replace function increment_likes(row_id uuid)
+ * returns void as $$
+ * begin
+ *   update generations
+ *   set likes_count = likes_count + 1
+ *   where id = row_id;
+ * end;
+ * $$ language plpgsql security definer;
+ * 
+ * -- Decrement likes_count
+ * create or replace function decrement_likes(row_id uuid)
+ * returns void as $$
+ * begin
+ *   update generations
+ *   set likes_count = greatest(0, likes_count - 1)
+ *   where id = row_id;
+ * end;
+ * $$ language plpgsql security definer;
  */

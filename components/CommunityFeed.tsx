@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../services/supabase';
 import { storage } from '../services/storage';
+import { messageService } from '../services/messageService';
 import { AppRoute, HistoryItem } from '../types';
 import { Header } from './Header';
-import { Sparkles, Globe, Heart, Share2, Info, User, X, ThumbsUp, MessageSquare } from 'lucide-react';
+import { Sparkles, Globe, Heart, Share2, Info, User, X, ThumbsUp, MessageSquare, RefreshCw } from 'lucide-react';
 
 interface CommunityFeedProps {
     onNavigate: (route: AppRoute) => void;
@@ -16,19 +17,27 @@ export const CommunityFeed: React.FC<CommunityFeedProps> = ({ onNavigate, user }
     const [isLoading, setIsLoading] = useState(true);
     const [selectedImage, setSelectedImage] = useState<any | null>(null);
     const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
-    const [filter, setFilter] = useState<'recent' | 'top'>('recent');
+    const [filter, setFilter] = useState<'recent' | 'top' | 'mine'>('recent');
 
     const isDeveloper = user?.email === 'herobakhshi@gmail.com';
 
-    const fetchFeed = async () => {
+    const fetchFeed = async (forceRefresh = false) => {
         if (!supabase) return;
         setIsLoading(true);
         
+        if (forceRefresh) {
+            setImages([]);
+            await storage.remove('community_feed_images');
+        }
+
         let query = supabase
             .from('generations')
             .select('*, author:profiles(name, avatar_url)');
         
-        if (filter === 'recent') {
+        if (filter === 'top') {
+            query = query.order('likes_count', { ascending: false });
+        } else if (filter === 'mine' && user) {
+            query = query.eq('user_id', user.id);
             query = query.order('created_at', { ascending: false });
         } else {
             query = query.order('created_at', { ascending: false });
@@ -36,6 +45,8 @@ export const CommunityFeed: React.FC<CommunityFeedProps> = ({ onNavigate, user }
         
         if (!isDeveloper) {
             query = query.eq('is_public', true);
+            // Only show images that passed the visual audit
+            query = query.eq('visual_audit_passed', true);
         }
         
         let { data, error } = await query;
@@ -50,6 +61,7 @@ export const CommunityFeed: React.FC<CommunityFeedProps> = ({ onNavigate, user }
                 
             if (!isDeveloper) {
                 fallbackQuery = fallbackQuery.eq('is_public', true);
+                fallbackQuery = fallbackQuery.eq('visual_audit_passed', true);
             }
             
             const fallbackResult = await fallbackQuery;
@@ -104,21 +116,53 @@ export const CommunityFeed: React.FC<CommunityFeedProps> = ({ onNavigate, user }
                 .eq('user_id', user.id)
                 .eq('generation_id', generationId);
             
-            if (!error) {
-                setLikedIds(prev => {
-                    const next = new Set(prev);
-                    next.delete(generationId);
-                    return next;
-                });
+            if (error) {
+                console.error("Failed to delete like:", error);
             }
+            
+            // Proceed even if delete fails (e.g. table doesn't exist)
+            setLikedIds(prev => {
+                const next = new Set(prev);
+                next.delete(generationId);
+                return next;
+            });
+            // Decrement likes_count in generations table
+            const { error: rpcError } = await supabase.rpc('decrement_likes', { row_id: generationId });
+            if (rpcError) {
+                console.warn("RPC decrement_likes failed, falling back to direct update:", rpcError);
+                const img = images.find(i => i.id === generationId);
+                if (img) {
+                    await supabase.from('generations').update({ likes_count: Math.max(0, (img.likes_count || 1) - 1) }).eq('id', generationId);
+                }
+            }
+            // Refresh local state for the image if it's in the list
+            setImages(prev => prev.map(img => 
+                img.id === generationId ? { ...img, likes_count: Math.max(0, (img.likes_count || 1) - 1) } : img
+            ));
         } else {
             const { error } = await supabase
                 .from('likes')
                 .insert([{ user_id: user.id, generation_id: generationId }]);
             
-            if (!error) {
-                setLikedIds(prev => new Set(prev).add(generationId));
+            if (error) {
+                console.error("Failed to insert like:", error);
             }
+            
+            // Proceed even if insert fails (e.g. table doesn't exist)
+            setLikedIds(prev => new Set(prev).add(generationId));
+            // Increment likes_count in generations table
+            const { error: rpcError } = await supabase.rpc('increment_likes', { row_id: generationId });
+            if (rpcError) {
+                console.warn("RPC increment_likes failed, falling back to direct update:", rpcError);
+                const img = images.find(i => i.id === generationId);
+                if (img) {
+                    await supabase.from('generations').update({ likes_count: (img.likes_count || 0) + 1 }).eq('id', generationId);
+                }
+            }
+            // Refresh local state for the image if it's in the list
+            setImages(prev => prev.map(img => 
+                img.id === generationId ? { ...img, likes_count: (img.likes_count || 0) + 1 } : img
+            ));
         }
     };
 
@@ -145,7 +189,7 @@ export const CommunityFeed: React.FC<CommunityFeedProps> = ({ onNavigate, user }
                         <h2 className="text-3xl font-black text-white tracking-tight">Public Feed</h2>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-center">
                         <button 
                             onClick={() => setFilter('recent')}
                             className={`px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${filter === 'recent' ? 'bg-white text-black shadow-glow' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}
@@ -157,6 +201,20 @@ export const CommunityFeed: React.FC<CommunityFeedProps> = ({ onNavigate, user }
                             className={`px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${filter === 'top' ? 'bg-white text-black shadow-glow' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}
                         >
                             Top Rated
+                        </button>
+                        {user && (
+                            <button 
+                                onClick={() => setFilter('mine')}
+                                className={`px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${filter === 'mine' ? 'bg-white text-black shadow-glow' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}
+                            >
+                                My Shared
+                            </button>
+                        )}
+                        <button 
+                            onClick={() => fetchFeed(true)}
+                            className="ml-auto size-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white transition-all active:scale-90"
+                        >
+                            <RefreshCw size={16} />
                         </button>
                     </div>
                 </div>
@@ -254,8 +312,11 @@ export const CommunityFeed: React.FC<CommunityFeedProps> = ({ onNavigate, user }
                                 >
                                     <X size={20} />
                                 </button>
-                                <button className="absolute top-6 left-6 size-10 rounded-full bg-black/40 border border-white/10 flex items-center justify-center text-white/60 hover:text-primary transition-colors">
-                                    <ThumbsUp size={20} />
+                                 <button 
+                                    onClick={(e) => handleLike(e, selectedImage.id)}
+                                    className={`absolute top-6 left-6 size-10 rounded-full bg-black/40 border border-white/10 flex items-center justify-center transition-colors ${likedIds.has(selectedImage.id) ? 'text-primary' : 'text-white/60 hover:text-primary'}`}
+                                >
+                                    <ThumbsUp size={20} fill={likedIds.has(selectedImage.id) ? "currentColor" : "none"} />
                                 </button>
                             </div>
                             <div className="p-6 space-y-4">
@@ -270,7 +331,23 @@ export const CommunityFeed: React.FC<CommunityFeedProps> = ({ onNavigate, user }
                                         </div>
                                         <p className="text-xs font-bold text-white">{selectedImage.author?.name || 'Anonymous Creator'}</p>
                                     </div>
-                                    <button className="text-white/60 hover:text-primary transition-colors">
+                                    <button 
+                                        onClick={() => {
+                                            if (selectedImage.user_id === user?.id) {
+                                                alert("You cannot message yourself.");
+                                                return;
+                                            }
+                                            const msg = prompt(`Send a message to ${selectedImage.author?.name || 'Anonymous'}:`);
+                                            if (msg && msg.trim()) {
+                                                messageService.sendMessage(
+                                                    user?.id || 'anonymous',
+                                                    user?.email || 'anonymous',
+                                                    `Regarding image "${selectedImage.prompt.substring(0, 30)}...": ${msg}`
+                                                ).then(() => alert("Message sent to creator.")).catch(() => alert("Failed to send message."));
+                                            }
+                                        }}
+                                        className="text-white/60 hover:text-primary transition-colors"
+                                    >
                                         <MessageSquare size={20} />
                                     </button>
                                 </div>

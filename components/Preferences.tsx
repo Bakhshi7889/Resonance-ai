@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DownloadCloud, Smartphone, Share, PlusSquare, ArrowLeft, ExternalLink, RefreshCw, Layers, Download, PlusCircle, Trash2, Wand2, Terminal, Copy, Globe, Trophy, Github, Mail, LogIn, LogOut, User, MessageSquare, Check, Send, Inbox, ShieldCheck, Eye, EyeOff } from 'lucide-react';
-import { AppSettings, AppRoute, AccountState, DirectMessage, HistoryItem } from '../types';
+import { DownloadCloud, Smartphone, Share, PlusSquare, ArrowLeft, ExternalLink, RefreshCw, Layers, Download, PlusCircle, Trash2, Wand2, Terminal, Copy, Globe, Trophy, Github, Mail, LogIn, LogOut, User, MessageSquare, Check, Send, Inbox, ShieldCheck, Eye, EyeOff, Sparkles, ChevronRight, Zap } from 'lucide-react';
+import { AppSettings, AppRoute, AccountState, DirectMessage, HistoryItem, ModelInfo } from '../types';
 import { getAccountDetails, getEstimatedImagesLeft, getAuthUrl, MODEL_PRICING } from '../services/pollinations';
 import { getLogs, clearLogs, LogEntry } from '../services/logger';
 import { supabase } from '../services/supabase';
@@ -16,9 +16,10 @@ interface PreferencesProps {
   accountState: AccountState;
   refreshAccount: () => void;
   history: HistoryItem[];
+  models: ModelInfo[];
 }
 
-export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateSettings, onNavigate, canInstall, onInstallApp, accountState, refreshAccount, history }) => {
+export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateSettings, onNavigate, canInstall, onInstallApp, accountState, refreshAccount, history, models }) => {
   const [localLogs, setLocalLogs] = useState<LogEntry[]>([]);
   const [showLogs, setShowLogs] = useState(false);
   const [authEmail, setAuthEmail] = useState('');
@@ -39,7 +40,28 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
   const [messageSent, setMessageSent] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
+  const [globalPollen, setGlobalPollen] = useState<number>(0);
+
   const isDeveloper = accountState.user?.email === 'herobakhshi@gmail.com';
+
+  const fetchGlobalPollen = useCallback(async () => {
+    if (!isDeveloper || !supabase) return;
+    try {
+        const { data, error } = await supabase
+            .from('generations')
+            .select('model');
+        if (!error && data) {
+            const total = data.reduce((sum, item) => {
+                const modelData = models.find(m => m.id === item.model);
+                const price = modelData ? modelData.price : (MODEL_PRICING[item.model as string] || 0.001);
+                return sum + price;
+            }, 0);
+            setGlobalPollen(total);
+        }
+    } catch (e) {
+        console.error("Failed to fetch global pollen", e);
+    }
+  }, [isDeveloper, models]);
 
   const refreshLogs = useCallback(() => {
       const logs = getLogs();
@@ -80,8 +102,9 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
   useEffect(() => {
     if (isDeveloper) {
         fetchUnreadCount();
+        fetchGlobalPollen();
     }
-  }, [isDeveloper, fetchUnreadCount]);
+  }, [isDeveloper, fetchUnreadCount, fetchGlobalPollen]);
 
   const handleSendMessage = async () => {
     if (!messageContent.trim() || !accountState.user) return;
@@ -394,6 +417,8 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
                                             <div className="relative">
                                                 <input 
                                                     type="email"
+                                                    name="resonance_id"
+                                                    autoComplete="username"
                                                     value={authEmail}
                                                     onChange={(e) => setAuthEmail(e.target.value)}
                                                     placeholder="Neural ID (Email)"
@@ -405,6 +430,8 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
                                             <div className="relative">
                                                 <input 
                                                     type={showPassword ? "text" : "password"}
+                                                    name="resonance_key"
+                                                    autoComplete={isSignUp ? "new-password" : "current-password"}
                                                     value={authPassword}
                                                     onChange={(e) => setAuthPassword(e.target.value)}
                                                     placeholder="Access Key (Password)"
@@ -542,70 +569,93 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
             </div>
         </section>
 
-        {/* Community & Rankings */}
         <section className="space-y-4 will-change-transform">
-            <p className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-2">BYOP • Access Core</p>
-            <div className="bg-white/[0.03] backdrop-blur-[40px] rounded-[3rem] p-8 border-[0.5px] border-white/15 space-y-8">
-                <div className="flex flex-col gap-4">
-                    <div className="flex justify-between items-center px-1">
-                        <div className="flex flex-col">
-                            <label className="text-[10px] text-white/30 uppercase font-black tracking-widest">Synthetic Key</label>
-                            <div className="mt-1.5">
-                                {!isManual ? (
-                                    <span className="px-2 py-0.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-[8px] font-black uppercase tracking-widest text-blue-400">CORE ACTIVE</span>
-                                ) : (
-                                    <span className="px-2 py-0.5 rounded-lg bg-primary/10 border border-primary/20 text-[8px] font-black uppercase tracking-widest text-primary">MANUAL OVERRIDE</span>
-                                )}
+            <p className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-2">System Intelligence</p>
+            <button 
+                onClick={() => onNavigate(AppRoute.WHATS_NEW)}
+                className="w-full bg-white/[0.03] backdrop-blur-[40px] rounded-full p-1.5 pl-3 pr-5 border-[0.5px] border-white/15 flex items-center justify-between gap-3 hover:bg-white/5 transition-all active:scale-95"
+            >
+                <div className="flex items-center gap-3">
+                    <div className="size-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 shrink-0">
+                        <Sparkles size={16} />
+                    </div>
+                    <div className="flex flex-col gap-0 items-start">
+                        <span className="text-sm font-bold text-white tracking-tight">What's New</span>
+                        <span className="text-[8px] text-white/30 uppercase font-black tracking-widest leading-relaxed text-left">Neural Updates</span>
+                    </div>
+                </div>
+                <ChevronRight size={14} className="text-white/20 shrink-0" />
+            </button>
+        </section>
+
+        {/* Bring Your Own Pollen (BYOP) */}
+        <section className="space-y-4 will-change-transform">
+            <div className="flex items-center justify-between px-2">
+                <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Neural Sync</p>
+                <div className="flex items-center gap-2">
+                    <span className={`size-1.5 rounded-full ${isManual ? 'bg-primary shadow-glow animate-pulse' : 'bg-blue-500/40'}`} />
+                    <span className={`text-[9px] font-black uppercase tracking-widest ${isManual ? 'text-primary' : 'text-white/20'}`}>
+                        {isManual ? 'Account Linked' : 'System Core'}
+                    </span>
+                </div>
+            </div>
+            
+            <div className="bg-white/[0.03] backdrop-blur-[40px] rounded-[2.5rem] p-6 border-[0.5px] border-white/15 relative overflow-hidden">
+                <div className="flex flex-col gap-6">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                                <Zap size={20} />
+                            </div>
+                            <div className="flex flex-col">
+                                <h3 className="text-sm font-black tracking-tight text-white uppercase">Neural Account</h3>
+                                <p className="text-[9px] text-white/30 uppercase font-black tracking-widest">Sync your Pollinations credits</p>
                             </div>
                         </div>
                         <button 
-                            onClick={handleOpenPollinations}
-                            className="text-[9px] text-primary font-black uppercase tracking-widest flex items-center gap-1.5 hover:underline"
-                        >
-                            GET KEY <ExternalLink size={12} />
-                        </button>
-                    </div>
-                    <div className="relative">
-                        <input 
-                            type="password"
-                            value={settings.apiKey}
-                            onChange={(e) => updateSettings({ apiKey: e.target.value })}
-                            placeholder={!isManual ? "pk_3GSNVF... (System Active)" : "Synthetic Token (pk_...)"}
-                            className="w-full bg-white/[0.03] border border-white/10 rounded-2xl px-6 py-4 text-sm font-mono text-white focus:ring-1 focus:ring-primary/40 focus:border-primary/40 transition-all placeholder:text-white/10"
-                        />
-                    </div>
-                </div>
-
-                <div className="flex flex-col gap-8 pt-8 border-t border-white/5">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="flex flex-col">
-                          <span className="text-4xl font-black font-mono tracking-tighter text-blue-400">
-                            ${accountState.balance?.toFixed(3) || '0.000'}
-                          </span>
-                          <span className="text-[9px] text-white/30 uppercase font-black tracking-[0.2em] mt-2">Available Credits</span>
-                        </div>
-                        <div className="flex flex-col items-end">
-                          <span className="text-4xl font-black font-mono tracking-tighter text-emerald-400">
-                            {history.reduce((sum, item) => sum + (MODEL_PRICING[item.model] || 0.001), 0).toFixed(4)}
-                          </span>
-                          <span className="text-[9px] text-white/30 uppercase font-black tracking-widest mt-2">Total Pollen Used</span>
-                        </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-3">
-                        <button 
                             onClick={handleConnectExternal}
-                            className="py-4 rounded-2xl bg-white text-black text-[10px] font-black uppercase tracking-[0.2em] shadow-liquid active:scale-95 transition-all"
+                            className="px-6 py-3 rounded-xl bg-white text-black text-[10px] font-black uppercase tracking-widest shadow-liquid active:scale-95 transition-all flex items-center gap-2"
                         >
-                            BYOP SYNC
+                            <LogIn size={14} />
+                            Sync Now
                         </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 pt-6 border-t border-white/5">
+                        <div className="flex flex-col p-5 rounded-2xl bg-white/[0.02] border border-white/5">
+                            <span className="text-2xl font-black font-mono tracking-tighter text-blue-400">
+                                ${accountState.balance?.toFixed(3) || '0.000'}
+                            </span>
+                            <span className="text-[8px] text-white/30 uppercase font-black tracking-widest mt-1.5">Available Balance</span>
+                        </div>
+                        <div className="flex flex-col p-5 rounded-2xl bg-white/[0.02] border border-white/5 items-end">
+                            <span className="text-2xl font-black font-mono tracking-tighter text-emerald-400">
+                                {isDeveloper ? globalPollen.toFixed(4) : history.reduce((sum, item) => {
+                                    const modelData = models.find(m => m.id === item.model);
+                                    const price = modelData ? modelData.price : (MODEL_PRICING[item.model] || 0.001);
+                                    return sum + price;
+                                }, 0).toFixed(4)}
+                            </span>
+                            <span className="text-[8px] text-white/30 uppercase font-black tracking-widest mt-1.5">Session Usage</span>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center justify-between px-2">
                         <button 
                             onClick={refreshAccount}
-                            className="py-4 rounded-2xl bg-white/10 text-white text-[10px] font-black uppercase tracking-[0.2em] border border-white/10 active:scale-95 transition-all flex items-center justify-center gap-2"
+                            className="text-[9px] text-white/30 uppercase font-black tracking-widest flex items-center gap-2 hover:text-white transition-colors"
                         >
-                            <RefreshCw size={14} className={accountState.isLoading ? 'animate-spin' : ''} />
-                            FORCE SYNC
+                            <RefreshCw size={12} className={accountState.isLoading ? 'animate-spin' : ''} />
+                            Refresh Status
                         </button>
+                        {isManual && (
+                            <button 
+                                onClick={() => updateSettings({ apiKey: 'sk_fH3vuxg5ULiDIzbVK7y6ejUg4eK1f0VF' })}
+                                className="text-[9px] text-red-400/60 uppercase font-black tracking-widest hover:text-red-400 transition-colors"
+                            >
+                                Unlink Account
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>

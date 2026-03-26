@@ -8,7 +8,7 @@ export const enhancePrompt = async (
     onChunk?: (chunk: string) => void
 ): Promise<string> => {
     const effectiveKey = getEffectiveKey(apiKey);
-    addLog('info', 'Enhancing prompt with Step 3.5 Flash via Pollinations', { original: prompt, model });
+    addLog('info', 'Enhancing prompt with Google Gemini 2.5 Flash Lite via Pollinations', { original: prompt, model });
     
     let instructions = "";
 
@@ -161,7 +161,7 @@ export const enhancePrompt = async (
                 'Authorization': `Bearer ${effectiveKey}`
             },
             body: JSON.stringify({
-                model: 'step-3.5-flash',
+                model: 'gemini-fast',
                 messages: [
                     { role: 'system', content: `You are an elite AI prompt architect. ${instructions}` },
                     { role: 'user', content: `Original Idea: ${prompt}` }

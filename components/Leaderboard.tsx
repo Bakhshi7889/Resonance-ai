@@ -21,7 +21,7 @@ interface LeaderboardItem {
 export const Leaderboard: React.FC<{ onNavigate: (route: AppRoute) => void }> = ({ onNavigate }) => {
     const [items, setItems] = useState<LeaderboardItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [timeframe, setTimeframe] = useState<'month' | 'all'>('month');
+    const [timeframe, setTimeframe] = useState<'week' | 'month' | 'all'>('week');
 
     useEffect(() => {
         const fetchLeaderboard = async () => {
@@ -29,36 +29,55 @@ export const Leaderboard: React.FC<{ onNavigate: (route: AppRoute) => void }> = 
             try {
                 if (!supabase) return;
 
-                // Mocking leaderboard data for now since we don't have a real 'likes' system yet
-                // In a real app, you'd query a view or a table that aggregates likes
-                let { data, error } = await supabase
+                let query = supabase
                     .from('generations')
                     .select('*, author:profiles(name, avatar_url)')
                     .eq('is_public', true)
-                    .order('created_at', { ascending: false })
-                    .limit(20);
+                    .order('likes_count', { ascending: false })
+                    .limit(50);
+
+                if (timeframe === 'week') {
+                    const sevenDaysAgo = new Date();
+                    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+                    query = query.gte('created_at', sevenDaysAgo.toISOString());
+                } else if (timeframe === 'month') {
+                    const thirtyDaysAgo = new Date();
+                    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                    query = query.gte('created_at', thirtyDaysAgo.toISOString());
+                }
+
+                let { data, error } = await query;
 
                 if (error && error.message.includes('profiles')) {
                     console.warn('Profiles table not found, falling back to basic query.');
-                    const fallbackResult = await supabase
+                    let fallbackQuery = supabase
                         .from('generations')
                         .select('*')
                         .eq('is_public', true)
-                        .order('created_at', { ascending: false })
-                        .limit(20);
+                        .order('likes_count', { ascending: false })
+                        .limit(50);
+                    
+                    if (timeframe === 'week') {
+                        const sevenDaysAgo = new Date();
+                        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+                        fallbackQuery = fallbackQuery.gte('created_at', sevenDaysAgo.toISOString());
+                    } else if (timeframe === 'month') {
+                        const thirtyDaysAgo = new Date();
+                        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                        fallbackQuery = fallbackQuery.gte('created_at', thirtyDaysAgo.toISOString());
+                    }
+
+                    const fallbackResult = await fallbackQuery;
                     data = fallbackResult.data;
                     error = fallbackResult.error;
                 }
 
                 if (error) throw error;
 
-                // Add fake likes for demonstration if they don't exist
                 const formattedData = (data || []).map((item, index) => ({
                     ...item,
-                    likes_count: Math.floor(Math.random() * 500) + (20 - index) * 10,
                     rank: index + 1
-                })).sort((a, b) => b.likes_count - a.likes_count)
-                  .map((item, index) => ({ ...item, rank: index + 1 }));
+                }));
 
                 setItems(formattedData);
             } catch (err) {
@@ -108,16 +127,22 @@ export const Leaderboard: React.FC<{ onNavigate: (route: AppRoute) => void }> = 
 
             <div className="pt-32 px-6 max-w-2xl mx-auto">
                 {/* Timeframe Switcher */}
-                <div className="flex p-1 bg-white/5 rounded-2xl border border-white/5 mb-10">
+                <div className="flex p-1 bg-white/5 rounded-full border border-white/10 mb-10 max-w-[320px] mx-auto">
+                    <button 
+                        onClick={() => setTimeframe('week')}
+                        className={`flex-1 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${timeframe === 'week' ? 'bg-white text-black shadow-glow' : 'text-white/40 hover:text-white/60'}`}
+                    >
+                        Weekly Best
+                    </button>
                     <button 
                         onClick={() => setTimeframe('month')}
-                        className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${timeframe === 'month' ? 'bg-primary text-white shadow-glow' : 'text-white/40'}`}
+                        className={`flex-1 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${timeframe === 'month' ? 'bg-white text-black shadow-glow' : 'text-white/40 hover:text-white/60'}`}
                     >
-                        Monthly Best
+                        Monthly
                     </button>
                     <button 
                         onClick={() => setTimeframe('all')}
-                        className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${timeframe === 'all' ? 'bg-primary text-white shadow-glow' : 'text-white/40'}`}
+                        className={`flex-1 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${timeframe === 'all' ? 'bg-white text-black shadow-glow' : 'text-white/40 hover:text-white/60'}`}
                     >
                         All Time
                     </button>

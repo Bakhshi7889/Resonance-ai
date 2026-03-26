@@ -8,11 +8,12 @@ import { CreateStyle } from './components/CreateStyle';
 import { CommunityFeed } from './components/CommunityFeed';
 import { Leaderboard } from './components/Leaderboard';
 import { Messages } from './components/Messages';
-import { AppSettings, AppRoute, HistoryItem, CustomStyle, AccountState } from './types';
+import { WhatsNew } from './components/WhatsNew';
+import { AppSettings, AppRoute, HistoryItem, CustomStyle, AccountState, ModelInfo } from './types';
 import { supabase } from './services/supabase';
 import { storage } from './services/storage';
 import { styleService } from './services/styleService';
-import { getAccountDetails } from './services/pollinations';
+import { getAccountDetails, getImageModels, IMAGE_MODELS } from './services/pollinations';
 
 const STORAGE_KEY_SETTINGS = 'resonance_v4_settings';
 const STORAGE_KEY_HISTORY = 'resonance_v4_history';
@@ -31,21 +32,36 @@ const DEFAULT_SETTINGS: AppSettings = {
   hiddenStyleIds: [],
   favoriteStyleIds: [],
   styleOrder: [], 
-  apiKey: 'sk_fH3vuxg5ULiDIzbVK7y6ejUg4eK1f0VF',
+  apiKey: 'pk_N2YEvo5VHzELOFio',
   quality: 'hd',
   infiniteMode: false,
   seed: 0,
   visualSafety: true
 };
 
+const getInitialUser = () => {
+  try {
+    const stored = localStorage.getItem('resonance_supabase_auth_token');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      // Supabase v2 stores the session directly or wrapped
+      return parsed?.user || parsed?.currentSession?.user || parsed?.session?.user || null;
+    }
+  } catch (e) {
+    return null;
+  }
+  return null;
+};
+
 const App: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<AppRoute>(AppRoute.GENERATOR);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<any>(getInitialUser());
   const [isStorageLoaded, setIsStorageLoaded] = useState(false);
   
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [styles, setStyles] = useState<CustomStyle[]>([]);
+  const [models, setModels] = useState<ModelInfo[]>(IMAGE_MODELS);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [sessionPrompt, setSessionPrompt] = useState('');
   const [sessionImages, setSessionImages] = useState<HistoryItem[]>([]);
@@ -55,7 +71,7 @@ const App: React.FC = () => {
     usage: [], 
     isLoading: false, 
     error: null,
-    user: null
+    user: getInitialUser()
   });
 
   const fetchAccount = useCallback(async () => {
@@ -70,7 +86,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const loadStorage = async () => {
       try {
-        // Fetch dynamic styles first
+        // Fetch dynamic styles
         const fetchedStyles = await styleService.getStyles();
         setStyles(fetchedStyles);
 
@@ -79,6 +95,8 @@ const App: React.FC = () => {
         let storedHistory = await storage.get<HistoryItem[]>(STORAGE_KEY_HISTORY);
         let storedPrompt = await storage.get<string>(STORAGE_KEY_SESSION_PROMPT);
         let storedImages = await storage.get<HistoryItem[]>(STORAGE_KEY_SESSION_IMAGES);
+
+        // ... (rest of migration logic)
 
         // 2. Migration from localStorage if IndexedDB is empty
         if (!storedSettings) {
@@ -129,6 +147,8 @@ const App: React.FC = () => {
             storedSettings.model = 'flux';
           }
           setSettings({ ...DEFAULT_SETTINGS, ...storedSettings });
+        } else {
+          setSettings(DEFAULT_SETTINGS);
         }
 
         if (storedHistory) setHistory(storedHistory);
@@ -148,7 +168,7 @@ const App: React.FC = () => {
     };
 
     loadStorage();
-  }, []);
+  }, [fetchAccount]);
 
   // Supabase Auth Listener
   useEffect(() => {
@@ -302,6 +322,7 @@ const App: React.FC = () => {
             key="generator"
             settings={settings} 
             styles={styles}
+            models={models}
             updateSettings={handleUpdateSettings}
             onNavigate={setCurrentRoute}
             onAddToHistory={handleAddToHistory}
@@ -340,6 +361,7 @@ const App: React.FC = () => {
             accountState={accountState}
             refreshAccount={fetchAccount}
             history={history}
+            models={models}
           />
         );
       case AppRoute.STYLE_LIBRARY:
@@ -363,6 +385,7 @@ const App: React.FC = () => {
                 updateSettings={handleUpdateSettings}
                 onNavigate={setCurrentRoute}
                 user={user}
+                models={models}
             />
         );
       case AppRoute.COMMUNITY:
@@ -386,6 +409,13 @@ const App: React.FC = () => {
                 key="messages"
                 onNavigate={setCurrentRoute}
                 user={user}
+            />
+        );
+      case AppRoute.WHATS_NEW:
+        return (
+            <WhatsNew 
+                key="whats_new"
+                onNavigate={setCurrentRoute}
             />
         );
       default:

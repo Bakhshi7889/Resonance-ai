@@ -4,11 +4,11 @@ import {
     Settings, LayoutGrid, Shuffle, Eraser, Maximize2, Minimize2, 
     Trash2, EyeOff, Wand2, Zap, ArrowUp, ChevronDown, 
     Check, ShieldCheck, XCircle, Hash, Clock, AlertTriangle, RefreshCw, Layers, Heart,
-    Sparkles, Loader2, Camera, Plus, X, LogIn, LogOut, User, Globe, Download, Share2
+    Sparkles, Loader2, Camera, Plus, X, LogIn, LogOut, User, Globe, Download, Share2, Video, ExternalLink
 } from 'lucide-react';
 import { generateImageUrl, getRandomSeed, getAccountDetails, getEstimatedImagesLeft, getEffectiveKey } from '../services/pollinations';
 import { downloadImage } from '../services/utils';
-import { AppRoute, AppSettings, HistoryItem, ASPECT_RATIOS, AccountState, AVAILABLE_MODELS, CustomStyle } from '../types';
+import { AppRoute, AppSettings, HistoryItem, ASPECT_RATIOS, AccountState, ModelInfo, CustomStyle } from '../types';
 import { addLog } from '../services/logger';
 import { enhancePrompt } from '../services/ai';
 import { supabase } from '../services/supabase';
@@ -27,12 +27,13 @@ const performVisualAudit = async (imageUrl: string): Promise<boolean> => {
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
+    img.referrerPolicy = "no-referrer";
     img.src = imageUrl;
     img.onload = () => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       if (!ctx) return resolve(false);
-      const w = 100, h = 100;
+      const w = 10, h = 10;
       canvas.width = w; canvas.height = h;
       ctx.drawImage(img, 0, 0, w, h);
       const data = ctx.getImageData(0, 0, w, h).data;
@@ -68,6 +69,7 @@ const RatioIcon = ({ width, height, isSelected }: { width: number, height: numbe
 interface ImageGeneratorProps {
   settings: AppSettings;
   styles: CustomStyle[];
+  models: ModelInfo[];
   onNavigate: (route: AppRoute) => void;
   onAddToHistory: (item: HistoryItem) => void;
   updateSettings?: (s: Partial<AppSettings>) => void;
@@ -221,9 +223,23 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady, onNaviga
         return;
     }
 
+    // Perform visual audit before sharing
+    setIsAuditing(true);
+    const isRisky = await performVisualAudit(item.url);
+    setIsAuditing(false);
+
+    if (isRisky) {
+        alert("Neural Safety Alert: This image contains content that violates our community guidelines and cannot be shared publicly.");
+        setVisualRisk(true);
+        return;
+    }
+
     const { error } = await supabase
         .from('generations')
-        .update({ is_public: true })
+        .update({ 
+            is_public: true,
+            visual_audit_passed: true // Flag that it passed the audit
+        })
         .eq('url', item.url)
         .eq('user_id', session.user.id);
 
@@ -278,6 +294,8 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady, onNaviga
           <img 
             src={item.url} 
             alt="vision"
+            crossOrigin="anonymous"
+            referrerPolicy="no-referrer"
             className={`w-full h-full object-cover transition-all duration-500 ease-out ${isLoaded && !isAuditing ? 'opacity-100' : 'opacity-0'} ${(visualRisk && !revealed) ? 'blur-[80px] saturate-50 brightness-50' : 'blur-0'}`}
             onLoad={handleImageLoad}
             onError={handleImageError}
@@ -409,8 +427,8 @@ const NeuralMesh = memo(({ meshData, visibleStylesCount }: { meshData: any, visi
     );
 });
 
-const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, styles }: { 
-    localSettings: AppSettings, updateLocalSetting: (k: keyof AppSettings, v: any) => void, setAspectRatio: (w: number, h: number) => void, styles: CustomStyle[]
+const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, styles, models }: { 
+    localSettings: AppSettings, updateLocalSetting: (k: keyof AppSettings, v: any) => void, setAspectRatio: (w: number, h: number) => void, styles: CustomStyle[], models: ModelInfo[]
 }) => {
     // Get effective key for previews
     const effectiveKey = useMemo(() => getEffectiveKey(localSettings.apiKey), [localSettings.apiKey]);
@@ -453,19 +471,10 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, 
             if (aFav && !bFav) return -1;
             if (!aFav && bFav) return 1;
 
-            // Manual Order (styleOrder) if available
-            if (localSettings.styleOrder && localSettings.styleOrder.length > 0) {
-                let idxA = localSettings.styleOrder.indexOf(a.id);
-                let idxB = localSettings.styleOrder.indexOf(b.id);
-                if (idxA === -1) idxA = 9999;
-                if (idxB === -1) idxB = 9999;
-                return idxA - idxB;
-            }
-
-            // Fallback to alphabetical or default
+            // Fallback to default order (which is sorted by order property from styleService)
             return 0;
         });
-    }, [localSettings.hiddenStyleIds, allStyles, localSettings.activeStyles, localSettings.styleOrder]);
+    }, [localSettings.hiddenStyleIds, allStyles, localSettings.activeStyles]);
 
     const activeCount = localSettings.activeStyles.filter(s => s !== 'none').length;
 
@@ -535,23 +544,52 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, 
             <div className="space-y-3">
                 <p className="text-[8px] text-white/40 font-black uppercase tracking-[0.2em] pl-1">Batch Capacity</p>
                 <div className="grid grid-cols-4 gap-1.5 bg-white/10 backdrop-blur-md p-1.5 rounded-2xl border border-white/10">
-                    {[1, 2, 3, 4].map(n => (
-                        <button key={n} onClick={() => updateLocalSetting('imageCount', n)} className={`h-12 rounded-xl text-[9px] font-black transition-all ${localSettings.imageCount === n ? 'bg-primary text-white shadow-glow' : 'text-white/30 hover:text-white/50'}`}>{n}x</button>
-                    ))}
+                    {[1, 2, 3, 4].map(n => {
+                        const maxBatch = localSettings.model === 'klein' ? 1 : (localSettings.model === 'zimage' ? 2 : 4);
+                        const isDisabled = n > maxBatch;
+                        return (
+                            <button 
+                                key={n} 
+                                onClick={() => !isDisabled && updateLocalSetting('imageCount', n)} 
+                                disabled={isDisabled}
+                                className={`h-12 rounded-xl text-[9px] font-black transition-all ${localSettings.imageCount === n ? 'bg-primary text-white shadow-glow' : 'text-white/30 hover:text-white/50'} ${isDisabled ? 'opacity-20 cursor-not-allowed' : ''}`}
+                            >
+                                {n}x
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
 
             <div className="space-y-3">
                 <p className="text-[8px] text-white/40 font-black uppercase tracking-[0.2em] pl-1">Neural Model</p>
                 <div className="grid grid-cols-3 gap-2 bg-white/10 backdrop-blur-md p-1.5 rounded-2xl border border-white/10">
-                    {AVAILABLE_MODELS.map(m => (
+                    {models.map(m => (
                         <button 
                             key={m.id} 
-                            onClick={() => updateLocalSetting('model', m.id)} 
-                            className={`h-12 rounded-xl text-[8px] font-black transition-all flex flex-col items-center justify-center gap-1 ${localSettings.model === m.id ? 'bg-primary text-white shadow-glow' : 'text-white/30 hover:text-white/50'}`}
+                            onClick={() => {
+                                updateLocalSetting('model', m.id);
+                                const maxBatch = m.id === 'klein' ? 1 : (m.id === 'zimage' ? 2 : 4);
+                                if (localSettings.imageCount > maxBatch) {
+                                    updateLocalSetting('imageCount', maxBatch);
+                                }
+                            }} 
+                            className={`h-12 rounded-xl text-[8px] font-black transition-all flex flex-col items-center justify-center gap-1 relative overflow-hidden ${localSettings.model === m.id ? 'bg-primary text-white shadow-glow' : 'bg-white/5 text-white/30 hover:text-white/50 border border-white/5'}`}
                         >
-                            {m.id === 'zimage' ? <Zap size={10} /> : <Sparkles size={10} />}
-                            <span className="truncate w-full px-1">{m.name}</span>
+                            <div className="flex items-center gap-1">
+                                {m.type === 'video' ? <Video size={10} className="text-blue-400" /> : (m.paid_only ? <Zap size={10} className="text-amber-400" /> : <Sparkles size={10} />)}
+                                <span className="truncate max-w-[60px]">{m.name}</span>
+                            </div>
+                            {m.price > 0 && (
+                                <span className="text-[6px] opacity-60">
+                                    ${m.price}{m.type === 'video' ? '/s' : ''}
+                                </span>
+                            )}
+                            {m.type === 'video' && (
+                                <div className="absolute top-0 right-0 px-1 py-0.5 bg-blue-500/20 text-blue-400 text-[5px] font-black uppercase tracking-tighter rounded-bl-lg">
+                                    VIDEO
+                                </div>
+                            )}
                         </button>
                     ))}
                 </div>
@@ -590,7 +628,7 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, 
                                     onClick={() => toggleStyle(style.id)} 
                                     className={`relative shrink-0 w-32 h-48 rounded-[2rem] overflow-hidden border transition-all duration-500 cursor-pointer ${isSelected ? 'border-primary shadow-[0_4px_30px_rgba(59,130,246,0.4)] scale-105 z-10' : 'border-white/10 hover:border-white/20'}`}
                                 >
-                                    <img src={previewUrl} alt={style.label} className="w-full h-full object-cover" loading="lazy" />
+                                    <img src={previewUrl} alt={style.label} crossOrigin="anonymous" referrerPolicy="no-referrer" className="w-full h-full object-cover" loading="lazy" />
                                     
                                     {/* Like Button at Top Left */}
                                     {style.id !== 'none' && (
@@ -669,7 +707,7 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, 
 });
 
 export const ImageGenerator: React.FC<ImageGeneratorProps> = ({ 
-    settings: globalSettings, styles, onNavigate, onAddToHistory, updateSettings, sessionPrompt, setSessionPrompt, sessionImages, setSessionImages, accountState, refreshAccount
+    settings: globalSettings, styles, models, onNavigate, onAddToHistory, updateSettings, sessionPrompt, setSessionPrompt, sessionImages, setSessionImages, accountState, refreshAccount
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [localSettings, setLocalSettings] = useState({ ...globalSettings });
@@ -862,6 +900,24 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
 
   const handleGenerate = async () => {
     if (!sessionPrompt) return;
+
+    if (localSettings.model === 'klein') {
+        const today = new Date().toISOString().split('T')[0];
+        let usage: { date: string, count: number } | null = await storage.get('resonance_klein_usage');
+        
+        if (!usage || usage.date !== today) {
+            usage = { date: today, count: 0 };
+        }
+        
+        if (usage.count + localSettings.imageCount > 10) {
+            showToast(`Klein 4B limit reached. You have ${Math.max(0, 10 - usage.count)} left today.`);
+            return;
+        }
+        
+        usage.count += localSettings.imageCount;
+        await storage.set('resonance_klein_usage', usage);
+    }
+
     // setShowSettings(false); // REMOVED: Keep settings open as requested
     setIsProcessing(true);
     
@@ -1153,7 +1209,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto no-scrollbar relative px-6 pb-[32vh] pt-44 will-change-transform">
           <div className="flex flex-col items-center gap-20">
-              {groupedImages.length === 0 && !isActuallyRendering ? (
+              {groupedImages.length === 0 && !isActuallyRendering && !isProcessing ? (
                   <motion.div 
                     initial={{ opacity: 0, scale: 0.9, rotateX: 20 }} 
                     animate={{ opacity: 1, scale: 1, rotateX: 0 }} 
@@ -1215,6 +1271,42 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                                   </div>
                               </motion.div>
                           ))}
+                          {isProcessing && (
+                              <motion.div 
+                                  layout
+                                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                                  exit={{ opacity: 0, scale: 0.9, y: -20 }}
+                                  transition={LIQUID_SPRING}
+                                  key="skeleton-batch"
+                                  className="w-full flex flex-col items-center gap-10"
+                              >
+                                  <div className="w-full max-w-2xl flex items-center gap-4 opacity-50">
+                                      <div className="w-10 h-10 rounded-full bg-white/10 animate-pulse" />
+                                      <div className="flex-1 h-6 bg-white/10 rounded-full animate-pulse" />
+                                  </div>
+                                  <div className="w-full flex flex-col items-center gap-16">
+                                      {Array.from({ length: localSettings.imageCount }).map((_, idx) => (
+                                          <div key={idx} className="relative shrink-0 overflow-hidden bg-white/[0.02] border-[0.5px] border-white/10 shadow-liquid rounded-[2.5rem] flex items-center justify-center w-full max-w-3xl" style={{ aspectRatio: `${localSettings.width}/${localSettings.height}` }}>
+                                              <div className="absolute inset-0 z-10 overflow-hidden bg-black/20">
+                                                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.08] to-transparent -translate-x-full animate-shimmer" style={{ backgroundSize: '200% 100%' }} />
+                                                  <div className="absolute inset-0 flex flex-col p-10 gap-6">
+                                                      <div className="w-1/2 h-5 bg-white/10 rounded-full animate-pulse" />
+                                                      <div className="w-3/4 h-4 bg-white/10 rounded-full animate-pulse delay-150" />
+                                                      <div className="mt-auto flex justify-between items-end">
+                                                          <div className="flex flex-col gap-3">
+                                                              <div className="w-32 h-3 bg-white/5 rounded-full animate-pulse" />
+                                                              <div className="w-24 h-3 bg-white/5 rounded-full animate-pulse delay-75" />
+                                                          </div>
+                                                          <div className="size-14 rounded-3xl bg-white/10 animate-pulse" />
+                                                      </div>
+                                                  </div>
+                                              </div>
+                                          </div>
+                                      ))}
+                                  </div>
+                              </motion.div>
+                          )}
                       </AnimatePresence>
                   </div>
               )}
@@ -1374,6 +1466,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                                       updateLocalSetting={updateLocalSetting} 
                                       setAspectRatio={(w, h) => { updateLocalSetting('width', w); updateLocalSetting('height', h); }} 
                                       styles={styles}
+                                      models={models}
                                   />
                               </motion.div>
                           )}
@@ -1404,11 +1497,15 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                       <img 
                           src={selectedImage.url} 
                           alt={selectedImage.prompt} 
+                          crossOrigin="anonymous"
+                          referrerPolicy="no-referrer"
                           className="w-full h-full object-contain sm:object-cover sm:scale-105 sm:blur-3xl sm:opacity-50 absolute inset-0" 
                       />
                       <img 
                           src={selectedImage.url} 
                           alt={selectedImage.prompt} 
+                          crossOrigin="anonymous"
+                          referrerPolicy="no-referrer"
                           className="relative z-10 max-w-full max-h-full object-contain shadow-2xl" 
                       />
                   </motion.div>
