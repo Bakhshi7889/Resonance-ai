@@ -139,14 +139,16 @@ const App: React.FC = () => {
           if (!storedSettings.styleOrder || storedSettings.styleOrder.length === 0) {
             storedSettings.styleOrder = fetchedStyles.map(s => s.id);
           }
-          if (!storedSettings.apiKey || storedSettings.apiKey.trim() === '') {
-            storedSettings.apiKey = 'sk_fH3vuxg5ULiDIzbVK7y6ejUg4eK1f0VF';
+          if (!storedSettings.apiKey || storedSettings.apiKey.trim() === '' || storedSettings.apiKey === 'sk_fH3vuxg5ULiDIzbVK7y6ejUg4eK1f0VF') {
+            storedSettings.apiKey = 'pk_N2YEvo5VHzELOFio';
           }
           // Migration: Switch from zimage to flux as default
           if (storedSettings.model === 'zimage') {
             storedSettings.model = 'flux';
           }
-          setSettings({ ...DEFAULT_SETTINGS, ...storedSettings });
+          const finalSettings = { ...DEFAULT_SETTINGS, ...storedSettings };
+          setSettings(finalSettings);
+          await storage.set(STORAGE_KEY_SETTINGS, finalSettings);
         } else {
           setSettings(DEFAULT_SETTINGS);
         }

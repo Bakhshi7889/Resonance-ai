@@ -1,6 +1,6 @@
 import { Handler } from '@netlify/functions';
 
-const POLLINATIONS_API_KEY = process.env.POLLINATIONS_API_KEY || 'sk_fH3vuxg5ULiDIzbVK7y6ejUg4eK1f0VF';
+const POLLINATIONS_API_KEY = process.env.POLLINATIONS_API_KEY || 'pk_N2YEvo5VHzELOFio';
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -9,7 +9,7 @@ export const handler: Handler = async (event) => {
 
   try {
     const params = JSON.parse(event.body || '{}');
-    const { prompt, model, width, height, seed, enhance, nologo, negative_prompt, safe, private: isPrivate } = params;
+    const { prompt, model, width, height, seed, enhance, nologo, negative_prompt, safe } = params;
 
     const baseUrl = 'https://gen.pollinations.ai/image/';
     const url = new URL(`${baseUrl}${encodeURIComponent(prompt)}`);
@@ -22,7 +22,6 @@ export const handler: Handler = async (event) => {
     if (nologo) url.searchParams.append('nologo', 'true');
     if (negative_prompt) url.searchParams.append('negative_prompt', negative_prompt);
     if (safe) url.searchParams.append('safe', 'true');
-    if (isPrivate) url.searchParams.append('private', 'true');
     
     if (POLLINATIONS_API_KEY) {
       url.searchParams.append('key', POLLINATIONS_API_KEY);

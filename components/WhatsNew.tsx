@@ -10,15 +10,29 @@ interface WhatsNewProps {
 
 const UPDATES = [
     {
-        id: 'v5.2',
-        version: 'v5.2.0',
-        date: 'March 26, 2026',
-        title: 'Security & Stability',
+        id: 'v5.2.2',
+        version: 'v5.2.2',
+        date: 'April 10, 2026',
+        title: 'Smoothness & API Precision',
         icon: <ShieldCheck className="text-blue-400" />,
-        description: 'We\'ve improved session management and security.',
+        description: 'We\'ve eliminated UI flicker, fixed all known bugs, and perfectly aligned our generation engine with the latest Pollinations API specifications.',
         features: [
-            'Login Persistence: Your login status is now securely saved.',
-            'API Key Update: Upgraded to a public key for enhanced security.'
+            'API Precision: Updated query parameters (negative_prompt, enhance) to match the latest spec.',
+            'Smooth UI: Eliminated rendering stutters and loading flickers across the app.',
+            'Key Verification: Confirmed and locked in the pk_N2YEvo5VHzELOFio public key for secure, rate-limited generation.',
+            'Model Cleanup: Removed legacy web links from the model selection as requested.'
+        ]
+    },
+    {
+        id: 'v5.2',
+        version: 'v5.2.1',
+        date: 'March 27, 2026',
+        title: 'API & Sync Optimization',
+        icon: <ShieldCheck className="text-blue-400" />,
+        description: 'We\'ve optimized our API integration and fixed synchronization issues.',
+        features: [
+            'API Key Update: Implemented the new public API key for generation.',
+            'Sync Fixes: Resolved critical 401 unauthorized errors during account synchronization.'
         ]
     },
     {

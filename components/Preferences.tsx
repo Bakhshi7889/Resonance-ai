@@ -292,7 +292,7 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
       setLocalLogs([]);
   };
   
-  const isManual = settings.apiKey && settings.apiKey.trim().length > 5 && settings.apiKey !== 'sk_fH3vuxg5ULiDIzbVK7y6ejUg4eK1f0VF';
+  const isManual = settings.apiKey && settings.apiKey.trim().length > 5 && settings.apiKey !== 'pk_N2YEvo5VHzELOFio';
 
   return (
     <div className="flex flex-col h-full bg-black text-white w-full overflow-y-auto no-scrollbar">
@@ -650,7 +650,7 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
                         </button>
                         {isManual && (
                             <button 
-                                onClick={() => updateSettings({ apiKey: 'sk_fH3vuxg5ULiDIzbVK7y6ejUg4eK1f0VF' })}
+                                onClick={() => updateSettings({ apiKey: 'pk_N2YEvo5VHzELOFio' })}
                                 className="text-[9px] text-red-400/60 uppercase font-black tracking-widest hover:text-red-400 transition-colors"
                             >
                                 Unlink Account

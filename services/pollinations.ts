@@ -1,13 +1,13 @@
 import { addLog } from './logger';
 
-const DEFAULT_API_KEY = 'sk_fH3vuxg5ULiDIzbVK7y6ejUg4eK1f0VF';
+const DEFAULT_API_KEY = 'pk_N2YEvo5VHzELOFio';
 
 export const getEffectiveKey = (key?: string) => key || DEFAULT_API_KEY;
 
 export const getRandomSeed = () => Math.floor(Math.random() * 1000000);
 
 export const generateImageUrl = async (params: any) => {
-    const { prompt, width, height, seed, model, nologo, negative_prompt, safe, apiKey } = params;
+    const { prompt, width, height, seed, model, nologo, negative_prompt, safe, apiKey, enhance } = params;
     const effectiveKey = getEffectiveKey(apiKey);
     
     // Direct URL with API Key for high-quality/private features
@@ -16,8 +16,9 @@ export const generateImageUrl = async (params: any) => {
     
     let url = `${baseUrl}/${encodedPrompt}?width=${width}&height=${height}&seed=${seed}&model=${model || 'flux'}`;
     if (nologo) url += "&nologo=true";
-    if (negative_prompt) url += `&negative=${encodeURIComponent(negative_prompt)}`;
+    if (negative_prompt) url += `&negative_prompt=${encodeURIComponent(negative_prompt)}`;
     if (safe) url += "&safe=true";
+    if (enhance) url += "&enhance=true";
     
     // User's personal key for generation (if provided) or the default app API key
     url += `&key=${effectiveKey}`;
@@ -28,8 +29,8 @@ export const generateImageUrl = async (params: any) => {
 export const getAuthUrl = (redirectUri: string) => {
     const params = new URLSearchParams({
         redirect_url: redirectUri,
-        app_key: 'pk_2yctpceb1LwUL1Vr', // Updated app key
-        models: 'flux,openai,gptimage,zimage,imagen-4,grok-imagine', // Suggested models
+        app_key: 'pk_N2YEvo5VHzELOFio', // Updated app key
+        models: 'flux,openai,gptimage,zimage,grok-imagine,qwen-image,klein', // Suggested models
     });
     return `https://enter.pollinations.ai/authorize?${params.toString()}`;
 };
@@ -39,7 +40,7 @@ export const getAccountDetails = async (apiKey?: string) => {
     try {
         addLog('info', 'Initiating account sync via Pollinations API...');
         // Use the gen.pollinations.ai API for account details
-        const response = await fetch(`https://gen.pollinations.ai/account/balance?key=${effectiveKey}`, {
+        const response = await fetch('https://gen.pollinations.ai/account/balance', {
             headers: {
                 'Authorization': `Bearer ${effectiveKey}`
             }
@@ -79,8 +80,7 @@ export const IMAGE_MODELS: ModelInfo[] = [
         description: '1K Speed Optimized', 
         paid_only: false, 
         price: 0.001, 
-        type: 'image',
-        url: 'https://blackforestlabs.ai/'
+        type: 'image'
     },
     { 
         id: 'zimage', 
@@ -88,8 +88,7 @@ export const IMAGE_MODELS: ModelInfo[] = [
         description: '500 Neural Synthesis', 
         paid_only: true, 
         price: 0.002, 
-        type: 'image',
-        url: 'https://pollinations.ai/'
+        type: 'image'
     },
     { 
         id: 'klein', 
@@ -97,8 +96,7 @@ export const IMAGE_MODELS: ModelInfo[] = [
         description: 'ALPHA 100 Precision', 
         paid_only: true, 
         price: 0.01, 
-        type: 'image',
-        url: 'https://blackforestlabs.ai/'
+        type: 'image'
     }
 ];
 
@@ -110,7 +108,6 @@ export interface ModelInfo {
     price: number;
     base_model?: string;
     type?: string;
-    url?: string;
 }
 
 export const getImageModels = async (hasCustomKey: boolean = false, apiKey?: string): Promise<ModelInfo[]> => {

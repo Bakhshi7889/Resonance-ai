@@ -155,7 +155,7 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady, onNaviga
               } else if (res.status === 401) {
                   errorMsg = "Unauthorized: Invalid or missing API key.";
               } else if (res.status === 402) {
-                  errorMsg = "Out of Pollen: Please top up at checkout.pollinations.ai";
+                  errorMsg = "Out of Pollen: Please top up at enter.pollinations.ai";
               } else if (res.status === 403) {
                   errorMsg = "Forbidden: You don't have permission for this model.";
               } else if (res.status === 404) {
@@ -989,11 +989,11 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
             width: targetWidth, 
             height: targetHeight, 
             seed, 
-            enhance: false, 
+            enhance: localSettings.enhance, 
             nologo: true, 
             negative_prompt: localSettings.negativePrompt || SILENT_NEGATIVE, 
-            safe: true, 
-            private: true, 
+            safe: localSettings.visualSafety, 
+            private: localSettings.privateMode, 
             apiKey: globalSettings.apiKey 
         };
         
