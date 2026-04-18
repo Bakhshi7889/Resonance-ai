@@ -7,7 +7,7 @@ import {
     Sparkles, Loader2, Camera, Plus, X, LogIn, LogOut, User, Globe, Download, Share2, Video, ExternalLink
 } from 'lucide-react';
 import { generateImageUrl, getRandomSeed, getAccountDetails, getEstimatedImagesLeft, getEffectiveKey } from '../services/pollinations';
-import { downloadImage } from '../services/utils';
+import { downloadImage, performVisualAudit } from '../services/utils';
 import { AppRoute, AppSettings, HistoryItem, ASPECT_RATIOS, AccountState, ModelInfo, CustomStyle } from '../types';
 import { addLog } from '../services/logger';
 import { enhancePrompt } from '../services/ai';
@@ -22,31 +22,6 @@ const STORAGE_KEY_TELEMETRY = 'resonance_v4_telemetry';
 const NEGATIVE_SUGGESTIONS = [
     "Blurry", "Distorted", "Lowres", "Text", "Watermark", "Malformed", "Extra Limbs", "Grainy", "Logo", "Bad Anatomy"
 ];
-
-const performVisualAudit = async (imageUrl: string): Promise<boolean> => {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.referrerPolicy = "no-referrer";
-    img.src = imageUrl;
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return resolve(false);
-      const w = 10, h = 10;
-      canvas.width = w; canvas.height = h;
-      ctx.drawImage(img, 0, 0, w, h);
-      const data = ctx.getImageData(0, 0, w, h).data;
-      let flagged = 0;
-      for (let i = 0; i < data.length; i += 4) {
-        const r = data[i], g = data[i+1], b = data[i+2];
-        if (r > 95 && g > 40 && b > 20 && (Math.max(r, g, b) - Math.min(r, g, b) > 15) && Math.abs(r - g) > 15 && r > g && r > b) flagged++;
-      }
-      resolve((flagged / (w * h)) > 0.45);
-    };
-    img.onerror = () => resolve(false);
-  });
-};
 
 const formatPollen = (balance: number | null) => {
     if (balance === null) return '$0.000';
@@ -106,13 +81,15 @@ const PromptHeader = memo(({ prompt, onClearBatch, batchId }: { prompt: string, 
     );
 });
 
-const GenerationCard = memo(({ item, index, visualSafety, onImageReady, onNavigate, showToast }: { item: HistoryItem, index: number, visualSafety: boolean, onImageReady?: (id: string) => void, onNavigate: (route: AppRoute) => void, showToast: (msg: string) => void }) => {
+const GenerationCard = memo(({ item, index, visualSafety, privateMode, onImageReady, onNavigate, showToast }: { item: HistoryItem, index: number, visualSafety: boolean, privateMode: boolean, onImageReady?: (id: string) => void, onNavigate: (route: AppRoute) => void, showToast: (msg: string) => void }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [visualRisk, setVisualRisk] = useState(false);
   const [isAuditing, setIsAuditing] = useState(false);
   const [showOverlay, setShowOverlay] = useState(false);
+  const [imgSrc, setImgSrc] = useState(item.url);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Delay the "Synthesizing" overlay to prevent flickering on fast loads
   useEffect(() => {
@@ -125,22 +102,59 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady, onNaviga
   }, [isLoaded]);
   
   const handleImageLoad = async () => {
-      if (visualSafety) {
+      let isRisky = false;
+      if (visualSafety || !privateMode) {
           setIsAuditing(true);
-          const result = await performVisualAudit(item.url);
-          setVisualRisk(result);
+          isRisky = await performVisualAudit(item.url);
+          setVisualRisk(isRisky);
           setIsAuditing(false);
       }
       setIsLoaded(true);
       if (onImageReady) onImageReady(item.id);
+
+      if (!privateMode && !isRisky && supabase) {
+          try {
+              const { data: { session } } = await supabase.auth.getSession();
+              if (session) {
+                  await supabase.from('generations').update({ is_public: true, visual_audit_passed: true })
+                      .eq('url', item.url)
+                      .eq('user_id', session.user.id);
+              }
+          } catch(e) {
+              console.error("DB Update Failed", e);
+          }
+      }
   };
 
   const handleImageError = async () => {
+      if (retryCount < 2) {
+          setRetryCount(prev => prev + 1);
+          // Small delay before retry
+          setTimeout(() => {
+              const url = new URL(item.url);
+              url.searchParams.set('retry', (retryCount + 1).toString());
+              url.searchParams.set('t', Date.now().toString());
+              setImgSrc(url.toString());
+          }, 1500);
+          return;
+      }
+
       setHasError(true);
       setIsLoaded(true); 
       if (onImageReady) onImageReady(item.id);
 
       addLog('warn', 'Image element reported error', { id: item.id });
+      
+      try {
+          if (supabase) {
+             const { data: { session } } = await supabase.auth.getSession();
+             if (session) {
+                 await supabase.from('generations').delete().eq('url', item.url).eq('user_id', session.user.id);
+             }
+          }
+      } catch (e) {
+          console.error("Cleanup Failed", e);
+      }
       
       try {
           // Perform a diagnostic fetch to see WHY it failed
@@ -292,7 +306,7 @@ const GenerationCard = memo(({ item, index, visualSafety, onImageReady, onNaviga
 
       {!hasError ? (
           <img 
-            src={item.url} 
+            src={imgSrc} 
             alt="vision"
             crossOrigin="anonymous"
             referrerPolicy="no-referrer"
@@ -892,7 +906,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
           });
           showToast("Prompt Enhanced");
       } catch (error: any) {
-          showToast("Enhancement Failed");
+          showToast(error.message || "Enhancement Failed");
       } finally {
           setIsEnhancing(false);
       }
@@ -954,16 +968,16 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
     
     const styleSuffix = activeStyleObjects.map(s => s.suffix).join('');
     
-    // NEURAL ENHANCE: If enabled, we use our own Gemini-based enhancement before sending to Pollinations
     let basePrompt = sessionPrompt;
     if (localSettings.enhance) {
         try {
             setIsEnhancing(true);
             showToast("Neural Core Enhancing...");
             basePrompt = await enhancePrompt(sessionPrompt, localSettings.model, globalSettings.apiKey);
-            setIsEnhancing(false);
-        } catch (e) {
-            console.error("Neural Enhance Failed, falling back to original prompt", e);
+        } catch (e: any) {
+            console.error("Neural Enhance Failed", e);
+            showToast(e?.message || "Enhancement Failed, using original prompt.");
+        } finally {
             setIsEnhancing(false);
         }
     }
@@ -1262,6 +1276,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                                               item={item} 
                                               index={idx} 
                                               visualSafety={localSettings.visualSafety} 
+                                              privateMode={localSettings.privateMode}
                                               onImageReady={handleImageLoaded}
                                               onNavigate={onNavigate}
                                               showToast={showToast}

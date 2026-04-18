@@ -99,7 +99,8 @@ export enum AppRoute {
   COMMUNITY = 'community',
   LEADERBOARD = 'leaderboard',
   MESSAGES = 'messages',
-  WHATS_NEW = 'whats_new'
+  WHATS_NEW = 'whats_new',
+  ANALYTICS = 'analytics'
 }
 
 export interface ModelInfo {

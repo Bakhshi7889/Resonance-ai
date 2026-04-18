@@ -18,7 +18,6 @@ export const generateImageUrl = async (params: any) => {
     if (nologo) url += "&nologo=true";
     if (negative_prompt) url += `&negative_prompt=${encodeURIComponent(negative_prompt)}`;
     if (safe) url += "&safe=true";
-    if (enhance) url += "&enhance=true";
     
     // User's personal key for generation (if provided) or the default app API key
     url += `&key=${effectiveKey}`;

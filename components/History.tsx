@@ -130,6 +130,14 @@ export const History: React.FC<HistoryProps> = memo(({ history, onNavigate, onRe
           return;
       }
 
+      // Dynamic import to avoid circular dependencies if any
+      const { performVisualAudit } = await import('../services/utils');
+      const isRisky = await performVisualAudit(currentFullscreenItem.url);
+      if (isRisky) {
+          alert("Neural Safety Alert: This image contains content that violates our community guidelines and cannot be shared publicly.");
+          return;
+      }
+
       const { error } = await supabase
           .from('generations')
           .update({ is_public: true })

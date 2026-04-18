@@ -5,7 +5,8 @@ import { storage } from '../services/storage';
 import { messageService } from '../services/messageService';
 import { AppRoute, HistoryItem } from '../types';
 import { Header } from './Header';
-import { Sparkles, Globe, Heart, Share2, Info, User, X, ThumbsUp, MessageSquare, RefreshCw } from 'lucide-react';
+import { Sparkles, Globe, Heart, Share2, Info, User, X, ThumbsUp, MessageSquare, RefreshCw, Download, ExternalLink } from 'lucide-react';
+import { downloadImage } from '../services/utils';
 
 interface CommunityFeedProps {
     onNavigate: (route: AppRoute) => void;
@@ -20,6 +21,34 @@ export const CommunityFeed: React.FC<CommunityFeedProps> = ({ onNavigate, user }
     const [filter, setFilter] = useState<'recent' | 'top' | 'mine'>('recent');
 
     const isDeveloper = user?.email === 'herobakhshi@gmail.com';
+
+    const handleShare = async (e: React.MouseEvent, img: any) => {
+        e.stopPropagation();
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: 'Resonance Creation',
+                    text: `Check out this AI creation: "${img.prompt}"`,
+                    url: img.url
+                });
+            } catch (err) {
+                console.error("Share failed", err);
+            }
+        } else {
+            try {
+                await navigator.clipboard.writeText(img.url);
+                alert("Link copied to clipboard!");
+            } catch (err) {
+                alert("Failed to copy link.");
+            }
+        }
+    };
+
+    const handleDownload = async (e: React.MouseEvent, img: any) => {
+        e.stopPropagation();
+        const filename = `resonance-${img.id.substring(0, 8)}.jpg`;
+        await downloadImage(img.url, filename);
+    };
 
     const fetchFeed = async (forceRefresh = false) => {
         if (!supabase) return;
@@ -241,19 +270,24 @@ export const CommunityFeed: React.FC<CommunityFeedProps> = ({ onNavigate, user }
                                     onClick={() => setSelectedImage(img)}
                                     className="relative break-inside-avoid rounded-2xl overflow-hidden border border-white/5 group cursor-pointer"
                                 >
-                                    <img src={img.url} className="w-full h-auto block" alt="community" />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-4 flex flex-col justify-end gap-3">
+                                    <img src={img.url} className="w-full h-auto block bg-white/5" alt="community" loading="lazy" decoding="async" />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-4 opacity-0 group-hover:opacity-100 transition-opacity gap-3">
                                         <div className="flex items-center gap-2">
-                                            <div className="size-5 rounded-full bg-white/10 flex items-center justify-center overflow-hidden border border-white/10">
+                                            <div className="size-5 rounded-full bg-white/10 flex items-center justify-center overflow-hidden border border-white/10 shrink-0">
                                                 {img.author?.avatar_url ? (
                                                     <img src={img.author.avatar_url} className="size-full object-cover" alt="avatar" />
                                                 ) : (
                                                     <User size={10} className="text-white/40" />
                                                 )}
                                             </div>
-                                            <span className="text-[9px] font-bold text-white/80 truncate">
-                                                {img.author?.name || 'Anonymous Creator'}
-                                            </span>
+                                            <div className="flex flex-col flex-1 overflow-hidden">
+                                                <span className="text-[9px] font-bold text-white/80 truncate">
+                                                    {img.author?.name || 'Anonymous Creator'}
+                                                </span>
+                                                <span className="text-[8px] font-medium text-white/40 truncate">
+                                                    {new Date(img.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} • {new Date(img.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                            </div>
                                         </div>
                                         <p className="text-[10px] text-white/90 line-clamp-2 font-medium italic">"{img.prompt}"</p>
                                         <div className="flex items-center justify-between">
@@ -264,8 +298,17 @@ export const CommunityFeed: React.FC<CommunityFeedProps> = ({ onNavigate, user }
                                                 >
                                                     <Heart size={14} fill={likedIds.has(img.id) ? 'currentColor' : 'none'} />
                                                 </button>
-                                                <button className="text-white/60 hover:text-primary transition-colors">
+                                                <button 
+                                                    onClick={(e) => handleShare(e, img)}
+                                                    className="text-white/60 hover:text-primary transition-colors"
+                                                >
                                                     <Share2 size={14} />
+                                                </button>
+                                                <button 
+                                                    onClick={(e) => handleDownload(e, img)}
+                                                    className="text-white/60 hover:text-primary transition-colors"
+                                                >
+                                                    <Download size={14} />
                                                 </button>
                                             </div>
                                             <span className="text-[8px] font-bold text-white/40 uppercase tracking-widest">{img.model}</span>
@@ -305,19 +348,43 @@ export const CommunityFeed: React.FC<CommunityFeedProps> = ({ onNavigate, user }
                             onClick={e => e.stopPropagation()}
                         >
                             <div className="relative aspect-square">
-                                <img src={selectedImage.url} className="size-full object-cover" alt="detail" />
-                                <button 
-                                    onClick={() => setSelectedImage(null)}
-                                    className="absolute top-6 right-6 size-10 rounded-full bg-black/40 border border-white/10 flex items-center justify-center text-white/60 hover:text-white transition-colors"
-                                >
-                                    <X size={20} />
-                                </button>
-                                 <button 
-                                    onClick={(e) => handleLike(e, selectedImage.id)}
-                                    className={`absolute top-6 left-6 size-10 rounded-full bg-black/40 border border-white/10 flex items-center justify-center transition-colors ${likedIds.has(selectedImage.id) ? 'text-primary' : 'text-white/60 hover:text-primary'}`}
-                                >
-                                    <ThumbsUp size={20} fill={likedIds.has(selectedImage.id) ? "currentColor" : "none"} />
-                                </button>
+                                <img 
+                                    src={selectedImage.url} 
+                                    className="size-full object-cover" 
+                                    alt="detail" 
+                                    onClick={(e) => e.stopPropagation()}
+                                />
+                                <div className="absolute top-6 right-6 flex gap-2">
+                                    <button 
+                                        onClick={(e) => handleDownload(e, selectedImage)}
+                                        className="size-10 rounded-full bg-black/40 border border-white/10 flex items-center justify-center text-white/60 hover:text-white transition-colors"
+                                    >
+                                        <Download size={20} />
+                                    </button>
+                                    <button 
+                                        onClick={() => setSelectedImage(null)}
+                                        className="size-10 rounded-full bg-black/40 border border-white/10 flex items-center justify-center text-white/60 hover:text-white transition-colors"
+                                    >
+                                        <X size={20} />
+                                    </button>
+                                </div>
+                                 <div className="absolute top-6 left-6 flex gap-2">
+                                    <button 
+                                        onClick={(e) => handleLike(e, selectedImage.id)}
+                                        className={`size-10 rounded-full bg-black/40 border border-white/10 flex items-center justify-center transition-colors ${likedIds.has(selectedImage.id) ? 'text-primary' : 'text-white/60 hover:text-primary'}`}
+                                    >
+                                        <ThumbsUp size={20} fill={likedIds.has(selectedImage.id) ? "currentColor" : "none"} />
+                                    </button>
+                                    <button 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            window.open(selectedImage.url, '_blank');
+                                        }}
+                                        className="size-10 rounded-full bg-black/40 border border-white/10 flex items-center justify-center text-white/60 hover:text-white transition-colors"
+                                    >
+                                        <ExternalLink size={20} />
+                                    </button>
+                                </div>
                             </div>
                             <div className="p-6 space-y-4">
                                 <div className="flex items-center justify-between">

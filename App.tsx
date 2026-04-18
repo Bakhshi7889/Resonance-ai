@@ -9,11 +9,13 @@ import { CommunityFeed } from './components/CommunityFeed';
 import { Leaderboard } from './components/Leaderboard';
 import { Messages } from './components/Messages';
 import { WhatsNew } from './components/WhatsNew';
+import { Analytics } from './components/Analytics';
 import { AppSettings, AppRoute, HistoryItem, CustomStyle, AccountState, ModelInfo } from './types';
 import { supabase } from './services/supabase';
 import { storage } from './services/storage';
 import { styleService } from './services/styleService';
 import { getAccountDetails, getImageModels, IMAGE_MODELS } from './services/pollinations';
+import { useAnalytics } from './hooks/useAnalytics';
 
 const STORAGE_KEY_SETTINGS = 'resonance_v4_settings';
 const STORAGE_KEY_HISTORY = 'resonance_v4_history';
@@ -57,6 +59,7 @@ const App: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<AppRoute>(AppRoute.GENERATOR);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [user, setUser] = useState<any>(getInitialUser());
+  const analytics = useAnalytics(user);
   const [isStorageLoaded, setIsStorageLoaded] = useState(false);
   
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
@@ -262,6 +265,7 @@ const App: React.FC = () => {
   }, []);
 
   const handleAddToHistory = useCallback(async (item: HistoryItem) => {
+    analytics.trackEvent('image_generated', { model: item.model, safe: !settings.privateMode });
     setHistory(prev => {
       const updated = [item, ...prev].slice(0, 500);
       storage.set(STORAGE_KEY_HISTORY, updated);
@@ -271,6 +275,8 @@ const App: React.FC = () => {
     // Save to Supabase if user is logged in
     if (supabase && user) {
       try {
+        // ALWAYS insert as private initially.
+        // It will be updated to public by ImageGenerator ONCE it successfully loads and passes visual audit.
         const { error } = await supabase
           .from('generations')
           .insert([{
@@ -282,7 +288,7 @@ const App: React.FC = () => {
             height: item.height,
             seed: item.seed,
             style_suffix: item.styleSuffix,
-            is_public: !settings.privateMode // Use privateMode setting to determine visibility
+            is_public: false // Start private to avoid broken images showing up in the community feed
           }]);
         
         if (error) console.error('Resonance: Supabase Save Error', error);
@@ -418,6 +424,14 @@ const App: React.FC = () => {
             <WhatsNew 
                 key="whats_new"
                 onNavigate={setCurrentRoute}
+            />
+        );
+      case AppRoute.ANALYTICS:
+        return (
+            <Analytics
+                key="analytics"
+                onNavigate={setCurrentRoute}
+                userEmail={user?.email}
             />
         );
       default:

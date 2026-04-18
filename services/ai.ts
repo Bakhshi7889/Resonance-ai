@@ -161,7 +161,7 @@ export const enhancePrompt = async (
                 'Authorization': `Bearer ${effectiveKey}`
             },
             body: JSON.stringify({
-                model: 'gemini-fast',
+                model: 'mistral',
                 messages: [
                     { role: 'system', content: `You are an elite AI prompt architect. ${instructions}` },
                     { role: 'user', content: `Original Idea: ${prompt}` }
@@ -175,7 +175,14 @@ export const enhancePrompt = async (
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error?.message || `API Error: ${response.status}`);
+            const apiMsg = errorData.error?.message || `API Error: ${response.status}`;
+            if (response.status === 429) {
+                throw new Error("Rate limit exceeded. Please wait a moment or add a Personal Key.");
+            }
+            if (response.status === 402) {
+                throw new Error("Out of Pollen balance. Add a Personal Key.");
+            }
+            throw new Error(apiMsg);
         }
 
         if (onChunk) {

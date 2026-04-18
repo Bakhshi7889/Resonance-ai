@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DownloadCloud, Smartphone, Share, PlusSquare, ArrowLeft, ExternalLink, RefreshCw, Layers, Download, PlusCircle, Trash2, Wand2, Terminal, Copy, Globe, Trophy, Github, Mail, LogIn, LogOut, User, MessageSquare, Check, Send, Inbox, ShieldCheck, Eye, EyeOff, Sparkles, ChevronRight, Zap } from 'lucide-react';
+import { DownloadCloud, Smartphone, Share, PlusSquare, ArrowLeft, ExternalLink, RefreshCw, Layers, Download, PlusCircle, Trash2, Wand2, Terminal, Copy, Globe, Trophy, Github, Mail, LogIn, LogOut, User, MessageSquare, Check, Send, Inbox, ShieldCheck, Eye, EyeOff, Sparkles, ChevronRight, Zap, TrendingUp } from 'lucide-react';
 import { AppSettings, AppRoute, AccountState, DirectMessage, HistoryItem, ModelInfo } from '../types';
 import { getAccountDetails, getEstimatedImagesLeft, getAuthUrl, MODEL_PRICING } from '../services/pollinations';
 import { getLogs, clearLogs, LogEntry } from '../services/logger';
@@ -586,6 +586,24 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
                 </div>
                 <ChevronRight size={14} className="text-white/20 shrink-0" />
             </button>
+            
+            {accountState.user?.email === 'herobakhshi@gmail.com' && (
+                <button 
+                    onClick={() => onNavigate(AppRoute.ANALYTICS)}
+                    className="w-full mt-2 bg-purple-500/[0.05] backdrop-blur-[40px] rounded-full p-1.5 pl-3 pr-5 border-[0.5px] border-purple-500/20 flex items-center justify-between gap-3 hover:bg-purple-500/10 transition-all active:scale-95"
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="size-8 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-400 shrink-0">
+                            <TrendingUp size={16} />
+                        </div>
+                        <div className="flex flex-col gap-0 items-start">
+                            <span className="text-sm font-bold text-white tracking-tight">Admin Analytics</span>
+                            <span className="text-[8px] text-purple-400/50 uppercase font-black tracking-widest leading-relaxed text-left">Global Insights</span>
+                        </div>
+                    </div>
+                    <ChevronRight size={14} className="text-purple-400/40 shrink-0" />
+                </button>
+            )}
         </section>
 
         {/* Bring Your Own Pollen (BYOP) */}
