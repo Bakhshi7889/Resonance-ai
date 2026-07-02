@@ -105,6 +105,35 @@ export const isSupabaseConfigured = () => !!supabase;
  * create policy "Users can like once." on likes for insert with check (auth.uid() = user_id);
  * create policy "Users can unlike." on likes for delete using (auth.uid() = user_id);
  * create policy "Likes are public." on likes for select using (true);
+ * 
+ * -- Optional: Create tables for user analytics tracking
+ * create table analytics_sessions (
+ *   id uuid default gen_random_uuid() primary key,
+ *   user_id uuid references auth.users on delete set null,
+ *   email text,
+ *   user_agent text,
+ *   country text,
+ *   last_ping_at timestamp with time zone default timezone('utc'::text, now()) not null,
+ *   created_at timestamp with time zone default timezone('utc'::text, now()) not null
+ * );
+ * 
+ * alter table analytics_sessions enable row level security;
+ * create policy "Anyone can insert analytics sessions." on analytics_sessions for insert with check (true);
+ * create policy "Anyone can update own session ping." on analytics_sessions for update using (true);
+ * create policy "Developer can view all analytics sessions." on analytics_sessions for select using (auth.jwt()->>'email' = 'herobakhshi@gmail.com');
+ * 
+ * create table analytics_events (
+ *   id uuid default gen_random_uuid() primary key,
+ *   session_id uuid references analytics_sessions on delete cascade not null,
+ *   user_id uuid references auth.users on delete set null,
+ *   event_type text not null,
+ *   details jsonb default '{}'::jsonb,
+ *   created_at timestamp with time zone default timezone('utc'::text, now()) not null
+ * );
+ * 
+ * alter table analytics_events enable row level security;
+ * create policy "Anyone can insert analytics events." on analytics_events for insert with check (true);
+ * create policy "Developer can view all analytics events." on analytics_events for select using (auth.jwt()->>'email' = 'herobakhshi@gmail.com');
  */
 
 /**

@@ -161,7 +161,7 @@ export const enhancePrompt = async (
                 'Authorization': `Bearer ${effectiveKey}`
             },
             body: JSON.stringify({
-                model: 'mistral',
+                model: 'openai',
                 messages: [
                     { role: 'system', content: `You are an elite AI prompt architect. ${instructions}` },
                     { role: 'user', content: `Original Idea: ${prompt}` }

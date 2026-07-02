@@ -27,7 +27,11 @@ export const useAnalytics = (user: any) => {
           .single();
 
         if (error) {
-            console.error('Failed to init analytics session', error);
+            if (error.code === '42P01') {
+                console.info('Analytics tables (analytics_sessions) are not created yet in Supabase. Please run the SQL schema in services/supabase.ts to enable analytics tracking.');
+            } else {
+                console.warn('Failed to init analytics session:', error.message || error);
+            }
             return;
         }
 
@@ -44,7 +48,7 @@ export const useAnalytics = (user: any) => {
           }, 60000);
         }
       } catch (err) {
-        console.error('Analytics error:', err);
+        console.warn('Analytics error:', err);
       }
     };
 
@@ -58,14 +62,17 @@ export const useAnalytics = (user: any) => {
   const trackEvent = useCallback(async (eventType: string, details: any = {}) => {
     if (!currentSessionId || !supabase) return;
     try {
-      await supabase.from('analytics_events').insert([{
+      const { error } = await supabase.from('analytics_events').insert([{
         session_id: currentSessionId,
         user_id: user?.id || null,
         event_type: eventType,
         details
       }]);
+      if (error && error.code !== '42P01') {
+        console.warn('Event tracking failed:', error.message || error);
+      }
     } catch (e) {
-      console.error('Event tracking failed', e);
+      // Ignored gracefully
     }
   }, [user]);
 

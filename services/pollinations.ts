@@ -27,9 +27,9 @@ export const generateImageUrl = async (params: any) => {
 
 export const getAuthUrl = (redirectUri: string) => {
     const params = new URLSearchParams({
-        redirect_uri: redirectUri,
-        client_id: 'pk_2yctpceb1LwUL1Vr',
-        models: 'flux,openai,gptimage,zimage,grok-imagine,qwen-image,klein', // Suggested models
+        redirect_url: redirectUri,
+        app_key: 'pk_2yctpceb1LwUL1Vr',
+        models: JSON.stringify(['flux', 'zimage', 'klein', 'openai']), // Use exactly the 4 models
     });
     return `https://enter.pollinations.ai/authorize?${params.toString()}`;
 };
@@ -67,7 +67,7 @@ export const getAccountDetails = async (apiKey?: string) => {
 };
 
 export const MODEL_PRICING: Record<string, number> = {
-    'flux': 0.001,
+    'flux': 0.00175,
     'zimage': 0.002,
     'klein': 0.01
 };
@@ -76,15 +76,15 @@ export const IMAGE_MODELS: ModelInfo[] = [
     { 
         id: 'flux', 
         name: 'Flux Schnell', 
-        description: '1K Speed Optimized', 
+        description: 'Flux Schnell - Fast high-quality image generation (Fireworks)', 
         paid_only: false, 
-        price: 0.001, 
+        price: 0.00175, 
         type: 'image'
     },
     { 
         id: 'zimage', 
         name: 'Z-Image Turbo', 
-        description: '500 Neural Synthesis', 
+        description: 'Alibaba S3-DiT 6B with 2x SPAN upscaling', 
         paid_only: true, 
         price: 0.002, 
         type: 'image'
@@ -92,7 +92,7 @@ export const IMAGE_MODELS: ModelInfo[] = [
     { 
         id: 'klein', 
         name: 'FLUX.2 Klein 4B', 
-        description: 'ALPHA 100 Precision', 
+        description: 'Fast image generation and editing', 
         paid_only: true, 
         price: 0.01, 
         type: 'image'
