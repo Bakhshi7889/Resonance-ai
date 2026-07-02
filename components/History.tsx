@@ -212,7 +212,7 @@ export const History: React.FC<HistoryProps> = memo(({ history, onNavigate, onRe
                                                 setFullscreenImageIndex(globalIndex);
                                             }
                                         }}
-                                        className={`relative break-inside-avoid cursor-pointer group rounded-2xl overflow-hidden border transition-all mb-4 will-change-transform ${isSelected ? 'border-primary ring-2 ring-primary ring-offset-2 ring-offset-black' : 'border-white/5 hover:border-white/20'}`}
+                                        className={`relative break-inside-avoid cursor-pointer group rounded-2xl overflow-hidden border transition-all mb-4 ${isSelected ? 'border-primary ring-2 ring-primary ring-offset-2 ring-offset-black' : 'border-white/5 hover:border-white/20'}`}
                                     >
                                         <img 
                                             src={item.url} 
@@ -335,14 +335,20 @@ export const History: React.FC<HistoryProps> = memo(({ history, onNavigate, onRe
                                     <p className="text-[11px] text-white/50 leading-relaxed">{currentFullscreenItem.styleSuffix.replace(/^, /, '')}</p>
                                 </div>
                             )}
-                            <div className="grid grid-cols-2 gap-4 border-t border-white/5 pt-4">
+                            <div className="grid grid-cols-3 gap-4 border-t border-white/5 pt-4">
                                 <div className="space-y-1">
-                                    <p className="text-[10px] text-white/30 uppercase font-black tracking-widest">Seed</p>
-                                    <p className="text-xs font-mono text-white/60">{currentFullscreenItem.seed}</p>
+                                    <p className="text-[9px] text-white/30 uppercase font-black tracking-widest">Seed</p>
+                                    <p className="text-[11px] font-mono text-white/60 truncate">{currentFullscreenItem.seed}</p>
                                 </div>
                                 <div className="space-y-1">
-                                    <p className="text-[10px] text-white/30 uppercase font-black tracking-widest">Scale</p>
-                                    <p className="text-xs font-mono text-white/60">{currentFullscreenItem.width}x{currentFullscreenItem.height}</p>
+                                    <p className="text-[9px] text-white/30 uppercase font-black tracking-widest">Scale</p>
+                                    <p className="text-[11px] font-mono text-white/60 truncate">{currentFullscreenItem.width}x{currentFullscreenItem.height}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-[9px] text-white/30 uppercase font-black tracking-widest">Synthesized</p>
+                                    <p className="text-[11px] font-mono text-white/60 truncate">
+                                        {currentFullscreenItem.timestamp ? new Date(currentFullscreenItem.timestamp).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : 'Recent'}
+                                    </p>
                                 </div>
                             </div>
                         </motion.div>

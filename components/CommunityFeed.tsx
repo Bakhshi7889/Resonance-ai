@@ -271,7 +271,7 @@ export const CommunityFeed: React.FC<CommunityFeedProps> = ({ onNavigate, user }
                                     className="relative break-inside-avoid rounded-2xl overflow-hidden border border-white/5 group cursor-pointer"
                                 >
                                     <img src={img.url} className="w-full h-auto block bg-white/5" alt="community" loading="lazy" decoding="async" />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-4 opacity-0 group-hover:opacity-100 transition-opacity gap-3">
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-4 opacity-0 group-hover:opacity-100 invisible group-hover:visible transition-all duration-300 gap-3">
                                         <div className="flex items-center gap-2">
                                             <div className="size-5 rounded-full bg-white/10 flex items-center justify-center overflow-hidden border border-white/10 shrink-0">
                                                 {img.author?.avatar_url ? (
@@ -424,14 +424,20 @@ export const CommunityFeed: React.FC<CommunityFeedProps> = ({ onNavigate, user }
                                     <p className="text-xs text-white/80 leading-relaxed italic line-clamp-3">"{selectedImage.prompt}"</p>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div className="p-3 rounded-xl bg-white/5 border border-white/5">
-                                        <p className="text-[8px] font-bold text-white/30 uppercase tracking-widest">Model</p>
-                                        <p className="text-[10px] font-bold text-white uppercase">{selectedImage.model}</p>
+                                <div className="grid grid-cols-3 gap-2">
+                                    <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 text-center">
+                                        <p className="text-[7px] font-bold text-white/30 uppercase tracking-widest">Model</p>
+                                        <p className="text-[9px] font-bold text-white uppercase truncate">{selectedImage.model}</p>
                                     </div>
-                                    <div className="p-3 rounded-xl bg-white/5 border border-white/5">
-                                        <p className="text-[8px] font-bold text-white/30 uppercase tracking-widest">Resolution</p>
-                                        <p className="text-[10px] font-bold text-white">{selectedImage.width} × {selectedImage.height}</p>
+                                    <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 text-center">
+                                        <p className="text-[7px] font-bold text-white/30 uppercase tracking-widest">Resolution</p>
+                                        <p className="text-[9px] font-bold text-white truncate">{selectedImage.width} × {selectedImage.height}</p>
+                                    </div>
+                                    <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 text-center">
+                                        <p className="text-[7px] font-bold text-white/30 uppercase tracking-widest">Synthesized</p>
+                                        <p className="text-[9px] font-bold text-white truncate">
+                                            {selectedImage.created_at ? new Date(selectedImage.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Recent'}
+                                        </p>
                                     </div>
                                 </div>
                             </div>

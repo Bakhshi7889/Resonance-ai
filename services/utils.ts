@@ -42,3 +42,37 @@ export const performVisualAudit = async (imageUrl: string): Promise<boolean> => 
     img.onerror = () => resolve(false);
   });
 };
+
+export const uploadToMediaStorage = async (imageUrl: string, apiKey: string): Promise<string> => {
+    try {
+        const response = await fetch(imageUrl);
+        if (!response.ok) throw new Error('Failed to fetch image for upload');
+        const blob = await response.blob();
+        
+        const formData = new FormData();
+        formData.append('file', blob, 'image.jpg');
+        
+        const uploadResponse = await fetch('https://media.pollinations.ai/upload', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: formData
+        });
+        
+        if (!uploadResponse.ok) {
+            throw new Error(`Upload failed: ${uploadResponse.status}`);
+        }
+        
+        const data = await uploadResponse.json();
+        const finalUrl = data.url || (data.hash ? `https://media.pollinations.ai/${data.hash}` : null);
+        if (!finalUrl) {
+            throw new Error('No URL or hash returned from upload endpoint');
+        }
+        return finalUrl;
+    } catch (e) {
+        console.error('Media upload failed:', e);
+        return imageUrl;
+    }
+};
+

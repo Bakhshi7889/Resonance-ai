@@ -292,12 +292,34 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
       setLocalLogs([]);
   };
   
-  const isManual = settings.apiKey && settings.apiKey.trim().length > 5 && settings.apiKey !== 'pk_N2YEvo5VHzELOFio';
+  const [manualKeyInput, setManualKeyInput] = useState(
+    settings.apiKey && settings.apiKey !== 'pk_2yctpceb1LwUL1Vr' ? settings.apiKey : ''
+  );
+
+  const handleApplyManualKey = () => {
+    const trimmed = manualKeyInput.trim();
+    if (trimmed) {
+      updateSettings({ apiKey: trimmed });
+      setTimeout(() => {
+        refreshAccount();
+      }, 500);
+    }
+  };
+
+  const handleResetToDefault = () => {
+    updateSettings({ apiKey: 'pk_2yctpceb1LwUL1Vr' });
+    setManualKeyInput('');
+    setTimeout(() => {
+      refreshAccount();
+    }, 500);
+  };
+  
+  const isManual = settings.apiKey && settings.apiKey.trim().length > 5 && settings.apiKey !== 'pk_2yctpceb1LwUL1Vr';
 
   return (
     <div className="flex flex-col h-full bg-black text-white w-full overflow-y-auto no-scrollbar">
       {/* Widen the container from max-w-2xl to max-w-3xl for a more robust "app" feel */}
-      <div className="max-w-3xl mx-auto w-full px-6 sm:px-10 pt-12 pb-40 space-y-12 will-change-transform">
+      <div className="max-w-3xl mx-auto w-full px-6 sm:px-10 pt-12 pb-40 space-y-12">
         <header className="flex items-center justify-between relative">
             <button onClick={() => onNavigate(AppRoute.GENERATOR)} className="size-11 rounded-full bg-white/5 backdrop-blur-[40px] border-[0.5px] border-white/12 flex items-center justify-center text-white/50 active:scale-90 transition-all">
               <ArrowLeft size={20} />
@@ -520,7 +542,7 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
 
         {/* PWA Install Section - The "Real Install Thing" */}
         {canInstall && (
-          <section className="space-y-4 will-change-transform">
+          <section className="space-y-4">
               <p className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-2">App Architecture</p>
               <div className="bg-primary/10 backdrop-blur-[40px] rounded-[2.5rem] p-8 border-[0.5px] border-primary/20 flex items-center justify-between gap-6 shadow-glow">
                   <div className="flex flex-col gap-1">
@@ -539,7 +561,7 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
         )}
 
         {/* Community & Rankings */}
-        <section className="space-y-4 will-change-transform">
+        <section className="space-y-4">
             <p className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-2">Global Resonance</p>
             <div className="grid grid-cols-2 gap-4">
                 <button 
@@ -569,7 +591,7 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
             </div>
         </section>
 
-        <section className="space-y-4 will-change-transform">
+        <section className="space-y-4">
             <p className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-2">System Intelligence</p>
             <button 
                 onClick={() => onNavigate(AppRoute.WHATS_NEW)}
@@ -607,7 +629,7 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
         </section>
 
         {/* Bring Your Own Pollen (BYOP) */}
-        <section className="space-y-4 will-change-transform">
+        <section className="space-y-4">
             <div className="flex items-center justify-between px-2">
                 <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Neural Sync</p>
                 <div className="flex items-center gap-2">
@@ -620,23 +642,61 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
             
             <div className="bg-white/[0.03] backdrop-blur-[40px] rounded-[2.5rem] p-6 border-[0.5px] border-white/15 relative overflow-hidden">
                 <div className="flex flex-col gap-6">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
-                            <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                            <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
                                 <Zap size={20} />
                             </div>
                             <div className="flex flex-col">
                                 <h3 className="text-sm font-black tracking-tight text-white uppercase">Neural Account</h3>
-                                <p className="text-[9px] text-white/30 uppercase font-black tracking-widest">Sync your Pollinations credits</p>
+                                <p className="text-[9px] text-white/30 uppercase font-black tracking-widest">Authorize with Pollinations</p>
                             </div>
                         </div>
                         <button 
                             onClick={handleConnectExternal}
-                            className="px-6 py-3 rounded-xl bg-white text-black text-[10px] font-black uppercase tracking-widest shadow-liquid active:scale-95 transition-all flex items-center gap-2"
+                            className="px-5 py-2.5 rounded-xl bg-white text-black text-[10px] font-black uppercase tracking-widest shadow-liquid active:scale-95 transition-all flex items-center gap-2 shrink-0"
                         >
-                            <LogIn size={14} />
+                            <LogIn size={13} />
                             Sync Now
                         </button>
+                    </div>
+
+                    <div className="space-y-3 pt-6 border-t border-white/5">
+                        <p className="text-[9px] font-black text-white/40 uppercase tracking-widest ml-1">Or use manual API Key / BYOP Key</p>
+                        <div className="flex gap-2">
+                            <input 
+                                type="text"
+                                value={manualKeyInput}
+                                onChange={(e) => setManualKeyInput(e.target.value)}
+                                placeholder="sk_... or pk_..."
+                                className="flex-1 bg-white/[0.03] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:ring-1 focus:ring-primary/40 transition-all placeholder:text-white/10 font-mono"
+                            />
+                            <button 
+                                onClick={handleApplyManualKey}
+                                disabled={!manualKeyInput.trim() || manualKeyInput.trim() === settings.apiKey}
+                                className="px-5 rounded-xl bg-white/10 border border-white/20 text-white text-[10px] font-black uppercase tracking-widest hover:bg-white/20 active:scale-95 transition-all disabled:opacity-30 disabled:pointer-events-none"
+                            >
+                                Apply
+                            </button>
+                        </div>
+                        {isManual ? (
+                            <div className="flex items-center justify-between px-1">
+                                <p className="text-[9px] text-emerald-400 font-bold uppercase tracking-widest flex items-center gap-1.5">
+                                    <Check size={11} />
+                                    Active Key: {settings.apiKey.startsWith('sk_') ? 'Personal Secret' : 'Custom app'} ({settings.apiKey.slice(0, 6)}...{settings.apiKey.slice(-4)})
+                                </p>
+                                <button 
+                                    onClick={handleResetToDefault}
+                                    className="text-[9px] text-red-400/70 hover:text-red-400 uppercase font-black tracking-widest transition-colors"
+                                >
+                                    Reset to Default
+                                </button>
+                            </div>
+                        ) : (
+                            <p className="text-[9px] text-white/30 uppercase font-black tracking-widest ml-1">
+                                Active Key: Default App Pollen (pk_2yctpceb...)
+                            </p>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 pt-6 border-t border-white/5">
@@ -666,20 +726,12 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
                             <RefreshCw size={12} className={accountState.isLoading ? 'animate-spin' : ''} />
                             Refresh Status
                         </button>
-                        {isManual && (
-                            <button 
-                                onClick={() => updateSettings({ apiKey: 'pk_N2YEvo5VHzELOFio' })}
-                                className="text-[9px] text-red-400/60 uppercase font-black tracking-widest hover:text-red-400 transition-colors"
-                            >
-                                Unlink Account
-                            </button>
-                        )}
                     </div>
                 </div>
             </div>
         </section>
 
-        <section className="space-y-4 will-change-transform">
+        <section className="space-y-4">
             <p className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-2">Platform Matrix</p>
             <div className="bg-white/[0.03] backdrop-blur-[40px] rounded-[2.5rem] p-6 border-[0.5px] border-white/12 space-y-4">
                 
@@ -699,7 +751,7 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
             </div>
         </section>
 
-        <section className="space-y-4 will-change-transform">
+        <section className="space-y-4">
             <div className="flex items-center justify-between px-2">
                  <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Execution Stream</p>
                  <button 
@@ -757,7 +809,7 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
         </section>
 
         {/* Contact Developer Section */}
-        <section className="space-y-4 pb-12 will-change-transform">
+        <section className="space-y-4 pb-12">
             <p className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-2">Neural Support</p>
             <div className="bg-white/[0.03] backdrop-blur-[40px] rounded-[2.5rem] p-8 border-[0.5px] border-white/12 space-y-8">
                 <div className="flex flex-col gap-1">

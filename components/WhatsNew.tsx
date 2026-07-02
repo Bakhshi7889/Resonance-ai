@@ -19,7 +19,7 @@ const UPDATES = [
         features: [
             'API Precision: Updated query parameters (negative_prompt, enhance) to match the latest spec.',
             'Smooth UI: Eliminated rendering stutters and loading flickers across the app.',
-            'Key Verification: Confirmed and locked in the pk_N2YEvo5VHzELOFio public key for secure, rate-limited generation.',
+            'Key Verification: Confirmed and locked in the pk_2yctpceb1LwUL1Vr public key for secure, rate-limited generation.',
             'Model Cleanup: Removed legacy web links from the model selection as requested.'
         ]
     },

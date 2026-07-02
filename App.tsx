@@ -34,7 +34,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   hiddenStyleIds: [],
   favoriteStyleIds: [],
   styleOrder: [], 
-  apiKey: 'pk_N2YEvo5VHzELOFio',
+  apiKey: 'pk_2yctpceb1LwUL1Vr',
   quality: 'hd',
   infiniteMode: false,
   seed: 0,
@@ -142,8 +142,8 @@ const App: React.FC = () => {
           if (!storedSettings.styleOrder || storedSettings.styleOrder.length === 0) {
             storedSettings.styleOrder = fetchedStyles.map(s => s.id);
           }
-          if (!storedSettings.apiKey || storedSettings.apiKey.trim() === '' || storedSettings.apiKey === 'sk_fH3vuxg5ULiDIzbVK7y6ejUg4eK1f0VF') {
-            storedSettings.apiKey = 'pk_N2YEvo5VHzELOFio';
+          if (!storedSettings.apiKey || storedSettings.apiKey.trim() === '' || storedSettings.apiKey === 'sk_fH3vuxg5ULiDIzbVK7y6ejUg4eK1f0VF' || storedSettings.apiKey === 'pk_N2YEvo5VHzELOFio') {
+            storedSettings.apiKey = 'pk_2yctpceb1LwUL1Vr';
           }
           // Migration: Switch from zimage to flux as default
           if (storedSettings.model === 'zimage') {
@@ -306,6 +306,14 @@ const App: React.FC = () => {
     });
   }, []);
 
+  const handleUpdateHistoryItemUrl = useCallback((id: string, newUrl: string) => {
+    setHistory(prev => {
+      const updated = prev.map(item => item.id === id ? { ...item, url: newUrl } : item);
+      storage.set(STORAGE_KEY_HISTORY, updated);
+      return updated;
+    });
+  }, []);
+
   const handleSetSessionImages = useCallback((update: React.SetStateAction<HistoryItem[]>) => {
     setSessionImages(prev => {
       const next = typeof update === 'function' ? update(prev) : update;
@@ -334,6 +342,7 @@ const App: React.FC = () => {
             updateSettings={handleUpdateSettings}
             onNavigate={setCurrentRoute}
             onAddToHistory={handleAddToHistory}
+            onUpdateHistoryItemUrl={handleUpdateHistoryItemUrl}
             sessionPrompt={sessionPrompt}
             setSessionPrompt={handleSetSessionPrompt}
             sessionImages={sessionImages}

@@ -1,6 +1,6 @@
 import { addLog } from './logger';
 
-const DEFAULT_API_KEY = 'pk_N2YEvo5VHzELOFio';
+const DEFAULT_API_KEY = 'pk_2yctpceb1LwUL1Vr';
 
 export const getEffectiveKey = (key?: string) => key || DEFAULT_API_KEY;
 
@@ -27,8 +27,8 @@ export const generateImageUrl = async (params: any) => {
 
 export const getAuthUrl = (redirectUri: string) => {
     const params = new URLSearchParams({
-        redirect_url: redirectUri,
-        app_key: 'pk_N2YEvo5VHzELOFio', // Updated app key
+        redirect_uri: redirectUri,
+        client_id: 'pk_2yctpceb1LwUL1Vr',
         models: 'flux,openai,gptimage,zimage,grok-imagine,qwen-image,klein', // Suggested models
     });
     return `https://enter.pollinations.ai/authorize?${params.toString()}`;

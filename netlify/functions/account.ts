@@ -1,6 +1,6 @@
 import { Handler } from '@netlify/functions';
 
-const POLLINATIONS_API_KEY = process.env.POLLINATIONS_API_KEY || 'pk_N2YEvo5VHzELOFio';
+const POLLINATIONS_API_KEY = process.env.POLLINATIONS_API_KEY || 'pk_2yctpceb1LwUL1Vr';
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'GET') {

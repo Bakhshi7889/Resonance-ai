@@ -47,6 +47,7 @@ interface ImageGeneratorProps {
   models: ModelInfo[];
   onNavigate: (route: AppRoute) => void;
   onAddToHistory: (item: HistoryItem) => void;
+  onUpdateHistoryItemUrl?: (id: string, newUrl: string) => void;
   updateSettings?: (s: Partial<AppSettings>) => void;
   sessionPrompt: string;
   setSessionPrompt: (prompt: string) => void;
@@ -81,7 +82,7 @@ const PromptHeader = memo(({ prompt, onClearBatch, batchId }: { prompt: string, 
     );
 });
 
-const GenerationCard = memo(({ item, index, visualSafety, privateMode, onImageReady, onNavigate, showToast }: { item: HistoryItem, index: number, visualSafety: boolean, privateMode: boolean, onImageReady?: (id: string) => void, onNavigate: (route: AppRoute) => void, showToast: (msg: string) => void }) => {
+const GenerationCard = memo(({ item, index, visualSafety, privateMode, onImageReady, onNavigate, showToast, onUploadComplete, apiKey }: { item: HistoryItem, index: number, visualSafety: boolean, privateMode: boolean, onImageReady?: (id: string) => void, onNavigate: (route: AppRoute) => void, showToast: (msg: string) => void, onUploadComplete?: (id: string, newUrl: string) => void, apiKey: string }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [revealed, setRevealed] = useState(false);
@@ -90,6 +91,11 @@ const GenerationCard = memo(({ item, index, visualSafety, privateMode, onImageRe
   const [showOverlay, setShowOverlay] = useState(false);
   const [imgSrc, setImgSrc] = useState(item.url);
   const [retryCount, setRetryCount] = useState(0);
+
+  // Sync state if url updates externally
+  useEffect(() => {
+     setImgSrc(item.url);
+  }, [item.url]);
 
   // Delay the "Synthesizing" overlay to prevent flickering on fast loads
   useEffect(() => {
@@ -112,6 +118,37 @@ const GenerationCard = memo(({ item, index, visualSafety, privateMode, onImageRe
       setIsLoaded(true);
       if (onImageReady) onImageReady(item.id);
 
+      // Handle automatic permanent media hosting
+      if (!item.url.startsWith('https://media.pollinations.ai/')) {
+          try {
+              const { uploadToMediaStorage } = await import('../services/utils');
+              const mediaUrl = await uploadToMediaStorage(item.url, apiKey);
+              if (mediaUrl && mediaUrl !== item.url) {
+                  if (onUploadComplete) onUploadComplete(item.id, mediaUrl);
+                  
+                  if (!privateMode && !isRisky && supabase) {
+                      try {
+                          const { data: { session } } = await supabase.auth.getSession();
+                          if (session) {
+                              await supabase.from('generations').update({ 
+                                  url: mediaUrl,
+                                  is_public: true, 
+                                  visual_audit_passed: true 
+                              })
+                              .eq('url', item.url)
+                              .eq('user_id', session.user.id);
+                          }
+                      } catch (e) {
+                          console.error("DB URL update failed:", e);
+                      }
+                  }
+                  return; // Skip standard update since we just handled it above with the final URL
+              }
+          } catch(e) {
+              console.error("Upload to Media Storage failed", e);
+          }
+      }
+
       if (!privateMode && !isRisky && supabase) {
           try {
               const { data: { session } } = await supabase.auth.getSession();
@@ -131,10 +168,15 @@ const GenerationCard = memo(({ item, index, visualSafety, privateMode, onImageRe
           setRetryCount(prev => prev + 1);
           // Small delay before retry
           setTimeout(() => {
-              const url = new URL(item.url);
-              url.searchParams.set('retry', (retryCount + 1).toString());
-              url.searchParams.set('t', Date.now().toString());
-              setImgSrc(url.toString());
+              try {
+                  const url = new URL(item.url);
+                  url.searchParams.set('retry', (retryCount + 1).toString());
+                  url.searchParams.set('t', Date.now().toString());
+                  setImgSrc(url.toString());
+              } catch (e) {
+                  const separator = item.url.includes('?') ? '&' : '?';
+                  setImgSrc(`${item.url}${separator}retry=${retryCount + 1}&t=${Date.now()}`);
+              }
           }, 1500);
           return;
       }
@@ -283,7 +325,7 @@ const GenerationCard = memo(({ item, index, visualSafety, privateMode, onImageRe
       initial={{ opacity: 0, scale: 0.8, y: 40 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={LIQUID_SPRING}
-      className={`relative shrink-0 overflow-hidden bg-white/[0.02] border-[0.5px] border-white/10 shadow-liquid rounded-[2.5rem] flex items-center justify-center group/card w-full max-w-3xl will-change-transform ${!isLoaded ? 'bg-white/[0.03]' : ''}`}
+      className={`relative shrink-0 overflow-hidden bg-white/[0.02] border-[0.5px] border-white/10 shadow-liquid rounded-[2.5rem] flex items-center justify-center group/card w-full max-w-3xl ${!isLoaded ? 'bg-white/[0.03]' : ''}`}
       style={{ rotateX, rotateY, transformStyle: 'preserve-3d', aspectRatio: `${item.width}/${item.height}` }}
     >
       {/* Skeleton Shimmer Layer - Always visible until loaded */}
@@ -721,7 +763,7 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, 
 });
 
 export const ImageGenerator: React.FC<ImageGeneratorProps> = ({ 
-    settings: globalSettings, styles, models, onNavigate, onAddToHistory, updateSettings, sessionPrompt, setSessionPrompt, sessionImages, setSessionImages, accountState, refreshAccount
+    settings: globalSettings, styles, models, onNavigate, onAddToHistory, onUpdateHistoryItemUrl, updateSettings, sessionPrompt, setSessionPrompt, sessionImages, setSessionImages, accountState, refreshAccount
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [localSettings, setLocalSettings] = useState({ ...globalSettings });
@@ -729,6 +771,11 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
   const [isIslandExpanded, setIsIslandExpanded] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isInputExpanded, setIsInputExpanded] = useState(false);
+
+  const handleUploadComplete = useCallback((id: string, newUrl: string) => {
+    setSessionImages(prev => prev.map(img => img.id === id ? { ...img, url: newUrl } : img));
+    onUpdateHistoryItemUrl?.(id, newUrl);
+  }, [setSessionImages, onUpdateHistoryItemUrl]);
   const [showPromptTools, setShowPromptTools] = useState(false);
   const [renderTime, setRenderTime] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -1126,7 +1173,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                     mass: 1
                 }
             }} 
-            className="relative pointer-events-auto glass-card shadow-liquid overflow-hidden cursor-pointer flex flex-col items-center will-change-transform" 
+            className="relative pointer-events-auto glass-card shadow-liquid overflow-hidden cursor-pointer flex flex-col items-center" 
             onClick={() => !isActuallyRendering && setIsIslandExpanded(!isIslandExpanded)}
           >
               <AnimatePresence>
@@ -1221,7 +1268,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
           </motion.div>
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto no-scrollbar relative px-6 pb-[32vh] pt-44 will-change-transform">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto no-scrollbar relative px-6 pb-[32vh] pt-44">
           <div className="flex flex-col items-center gap-20">
               {groupedImages.length === 0 && !isActuallyRendering && !isProcessing ? (
                   <motion.div 
@@ -1280,6 +1327,8 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                                               onImageReady={handleImageLoaded}
                                               onNavigate={onNavigate}
                                               showToast={showToast}
+                                              onUploadComplete={handleUploadComplete}
+                                              apiKey={globalSettings.apiKey}
                                             />
                                         </div>
                                       ))}
@@ -1333,7 +1382,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
               <motion.div 
                   layout 
                   transition={{ type: "spring", ...LIQUID_SPRING }} 
-                  className={`glass-card overflow-hidden shadow-liquid w-full will-change-transform ${showSettings ? 'rounded-[2.5rem]' : 'rounded-[2rem]'}`}
+                  className={`glass-card overflow-hidden shadow-liquid w-full ${showSettings ? 'rounded-[2.5rem]' : 'rounded-[2rem]'}`}
               >
                   <div className="flex flex-col">
                       <div className={`flex p-2 ${isInputExpanded ? 'flex-col gap-3' : 'flex-row items-center gap-2'}`}>
