@@ -64,7 +64,7 @@ const PromptHeader = memo(({ prompt, onClearBatch, batchId }: { prompt: string, 
             <div className="flex items-center gap-3">
                 <div 
                     onClick={() => setIsExpanded(!isExpanded)}
-                    className="flex-1 flex items-center gap-3 px-6 py-4 rounded-[1.8rem] glass-panel backdrop-blur-xl cursor-pointer hover:bg-white/5 transition-all overflow-hidden shadow-sm"
+                    className="flex-1 flex items-center gap-3 px-6 py-4 rounded-[1.8rem] bg-zinc-900 border border-zinc-800 cursor-pointer hover:bg-zinc-800 transition-all overflow-hidden shadow-sm"
                 >
                     <Camera size={14} className="text-primary shrink-0" />
                     <p className={`text-xs font-medium text-white/70 tracking-tight leading-relaxed ${isExpanded ? '' : 'truncate'}`}>
@@ -73,7 +73,7 @@ const PromptHeader = memo(({ prompt, onClearBatch, batchId }: { prompt: string, 
                 </div>
                 <button 
                     onClick={() => onClearBatch(batchId)}
-                    className="size-12 rounded-[1.5rem] bg-white/5 border-[0.5px] border-white/10 flex items-center justify-center text-white/10 hover:text-red-400 hover:bg-red-500/10 transition-all shrink-0 active:scale-90"
+                    className="size-12 rounded-[1.5rem] bg-zinc-900 border border-zinc-800 flex items-center justify-center text-white/40 hover:text-red-400 hover:bg-red-500/10 transition-all shrink-0 active:scale-90"
                 >
                     <Trash2 size={16} />
                 </button>
@@ -330,8 +330,8 @@ const GenerationCard = memo(({ item, index, visualSafety, privateMode, onImageRe
     >
       {/* Skeleton Shimmer Layer - Always visible until loaded */}
       {!isLoaded && (
-          <div className="absolute inset-0 z-10 overflow-hidden bg-black/20">
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.08] to-transparent -translate-x-full animate-shimmer" style={{ backgroundSize: '200% 100%' }} />
+          <div className="absolute inset-0 z-10 overflow-hidden bg-zinc-900">
+              <div className="absolute inset-0 bg-zinc-800 animate-pulse" />
               <div className="absolute inset-0 flex flex-col p-10 gap-6">
                   <div className="w-1/2 h-5 bg-white/10 rounded-full animate-pulse" />
                   <div className="w-3/4 h-4 bg-white/10 rounded-full animate-pulse delay-150" />
@@ -352,7 +352,7 @@ const GenerationCard = memo(({ item, index, visualSafety, privateMode, onImageRe
             alt="vision"
             crossOrigin="anonymous"
             referrerPolicy="no-referrer"
-            className={`w-full h-full object-cover transition-all duration-500 ease-out ${isLoaded && !isAuditing ? 'opacity-100' : 'opacity-0'} ${(visualRisk && !revealed) ? 'blur-[80px] saturate-50 brightness-50' : 'blur-0'}`}
+            className={`w-full h-full object-cover transition-all duration-500 ease-out ${isLoaded && !isAuditing ? 'opacity-100' : 'opacity-0'} ${(visualRisk && !revealed) ? 'saturate-50 brightness-50 opacity-20' : ''}`}
             onLoad={handleImageLoad}
             onError={handleImageError}
           />
@@ -368,7 +368,7 @@ const GenerationCard = memo(({ item, index, visualSafety, privateMode, onImageRe
                     Check logs for details
                 </button>
               </div>
-              <button onClick={retry} className="px-4 py-2 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 text-[9px] font-bold uppercase tracking-widest text-white/60 flex items-center gap-2">
+              <button onClick={retry} className="px-4 py-2 rounded-full bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-[9px] font-bold uppercase tracking-widest text-white/60 flex items-center gap-2">
                   <RefreshCw size={12} /> Retry
               </button>
           </div>
@@ -378,13 +378,13 @@ const GenerationCard = memo(({ item, index, visualSafety, privateMode, onImageRe
         <div className="absolute bottom-6 right-6 flex gap-2 opacity-0 group-hover/card:opacity-100 transition-all translate-y-2 group-hover/card:translate-y-0 z-30">
            <button 
                onClick={handleDownload}
-               className="size-10 rounded-full bg-black/40 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white/60 hover:text-white hover:bg-black/60 transition-all active:scale-90"
+               className="size-10 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-white/60 hover:text-white hover:bg-zinc-800 transition-all active:scale-90"
            >
                <Download size={16} />
            </button>
            <button 
                onClick={handleShare}
-               className="size-10 rounded-full bg-black/40 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white/60 hover:text-white hover:bg-black/60 transition-all active:scale-90"
+               className="size-10 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-white/60 hover:text-white hover:bg-zinc-800 transition-all active:scale-90"
            >
                <Share2 size={16} />
            </button>
@@ -395,9 +395,9 @@ const GenerationCard = memo(({ item, index, visualSafety, privateMode, onImageRe
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="absolute inset-0 flex flex-col items-center justify-center bg-black/20 backdrop-blur-sm overflow-hidden z-20"
+          className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950 overflow-hidden z-20"
         >
-          <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 animate-pulse" />
+          <div className="absolute inset-0 bg-zinc-900 animate-pulse" />
           <div className="relative flex flex-col items-center gap-6">
               <div className="relative">
                   <div className="size-12 rounded-full border-2 border-white/5 border-t-primary animate-spin" />
@@ -412,7 +412,7 @@ const GenerationCard = memo(({ item, index, visualSafety, privateMode, onImageRe
                         initial={{ x: '-100%' }}
                         animate={{ x: '100%' }}
                         transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
-                        className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/40 to-transparent"
+                        className="absolute inset-0 bg-primary"
                       />
                   </div>
               </div>
@@ -420,7 +420,7 @@ const GenerationCard = memo(({ item, index, visualSafety, privateMode, onImageRe
         </motion.div>
       )}
       {visualRisk && !revealed && isLoaded && !isAuditing && !hasError && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center z-20 bg-black/80 backdrop-blur-3xl">
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center z-20 bg-zinc-950">
           <EyeOff className="text-white/10 mb-6" strokeWidth={1} size={54} />
           <p className="text-[10px] text-white/30 font-black uppercase tracking-[0.4em] mb-10">Neural Filter Active</p>
           <button onClick={() => setRevealed(true)} className="px-12 py-5 rounded-full bg-white text-black text-[11px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-glow">Reveal</button>
@@ -568,15 +568,12 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, 
     return (
         <div className="px-5 py-6 flex flex-col gap-6 overflow-y-auto no-scrollbar max-h-[60vh] pb-24">
             <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => updateLocalSetting('enhance', !localSettings.enhance)} className={`relative h-12 rounded-2xl flex items-center justify-center gap-2 transition-all border backdrop-blur-md ${localSettings.enhance ? 'bg-primary/20 border-primary/40 text-primary shadow-glow' : 'bg-white/5 border-transparent text-white/20'}`}>
+                <button onClick={() => updateLocalSetting('enhance', !localSettings.enhance)} className={`relative h-12 rounded-2xl flex items-center justify-center gap-2 transition-all border ${localSettings.enhance ? 'bg-primary/20 border-primary/40 text-primary' : 'bg-zinc-800 border-zinc-700 text-white/40'}`}>
                     <Wand2 size={14} />
                     <span className="text-[9px] font-black uppercase tracking-widest">Neural {localSettings.enhance ? 'ON' : 'OFF'}</span>
                     <span className="absolute -top-1 -right-1 bg-black/80 text-[7px] px-1.5 py-0.5 rounded-full border border-white/10 font-bold text-white/40">+~3s</span>
-                    <div className="absolute -bottom-6 left-0 right-0 text-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                        <p className="text-[6px] text-white/20 uppercase font-black tracking-tighter">AI Prompt Expansion</p>
-                    </div>
                 </button>
-                <button onClick={() => updateLocalSetting('visualSafety', !localSettings.visualSafety)} className={`h-12 rounded-2xl flex items-center justify-center gap-2 transition-all border backdrop-blur-md ${localSettings.visualSafety ? 'bg-blue-500/20 border-blue-500/40 text-blue-400 shadow-glow' : 'bg-white/5 border-transparent text-white/20'}`}>
+                <button onClick={() => updateLocalSetting('visualSafety', !localSettings.visualSafety)} className={`h-12 rounded-2xl flex items-center justify-center gap-2 transition-all border ${localSettings.visualSafety ? 'bg-blue-500/20 border-blue-500/40 text-blue-400' : 'bg-zinc-800 border-zinc-700 text-white/40'}`}>
                     <ShieldCheck size={14} />
                     <span className="text-[9px] font-black uppercase tracking-widest">Audit {localSettings.visualSafety ? 'ON' : 'OFF'}</span>
                 </button>
@@ -584,11 +581,11 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, 
 
             <div className="space-y-3">
                 <p className="text-[8px] text-white/40 font-black uppercase tracking-[0.2em] pl-1">Aspect Geometry</p>
-                <div className="grid grid-cols-5 gap-1.5 bg-white/10 backdrop-blur-md p-1.5 rounded-2xl border border-white/10">
+                <div className="grid grid-cols-5 gap-1.5 bg-zinc-900 p-1.5 rounded-2xl border border-zinc-800">
                     {ASPECT_RATIOS.map(ratio => {
                         const isSelected = localSettings.width === ratio.width && localSettings.height === ratio.height;
                         return (
-                            <button key={ratio.label} onClick={() => setAspectRatio(ratio.width, ratio.height)} className={`h-12 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all ${isSelected ? 'bg-white/20 text-white shadow-lg' : 'text-white/30 hover:text-white/50'}`}>
+                            <button key={ratio.label} onClick={() => setAspectRatio(ratio.width, ratio.height)} className={`h-12 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all ${isSelected ? 'bg-zinc-700 text-white shadow-lg' : 'text-white/30 hover:text-white/50'}`}>
                                 <RatioIcon width={ratio.width} height={ratio.height} isSelected={isSelected} />
                                 <span className="text-[7px] font-black">{ratio.label}</span>
                             </button>
@@ -599,16 +596,16 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, 
 
             <div className="space-y-3">
                 <p className="text-[8px] text-white/40 font-black uppercase tracking-[0.2em] pl-1">Batch Capacity</p>
-                <div className="grid grid-cols-4 gap-1.5 bg-white/10 backdrop-blur-md p-1.5 rounded-2xl border border-white/10">
+                <div className="grid grid-cols-4 gap-1.5 bg-zinc-900 p-1.5 rounded-2xl border border-zinc-800">
                     {[1, 2, 3, 4].map(n => {
-                        const maxBatch = localSettings.model === 'klein' ? 1 : (localSettings.model === 'zimage' ? 2 : 4);
+                        const maxBatch = localSettings.model === 'zimage' ? 2 : 4;
                         const isDisabled = n > maxBatch;
                         return (
                             <button 
                                 key={n} 
                                 onClick={() => !isDisabled && updateLocalSetting('imageCount', n)} 
                                 disabled={isDisabled}
-                                className={`h-12 rounded-xl text-[9px] font-black transition-all ${localSettings.imageCount === n ? 'bg-primary text-white shadow-glow' : 'text-white/30 hover:text-white/50'} ${isDisabled ? 'opacity-20 cursor-not-allowed' : ''}`}
+                                className={`h-12 rounded-xl text-[9px] font-black transition-all ${localSettings.imageCount === n ? 'bg-primary text-white' : 'text-white/30 hover:text-white/50'} ${isDisabled ? 'opacity-20 cursor-not-allowed' : ''}`}
                             >
                                 {n}x
                             </button>
@@ -619,18 +616,18 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, 
 
             <div className="space-y-3">
                 <p className="text-[8px] text-white/40 font-black uppercase tracking-[0.2em] pl-1">Neural Model</p>
-                <div className="grid grid-cols-3 gap-2 bg-white/10 backdrop-blur-md p-1.5 rounded-2xl border border-white/10">
+                <div className="grid grid-cols-3 gap-2 bg-zinc-900 p-1.5 rounded-2xl border border-zinc-800">
                     {models.map(m => (
                         <button 
                             key={m.id} 
                             onClick={() => {
                                 updateLocalSetting('model', m.id);
-                                const maxBatch = m.id === 'klein' ? 1 : (m.id === 'zimage' ? 2 : 4);
+                                const maxBatch = m.id === 'zimage' ? 2 : 4;
                                 if (localSettings.imageCount > maxBatch) {
                                     updateLocalSetting('imageCount', maxBatch);
                                 }
                             }} 
-                            className={`h-12 rounded-xl text-[8px] font-black transition-all flex flex-col items-center justify-center gap-1 relative overflow-hidden ${localSettings.model === m.id ? 'bg-primary text-white shadow-glow' : 'bg-white/5 text-white/30 hover:text-white/50 border border-white/5'}`}
+                            className={`h-12 rounded-xl text-[8px] font-black transition-all flex flex-col items-center justify-center gap-1 relative overflow-hidden ${localSettings.model === m.id ? 'bg-primary text-white' : 'bg-zinc-800 text-white/40 hover:text-white/70 border border-zinc-700'}`}
                         >
                             <div className="flex items-center gap-1">
                                 {m.type === 'video' ? <Video size={10} className="text-blue-400" /> : (m.paid_only ? <Zap size={10} className="text-amber-400" /> : <Sparkles size={10} />)}
@@ -690,7 +687,7 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, 
                                     {style.id !== 'none' && (
                                         <button 
                                             onClick={(e) => toggleFavorite(e, style.id)}
-                                            className={`absolute top-3 left-3 size-7 rounded-full flex items-center justify-center transition-all z-30 ${isFavorite ? 'bg-red-500 text-white shadow-glow' : 'bg-black/40 backdrop-blur-md border border-white/10 text-white/40 hover:text-white'}`}
+                                            className={`absolute top-3 left-3 size-7 rounded-full flex items-center justify-center transition-all z-30 ${isFavorite ? 'bg-red-500 text-white' : 'bg-zinc-900 border border-zinc-800 text-white/40 hover:text-white'}`}
                                         >
                                             <Heart size={12} fill={isFavorite ? "currentColor" : "none"} />
                                         </button>
@@ -698,18 +695,14 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, 
 
                                     {/* Model Pill moved to Top Right */}
                                     {effectiveModelId && (
-                                        <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 z-20">
+                                        <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-zinc-900 border border-zinc-800 z-20">
                                             <p className="text-[7px] font-black uppercase tracking-widest text-white/60">{effectiveModelId}</p>
                                         </div>
                                     )}
 
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-4">
+                                    <div className="absolute inset-0 bg-black/70 flex flex-col justify-end p-4">
                                         <p className={`text-[10px] font-black uppercase tracking-tighter text-center leading-tight ${isSelected ? 'text-primary' : 'text-white/80'}`}>{style.label}</p>
                                     </div>
-                                    
-                                    {isSelected && style.id !== 'none' && (
-                                        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-12 bg-primary/20 blur-2xl pointer-events-none" />
-                                    )}
                                 </motion.div>
                             );
                         })}
@@ -785,7 +778,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
   const [telemetry, setTelemetry] = useState<Record<string, { avgDuration: number; count: number }>>({
     zimage: { avgDuration: 1.5, count: 0 },
     flux: { avgDuration: 8.0, count: 0 },
-    'flux-2-dev': { avgDuration: 12.0, count: 0 }
+    klein: { avgDuration: 4.0, count: 0 }
   });
 
   const [selectedImage, setSelectedImage] = useState<HistoryItem | null>(null);
@@ -831,11 +824,11 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
         const storedTelemetry = await storage.get<any>(STORAGE_KEY_TELEMETRY);
         if (storedTelemetry) {
           // Migration/Safety check: if it's the old format (single object), reset to default
-          if (storedTelemetry.avgDuration !== undefined) {
+          if (storedTelemetry.avgDuration !== undefined || !storedTelemetry.klein) {
             setTelemetry({
               zimage: { avgDuration: 1.5, count: 0 },
               flux: { avgDuration: 8.0, count: 0 },
-              'flux-2-dev': { avgDuration: 12.0, count: 0 }
+              klein: { avgDuration: 4.0, count: 0 }
             });
           } else {
             setTelemetry(storedTelemetry);
@@ -890,17 +883,6 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
             timerRef.current = setInterval(() => setRenderTime(prev => prev + 0.1), 100);
           }
       } else {
-          if (renderTime > 1.0) {
-            const model = localSettings.model;
-            setTelemetry(prev => {
-                const current = prev[model] || { avgDuration: 8.0, count: 0 };
-                const nextCount = current.count + 1;
-                const nextAvg = (current.avgDuration * current.count + renderTime) / nextCount;
-                const nextData = { ...prev, [model]: { avgDuration: nextAvg, count: nextCount } };
-                storage.set(STORAGE_KEY_TELEMETRY, nextData);
-                return nextData;
-            });
-          }
           clearInterval(timerRef.current);
           timerRef.current = null;
       }
@@ -1121,7 +1103,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                 initial={{ opacity: 0 }} 
                 animate={{ opacity: 1 }} 
                 exit={{ opacity: 0 }} 
-                className="fixed inset-0 z-[299] bg-black/60 backdrop-blur-md" 
+                className="fixed inset-0 z-[299] bg-black/80" 
                 onClick={() => setIsIslandExpanded(false)} 
               />
           )}
@@ -1281,7 +1263,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                         initial={{ y: 20, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         transition={{ delay: 0.3 }}
-                        className="size-20 rounded-[2rem] bg-white/[0.04] border-[0.5px] border-white/10 flex items-center justify-center mb-10 mx-auto shadow-liquid backdrop-blur-3xl animate-liquid-pulse"
+                        className="size-20 rounded-[2rem] bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-10 mx-auto shadow-liquid animate-liquid-pulse"
                       >
                         <Wand2 size={32} className="text-white/40" strokeWidth={1} />
                       </motion.div>
@@ -1353,7 +1335,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                                       {Array.from({ length: localSettings.imageCount }).map((_, idx) => (
                                           <div key={idx} className="relative shrink-0 overflow-hidden bg-white/[0.02] border-[0.5px] border-white/10 shadow-liquid rounded-[2.5rem] flex items-center justify-center w-full max-w-3xl" style={{ aspectRatio: `${localSettings.width}/${localSettings.height}` }}>
                                               <div className="absolute inset-0 z-10 overflow-hidden bg-black/20">
-                                                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.08] to-transparent -translate-x-full animate-shimmer" style={{ backgroundSize: '200% 100%' }} />
+                                                  <div className="absolute inset-0 bg-zinc-800 animate-pulse" />
                                                   <div className="absolute inset-0 flex flex-col p-10 gap-6">
                                                       <div className="w-1/2 h-5 bg-white/10 rounded-full animate-pulse" />
                                                       <div className="w-3/4 h-4 bg-white/10 rounded-full animate-pulse delay-150" />
@@ -1540,7 +1522,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
           </div>
       </div>
 
-      <AnimatePresence>{toastMessage && <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed bottom-36 left-1/2 -translate-x-1/2 px-8 py-3 rounded-full glass-panel backdrop-blur-xl border-white/20 text-[10px] font-black uppercase tracking-widest">{toastMessage}</motion.div>}</AnimatePresence>
+      <AnimatePresence>{toastMessage && <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed bottom-36 left-1/2 -translate-x-1/2 px-8 py-3 rounded-full bg-zinc-900 border border-zinc-800 text-[10px] font-black uppercase tracking-widest">{toastMessage}</motion.div>}</AnimatePresence>
 
       <AnimatePresence>
           {selectedImage && (
@@ -1563,7 +1545,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                           alt={selectedImage.prompt} 
                           crossOrigin="anonymous"
                           referrerPolicy="no-referrer"
-                          className="w-full h-full object-contain sm:object-cover sm:scale-105 sm:blur-3xl sm:opacity-50 absolute inset-0" 
+                          className="w-full h-full object-contain sm:object-cover sm:scale-105 sm:opacity-30 absolute inset-0" 
                       />
                       <img 
                           src={selectedImage.url} 
@@ -1577,12 +1559,12 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                   {/* Close Button */}
                   <button 
                       onClick={() => setSelectedImage(null)}
-                      className="absolute top-8 right-8 size-14 rounded-full bg-black/20 backdrop-blur-2xl border border-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-all z-50 active:scale-90"
+                      className="absolute top-8 right-8 size-14 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-white hover:bg-zinc-800 transition-all z-50 active:scale-90"
                   >
                       <X size={24} />
                   </button>
 
-                  {/* Floating Info Panel (Bottom) - Compact White Frost */}
+                  {/* Floating Info Panel (Bottom) */}
                   <motion.div 
                       initial={{ y: 50, opacity: 0 }}
                       animate={{ y: 0, opacity: 1 }}
@@ -1590,7 +1572,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                       className="absolute bottom-8 left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-3xl z-50"
                       onClick={(e) => e.stopPropagation()}
                   >
-                      <div className="backdrop-blur-3xl bg-white/10 border border-white/20 rounded-[2rem] p-3 sm:p-4 shadow-2xl flex flex-col sm:flex-row items-center gap-4">
+                      <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-3 sm:p-4 shadow-2xl flex flex-col sm:flex-row items-center gap-4">
                           {/* Prompt & Metadata Group */}
                           <div className="flex-1 min-w-0 flex flex-col gap-1.5 px-3">
                               <div className="flex items-center gap-2">

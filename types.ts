@@ -68,16 +68,32 @@ export interface AppSettings {
 
 export interface AccountProfile {
   name?: string;
+  username?: string;
   email?: string;
-  tier?: 'anonymous' | 'seed' | 'flower' | 'nectar';
+  tier?: 'anonymous' | 'seed' | 'flower' | 'nectar' | string;
   createdAt?: string;
+  created_at?: string;
+  free_credits?: number;
+  freeCredits?: number;
+  paid_credits?: number;
+  paidCredits?: number;
+  total_generations?: number;
+  totalGenerations?: number;
 }
 
 export interface UsageRecord {
-  timestamp: string;
-  model: string;
-  cost_usd: number;
-  type: string;
+  timestamp?: string;
+  time?: string;
+  created_at?: string;
+  model?: string;
+  model_id?: string;
+  cost_usd?: number;
+  price?: number;
+  cost?: number;
+  type?: string;
+  prompt?: string;
+  width?: number;
+  height?: number;
 }
 
 export interface AccountState {

@@ -22,7 +22,7 @@ export const Header: React.FC<HeaderProps> = memo(({
         {leftIcon && (
           <button 
             onClick={onLeftClick}
-            className="size-11 rounded-full bg-white/5 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all active:scale-90"
+            className="size-11 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-white/60 hover:text-white hover:bg-zinc-800 transition-all active:scale-90"
           >
             <span className="material-symbols-outlined text-[22px]">{leftIcon}</span>
           </button>
@@ -44,7 +44,7 @@ export const Header: React.FC<HeaderProps> = memo(({
         {rightIcon && (
           <button 
             onClick={onRightClick}
-            className="size-11 rounded-full bg-white/5 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all active:scale-90"
+            className="size-11 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-white/60 hover:text-white hover:bg-zinc-800 transition-all active:scale-90"
           >
             <span className="material-symbols-outlined text-[22px]">{rightIcon}</span>
           </button>

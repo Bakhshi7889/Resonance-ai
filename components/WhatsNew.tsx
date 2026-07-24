@@ -10,6 +10,33 @@ interface WhatsNewProps {
 
 const UPDATES = [
     {
+        id: 'v5.4.0',
+        version: 'v5.4.0',
+        date: 'July 24, 2026',
+        title: 'Sana Model Integration & Model Sunset',
+        icon: <Sparkles className="text-primary" />,
+        description: 'Integrated the Sana model for near-instant images at rock-bottom cost (0.0001 pollen/gen) while sunsetting FLUX.2 Klein 4B and Sana Sprint 1.6B.',
+        features: [
+            'Sana Model Added: Near-instant image generation at 0.0001 pollen per generation.',
+            'Model Sunset: Removed FLUX.2 Klein 4B and Sana Sprint 1.6B to maintain high performance.',
+            'Precision Pricing: Updated account balance and usage estimation for the new Sana pricing tier.'
+        ]
+    },
+    {
+        id: 'v5.3.0',
+        version: 'v5.3.0',
+        date: 'July 2, 2026',
+        title: 'Multi-Model Realignment & Secure Sync',
+        icon: <Sparkles className="text-primary" />,
+        description: 'We have updated our neural suite with next-generation models, updated pricing to reflect the latest Pollinations standards, and fortified account synchronization and analytics telemetry.',
+        features: [
+            'Next-Gen Models: Native integration of Alibaba\'s S3-DiT 6B (Z-Image Turbo) with 2x SPAN upscaling, and Black Forest Labs\' FLUX.2 Klein 4B for rapid synthesis.',
+            'Aligned Consumption: Updated pricing indices (Flux Schnell at 0.00175 pollen, Z-Image Turbo at 0.002 pollen, and FLUX.2 Klein 4B at 0.01 pollen) to keep image balance estimates highly accurate.',
+            'Optimized Sync URL: Reconfigured external authorization flow to map the app key and redirect URLs exactly as requested, securing user credentials via pk_2yctpceb1LwUL1Vr.',
+            'Intelligent Analytics Fallback: Added automatic detection of local database state. When analytics schemas are not initialized, we fall back gracefully instead of flooding console logs with database errors.'
+        ]
+    },
+    {
         id: 'v5.2.2',
         version: 'v5.2.2',
         date: 'April 10, 2026',

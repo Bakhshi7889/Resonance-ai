@@ -51,15 +51,15 @@ const StyleCard = memo(({
             exit={{ opacity: 0, scale: 0.9 }}
             whileHover={{ y: -5 }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className={`bg-surface-dark/80 backdrop-blur-xl rounded-3xl border overflow-hidden group relative flex flex-col transition-all duration-500 will-change-transform ${
+            className={`bg-zinc-900 rounded-3xl border overflow-hidden group relative flex flex-col transition-all duration-500 will-change-transform ${
                 isActive ? 'border-primary shadow-[0_0_20px_rgba(59,130,246,0.3)]' : 
                 style.isFeatured ? 'golden-outline' :
                 isHidden ? 'border-red-500/20 opacity-50 grayscale' : 
-                'border-white/5 hover:border-white/20 hover:shadow-2xl'
+                'border-zinc-800 hover:border-zinc-700 hover:shadow-2xl'
             }`}
         >
             {/* Image Container */}
-            <div className="aspect-[2/3] relative bg-surface-highlight/30 overflow-hidden">
+            <div className="aspect-[2/3] relative bg-zinc-900/50 overflow-hidden">
                 <img 
                     src={style.image} 
                     alt={style.label} 
@@ -80,7 +80,7 @@ const StyleCard = memo(({
                 {/* Active Badge */}
                 {isActive && (
                     <div className={`absolute z-10 pointer-events-none ${style.isFeatured ? 'top-10 left-3' : 'top-3 left-3'}`}>
-                         <div className="bg-primary/90 backdrop-blur-md px-2.5 py-1 rounded-lg shadow-lg flex items-center gap-1.5 border border-white/20">
+                         <div className="bg-primary px-2.5 py-1 rounded-lg shadow-lg flex items-center gap-1.5 border border-white/20">
                             <Check size={10} className="text-white stroke-[4]" />
                             <span className="text-[9px] font-black text-white uppercase tracking-wider">Active</span>
                          </div>
@@ -90,15 +90,15 @@ const StyleCard = memo(({
                 {/* Favorite Toggle (Always Visible) */}
                 <button 
                     onClick={(e) => { e.stopPropagation(); onToggleFavorite(style.id); }}
-                    className={`absolute top-3 right-3 z-30 size-8 rounded-full flex items-center justify-center transition-all ${isFavorite ? 'bg-red-500 text-white shadow-glow' : 'bg-black/30 backdrop-blur-md text-white/40 hover:bg-white hover:text-red-500 hover:scale-110'}`}
+                    className={`absolute top-3 right-3 z-30 size-8 rounded-full flex items-center justify-center transition-all ${isFavorite ? 'bg-red-500 text-white' : 'bg-black/60 text-white/40 hover:bg-white hover:text-red-500 hover:scale-110'}`}
                 >
                     <Heart size={14} fill={isFavorite ? "currentColor" : "none"} strokeWidth={isFavorite ? 0 : 2} />
                 </button>
 
                 {/* Hidden Overlay Indicator */}
                 {isHidden && (
-                    <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none bg-black/40 backdrop-blur-[2px]">
-                        <div className="bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-full border border-red-500/30 flex items-center gap-2">
+                    <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none bg-black/60">
+                        <div className="bg-black/80 px-3 py-1.5 rounded-full border border-red-500/30 flex items-center gap-2">
                              <EyeOff size={16} className="text-red-400" />
                              <span className="text-[10px] font-bold text-red-400 uppercase tracking-widest">Hidden</span>
                         </div>

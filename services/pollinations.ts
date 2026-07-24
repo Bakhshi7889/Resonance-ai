@@ -29,7 +29,7 @@ export const getAuthUrl = (redirectUri: string) => {
     const params = new URLSearchParams({
         redirect_url: redirectUri,
         app_key: 'pk_2yctpceb1LwUL1Vr',
-        models: JSON.stringify(['flux', 'zimage', 'klein', 'openai']), // Use exactly the 4 models
+        models: JSON.stringify(['flux', 'zimage', 'sana', 'openai']),
     });
     return `https://enter.pollinations.ai/authorize?${params.toString()}`;
 };
@@ -37,31 +37,43 @@ export const getAuthUrl = (redirectUri: string) => {
 export const getAccountDetails = async (apiKey?: string) => {
     const effectiveKey = getEffectiveKey(apiKey);
     try {
-        addLog('info', 'Initiating account sync via Pollinations API...');
-        // Use the gen.pollinations.ai API for account details
-        const response = await fetch('https://gen.pollinations.ai/account/balance', {
-            headers: {
-                'Authorization': `Bearer ${effectiveKey}`
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error(`API Error: ${response.status}`);
+        addLog('info', 'Initiating complete account sync via Pollinations API...');
+        const headers = { 'Authorization': `Bearer ${effectiveKey}` };
+        const baseUrl = 'https://gen.pollinations.ai';
+
+        const [profileRes, balanceRes, usageRes] = await Promise.all([
+            fetch(`${baseUrl}/account/profile`, { headers }).catch(() => null),
+            fetch(`${baseUrl}/account/balance`, { headers }).catch(() => null),
+            fetch(`${baseUrl}/account/usage?limit=10`, { headers }).catch(() => null)
+        ]);
+
+        let profile = null;
+        let balance = null;
+        let usage = [];
+
+        if (profileRes && profileRes.ok) {
+            profile = await profileRes.json();
+        }
+        if (balanceRes && balanceRes.ok) {
+            const balanceData = await balanceRes.json();
+            balance = balanceData.balance;
+        }
+        if (usageRes && usageRes.ok) {
+            const usageData = await usageRes.json();
+            usage = usageData.usage || [];
         }
 
-        const data = await response.json();
-        
-        addLog('info', 'Sync complete', { balance: data.balance });
+        addLog('info', 'Sync complete', { balance, profileExists: !!profile, usageCount: usage.length });
         return { 
-            profile: null, 
-            balance: data.balance, 
-            usage: [], 
+            profile, 
+            balance, 
+            usage, 
             isLoading: false, 
             error: null 
         };
     } catch (e: any) {
         const errorMsg = e instanceof Error ? e.message : String(e || 'Unknown error');
-        addLog('error', 'Critical sync error', errorMsg);
+        addLog('error', 'Critical sync error during account sync', errorMsg);
         return { profile: null, balance: null, usage: [], isLoading: false, error: errorMsg };
     }
 };
@@ -69,7 +81,7 @@ export const getAccountDetails = async (apiKey?: string) => {
 export const MODEL_PRICING: Record<string, number> = {
     'flux': 0.00175,
     'zimage': 0.002,
-    'klein': 0.01
+    'sana': 0.0001
 };
 
 export const IMAGE_MODELS: ModelInfo[] = [
@@ -90,11 +102,11 @@ export const IMAGE_MODELS: ModelInfo[] = [
         type: 'image'
     },
     { 
-        id: 'klein', 
-        name: 'FLUX.2 Klein 4B', 
-        description: 'Fast image generation and editing', 
-        paid_only: true, 
-        price: 0.01, 
+        id: 'sana', 
+        name: 'Sana', 
+        description: 'Near-instant images at rock-bottom cost; simpler detail than premium models', 
+        paid_only: false, 
+        price: 0.0001, 
         type: 'image'
     }
 ];

@@ -661,7 +661,7 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
                         </button>
                     </div>
 
-                    <div className="space-y-3 pt-6 border-t border-white/5">
+                    <div className="space-y-4 pt-6 border-t border-white/5">
                         <p className="text-[9px] font-black text-white/40 uppercase tracking-widest ml-1">Or use manual API Key / BYOP Key</p>
                         <div className="flex gap-2">
                             <input 
@@ -699,33 +699,138 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
                         )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 pt-6 border-t border-white/5">
-                        <div className="flex flex-col p-5 rounded-2xl bg-white/[0.02] border border-white/5">
-                            <span className="text-2xl font-black font-mono tracking-tighter text-blue-400">
-                                ${accountState.balance?.toFixed(3) || '0.000'}
-                            </span>
-                            <span className="text-[8px] text-white/30 uppercase font-black tracking-widest mt-1.5">Available Balance</span>
+                    {/* Integrated Profile Header */}
+                    <div className="p-5 rounded-3xl bg-white/[0.02] border border-white/5 space-y-4">
+                        <div className="flex items-start justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                                <div className="size-10 rounded-full bg-primary/20 border border-primary/20 flex items-center justify-center text-primary shrink-0 relative">
+                                    <User size={18} />
+                                    <span className="absolute -bottom-1 -right-1 size-3.5 bg-emerald-500 rounded-full border-2 border-[#09090b] flex items-center justify-center" title="Synchronized">
+                                        <Check size={8} className="text-white" />
+                                    </span>
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-bold text-white tracking-tight">
+                                        {accountState.profile?.username || accountState.profile?.name || (isManual ? "Custom Key Sync" : "Guest Explorer")}
+                                    </span>
+                                    <span className="text-[9px] text-white/30 font-medium font-mono">
+                                        {accountState.profile?.email || (isManual ? "External Sync via BYOP" : "resonance@app.default")}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="flex flex-col items-end">
+                                <span className="px-2.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest bg-primary/20 text-primary border border-primary/30">
+                                    {accountState.profile?.tier || 'seed'}
+                                </span>
+                                {(accountState.profile?.created_at || accountState.profile?.createdAt) && (
+                                    <span className="text-[8px] text-white/20 mt-1 uppercase font-mono">
+                                        Since {new Date(accountState.profile?.created_at || accountState.profile?.createdAt || '').toLocaleDateString(undefined, { year: 'numeric', month: 'short' })}
+                                    </span>
+                                )}
+                            </div>
                         </div>
-                        <div className="flex flex-col p-5 rounded-2xl bg-white/[0.02] border border-white/5 items-end">
-                            <span className="text-2xl font-black font-mono tracking-tighter text-emerald-400">
-                                {isDeveloper ? globalPollen.toFixed(4) : history.reduce((sum, item) => {
-                                    const modelData = models.find(m => m.id === item.model);
-                                    const price = modelData ? modelData.price : (MODEL_PRICING[item.model] || 0.001);
-                                    return sum + price;
-                                }, 0).toFixed(4)}
-                            </span>
-                            <span className="text-[8px] text-white/30 uppercase font-black tracking-widest mt-1.5">Session Usage</span>
+
+                        {/* Credits / Pollen Matrix */}
+                        <div className="grid grid-cols-2 gap-2.5 pt-3 border-t border-white/5">
+                            <div className="p-3.5 rounded-2xl bg-white/[0.01] border border-white/5">
+                                <span className="text-xs text-white/40 uppercase font-bold tracking-widest block mb-1">Available balance</span>
+                                <span className="text-base font-black font-mono tracking-tight text-blue-400">
+                                    ${accountState.balance !== null ? accountState.balance.toFixed(4) : '0.0000'}
+                                </span>
+                            </div>
+                            <div className="p-3.5 rounded-2xl bg-white/[0.01] border border-white/5">
+                                <span className="text-xs text-white/40 uppercase font-bold tracking-widest block mb-1">Total Generations</span>
+                                <span className="text-base font-black font-mono tracking-tight text-yellow-400 flex items-center gap-1.5">
+                                    <Trophy size={13} className="text-yellow-400/80" />
+                                    {accountState.profile?.total_generations ?? accountState.profile?.totalGenerations ?? '—'}
+                                </span>
+                            </div>
+                            <div className="p-3.5 rounded-2xl bg-white/[0.01] border border-white/5">
+                                <span className="text-xs text-white/40 uppercase font-bold tracking-widest block mb-1">Free pollen credits</span>
+                                <span className="text-sm font-bold font-mono tracking-tight text-emerald-400">
+                                    {accountState.profile?.free_credits !== undefined 
+                                        ? `$${accountState.profile.free_credits.toFixed(4)}` 
+                                        : (accountState.profile?.freeCredits !== undefined 
+                                            ? `$${accountState.profile.freeCredits.toFixed(4)}` 
+                                            : 'Sponsor active')}
+                                </span>
+                            </div>
+                            <div className="p-3.5 rounded-2xl bg-white/[0.01] border border-white/5">
+                                <span className="text-xs text-white/40 uppercase font-bold tracking-widest block mb-1">Paid pollen credits</span>
+                                <span className="text-sm font-bold font-mono tracking-tight text-purple-400">
+                                    {accountState.profile?.paid_credits !== undefined 
+                                        ? `$${accountState.profile.paid_credits.toFixed(4)}` 
+                                        : (accountState.profile?.paidCredits !== undefined 
+                                            ? `$${accountState.profile.paidCredits.toFixed(4)}` 
+                                            : '0.0000')}
+                                </span>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="flex items-center justify-between px-2">
+                    {/* Usage / Live Generations History */}
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between px-1">
+                            <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Last Generations Feed</span>
+                            <span className="text-[8px] font-mono text-white/30 uppercase">Updated real-time</span>
+                        </div>
+
+                        {accountState.usage && accountState.usage.length > 0 ? (
+                            <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1 custom-scrollbar">
+                                {accountState.usage.slice(0, 5).map((item, idx) => (
+                                    <div key={idx} className="p-3 rounded-2xl bg-white/[0.01] border border-white/5 hover:bg-white/[0.02] transition-colors flex items-center justify-between gap-3 text-left">
+                                        <div className="flex flex-col min-w-0 flex-1 gap-1">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="px-1.5 py-0.5 rounded text-[8px] font-bold font-mono uppercase bg-white/5 text-white/60 border border-white/10">
+                                                    {item.model || item.model_id || 'flux'}
+                                                </span>
+                                                {item.cost_usd !== undefined || item.price !== undefined || item.cost !== undefined ? (
+                                                    <span className="text-[9px] font-mono text-emerald-400">
+                                                        -${(item.cost_usd ?? item.price ?? item.cost ?? 0).toFixed(5)}
+                                                    </span>
+                                                ) : null}
+                                                {item.width && item.height && (
+                                                    <span className="text-[8px] font-mono text-white/30">
+                                                        {item.width}x{item.height}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {item.prompt && (
+                                                <p className="text-[10px] text-white/60 truncate font-mono" title={item.prompt}>
+                                                    "{item.prompt}"
+                                                </p>
+                                            )}
+                                        </div>
+                                        {item.timestamp || item.time || item.created_at ? (
+                                            <span className="text-[8px] text-white/30 font-mono shrink-0">
+                                                {new Date(item.timestamp || item.time || item.created_at || '').toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="p-4 rounded-2xl bg-white/[0.01] border border-white/5 text-center">
+                                <p className="text-[9px] text-white/30 uppercase tracking-wider font-bold">No recent executions cached</p>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex items-center justify-between px-2 pt-2 border-t border-white/5">
                         <button 
                             onClick={refreshAccount}
-                            className="text-[9px] text-white/30 uppercase font-black tracking-widest flex items-center gap-2 hover:text-white transition-colors"
+                            className="text-[9px] text-white/30 hover:text-primary uppercase font-black tracking-widest flex items-center gap-2 transition-colors"
                         >
                             <RefreshCw size={12} className={accountState.isLoading ? 'animate-spin' : ''} />
-                            Refresh Status
+                            Refresh Account Data
                         </button>
+                        <div className="text-[9px] text-emerald-400 font-bold uppercase tracking-widest">
+                            Session Usage: {isDeveloper ? globalPollen.toFixed(4) : history.reduce((sum, item) => {
+                                const modelData = models.find(m => m.id === item.model);
+                                const price = modelData ? modelData.price : (MODEL_PRICING[item.model] || 0.001);
+                                return sum + price;
+                            }, 0).toFixed(4)}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -883,11 +988,13 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
                     
                     <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/5 group">
                         <div className="size-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform">
-                            <MessageSquare size={18} />
+                            <svg className="size-[18px]" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.419-2.157 2.419zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.419-2.157 2.419z"/>
+                            </svg>
                         </div>
                         <div className="flex flex-col">
                             <span className="text-[10px] font-black text-white/80 uppercase tracking-widest">Discord</span>
-                            <span className="text-xs font-medium text-white/40">_bakhshi</span>
+                            <span className="text-xs font-medium text-white/40">@bakhshi7889</span>
                         </div>
                     </div>
 

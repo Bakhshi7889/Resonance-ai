@@ -1,5 +1,6 @@
 {
   "name": "Resonance",
-  "description": "A premium, glass-morphic AI image generation studio powered by Pollinations.ai.",
-  "requestFramePermissions": []
+  "description": "A premium AI image generation studio powered by Pollinations.ai.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
