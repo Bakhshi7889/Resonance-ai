@@ -23,7 +23,7 @@ const STORAGE_KEY_SESSION_PROMPT = 'resonance_v4_session_prompt';
 const STORAGE_KEY_SESSION_IMAGES = 'resonance_v4_session_images';
 
 const DEFAULT_SETTINGS: AppSettings = {
-  model: 'flux',
+  model: 'sana',
   width: 1536,
   height: 1536,
   enhance: false,
@@ -265,7 +265,16 @@ const App: React.FC = () => {
   }, []);
 
   const handleAddToHistory = useCallback(async (item: HistoryItem) => {
-    analytics.trackEvent('image_generated', { model: item.model, safe: !settings.privateMode });
+    analytics.trackEvent('image_generated', { 
+      model: item.model, 
+      width: item.width,
+      height: item.height,
+      prompt_length: item.prompt?.length || 0,
+      safe: !settings.privateMode,
+      is_anonymous: !user,
+      user_id: user?.id || null,
+      user_email: user?.email || 'Anonymous'
+    });
     setHistory(prev => {
       const updated = [item, ...prev].slice(0, 500);
       storage.set(STORAGE_KEY_HISTORY, updated);
@@ -306,9 +315,9 @@ const App: React.FC = () => {
     });
   }, []);
 
-  const handleUpdateHistoryItemUrl = useCallback((id: string, newUrl: string) => {
+  const handleUpdateHistoryItem = useCallback((id: string, updates: Partial<HistoryItem>) => {
     setHistory(prev => {
-      const updated = prev.map(item => item.id === id ? { ...item, url: newUrl } : item);
+      const updated = prev.map(item => item.id === id ? { ...item, ...updates } : item);
       storage.set(STORAGE_KEY_HISTORY, updated);
       return updated;
     });
@@ -342,7 +351,7 @@ const App: React.FC = () => {
             updateSettings={handleUpdateSettings}
             onNavigate={setCurrentRoute}
             onAddToHistory={handleAddToHistory}
-            onUpdateHistoryItemUrl={handleUpdateHistoryItemUrl}
+            onUpdateHistoryItem={handleUpdateHistoryItem}
             sessionPrompt={sessionPrompt}
             setSessionPrompt={handleSetSessionPrompt}
             sessionImages={sessionImages}

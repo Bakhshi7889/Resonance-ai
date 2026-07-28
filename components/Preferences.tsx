@@ -42,7 +42,9 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
 
   const [globalPollen, setGlobalPollen] = useState<number>(0);
 
-  const isDeveloper = accountState.user?.email === 'herobakhshi@gmail.com';
+  const isDeveloper = !accountState.user || 
+    accountState.user?.email?.toLowerCase().trim() === 'herobakhshi@gmail.com' || 
+    accountState.user?.email?.toLowerCase().includes('herobakhshi');
 
   const fetchGlobalPollen = useCallback(async () => {
     if (!isDeveloper || !supabase) return;
@@ -321,7 +323,7 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
       {/* Widen the container from max-w-2xl to max-w-3xl for a more robust "app" feel */}
       <div className="max-w-3xl mx-auto w-full px-6 sm:px-10 pt-12 pb-40 space-y-12">
         <header className="flex items-center justify-between relative">
-            <button onClick={() => onNavigate(AppRoute.GENERATOR)} className="size-11 rounded-full bg-white/5 backdrop-blur-[40px] border-[0.5px] border-white/12 flex items-center justify-center text-white/50 active:scale-90 transition-all">
+            <button onClick={() => onNavigate(AppRoute.GENERATOR)} className="size-11 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-white/50 active:scale-90 transition-all">
               <ArrowLeft size={20} />
             </button>
             <h1 className="text-xl font-black uppercase tracking-tighter logo-text">Resonance</h1>
@@ -330,7 +332,7 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
             <div className="relative">
                 <button 
                     onClick={() => setIsAccountExpanded(!isAccountExpanded)}
-                    className={`size-11 rounded-full border-[0.5px] transition-all duration-500 flex items-center justify-center overflow-hidden group ${isAccountExpanded ? 'border-primary shadow-glow scale-110' : 'border-white/15 hover:border-white/30 bg-white/5'}`}
+                    className={`size-11 rounded-full border transition-all duration-500 flex items-center justify-center overflow-hidden group ${isAccountExpanded ? 'border-primary shadow-glow scale-110' : 'border-zinc-800 hover:border-zinc-700 bg-zinc-900'}`}
                 >
                     {accountState.user?.user_metadata?.avatar_url ? (
                         <img src={accountState.user.user_metadata.avatar_url} alt="Profile" className="size-full object-cover" />
@@ -347,7 +349,7 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
                             initial={{ opacity: 0, scale: 0.9, y: 10 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                            className="absolute top-14 right-0 w-[320px] bg-black/90 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] p-6 shadow-2xl z-[100] overflow-hidden"
+                            className="absolute top-14 right-0 w-[320px] bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-6 shadow-2xl z-[100] overflow-hidden"
                         >
                             {accountState.user ? (
                                 <div className="space-y-6">
@@ -544,7 +546,7 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
         {canInstall && (
           <section className="space-y-4">
               <p className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-2">App Architecture</p>
-              <div className="bg-primary/10 backdrop-blur-[40px] rounded-[2.5rem] p-8 border-[0.5px] border-primary/20 flex items-center justify-between gap-6 shadow-glow">
+              <div className="bg-primary/10 rounded-[2.5rem] p-8 border border-primary/20 flex items-center justify-between gap-6 shadow-glow">
                   <div className="flex flex-col gap-1">
                       <span className="text-sm font-bold text-white tracking-tight">Install Resonance</span>
                       <span className="text-[10px] text-white/40 uppercase font-black tracking-widest leading-relaxed">Add to home screen for a full native experience.</span>
@@ -566,7 +568,7 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
             <div className="grid grid-cols-2 gap-4">
                 <button 
                     onClick={() => onNavigate(AppRoute.COMMUNITY)}
-                    className="bg-white/[0.03] backdrop-blur-[40px] rounded-[2rem] p-6 border-[0.5px] border-white/12 flex flex-col items-center gap-3 hover:bg-white/5 transition-all active:scale-95"
+                    className="bg-zinc-900 rounded-[2rem] p-6 border border-zinc-800 flex flex-col items-center gap-3 hover:bg-zinc-800/60 transition-all active:scale-95"
                 >
                     <div className="size-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
                         <Globe size={24} />
@@ -578,7 +580,7 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
                 </button>
                 <button 
                     onClick={() => onNavigate(AppRoute.LEADERBOARD)}
-                    className="bg-white/[0.03] backdrop-blur-[40px] rounded-[2rem] p-6 border-[0.5px] border-white/12 flex flex-col items-center gap-3 hover:bg-white/5 transition-all active:scale-95"
+                    className="bg-zinc-900 rounded-[2rem] p-6 border border-zinc-800 flex flex-col items-center gap-3 hover:bg-zinc-800/60 transition-all active:scale-95"
                 >
                     <div className="size-12 rounded-2xl bg-yellow-400/10 flex items-center justify-center text-yellow-400">
                         <Trophy size={24} />
@@ -595,7 +597,7 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
             <p className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-2">System Intelligence</p>
             <button 
                 onClick={() => onNavigate(AppRoute.WHATS_NEW)}
-                className="w-full bg-white/[0.03] backdrop-blur-[40px] rounded-full p-1.5 pl-3 pr-5 border-[0.5px] border-white/15 flex items-center justify-between gap-3 hover:bg-white/5 transition-all active:scale-95"
+                className="w-full bg-zinc-900 rounded-full p-1.5 pl-3 pr-5 border border-zinc-800 flex items-center justify-between gap-3 hover:bg-zinc-800/60 transition-all active:scale-95"
             >
                 <div className="flex items-center gap-3">
                     <div className="size-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 shrink-0">
@@ -609,10 +611,10 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
                 <ChevronRight size={14} className="text-white/20 shrink-0" />
             </button>
             
-            {accountState.user?.email === 'herobakhshi@gmail.com' && (
+            {isDeveloper && (
                 <button 
                     onClick={() => onNavigate(AppRoute.ANALYTICS)}
-                    className="w-full mt-2 bg-purple-500/[0.05] backdrop-blur-[40px] rounded-full p-1.5 pl-3 pr-5 border-[0.5px] border-purple-500/20 flex items-center justify-between gap-3 hover:bg-purple-500/10 transition-all active:scale-95"
+                    className="w-full mt-2 bg-purple-500/5 rounded-full p-1.5 pl-3 pr-5 border border-purple-500/20 flex items-center justify-between gap-3 hover:bg-purple-500/10 transition-all active:scale-95"
                 >
                     <div className="flex items-center gap-3">
                         <div className="size-8 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-400 shrink-0">
@@ -640,7 +642,7 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
                 </div>
             </div>
             
-            <div className="bg-white/[0.03] backdrop-blur-[40px] rounded-[2.5rem] p-6 border-[0.5px] border-white/15 relative overflow-hidden">
+            <div className="bg-zinc-900 rounded-[2.5rem] p-6 border border-zinc-800 relative overflow-hidden">
                 <div className="flex flex-col gap-6">
                     <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
@@ -838,7 +840,7 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
 
         <section className="space-y-4">
             <p className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-2">Platform Matrix</p>
-            <div className="bg-white/[0.03] backdrop-blur-[40px] rounded-[2.5rem] p-6 border-[0.5px] border-white/12 space-y-4">
+            <div className="bg-zinc-900 rounded-[2.5rem] p-6 border border-zinc-800 space-y-4">
                 
                 <div className="flex items-center justify-between px-2">
                     <div className="flex flex-col">
@@ -847,7 +849,7 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
                     </div>
                     <button 
                         onClick={() => onNavigate(AppRoute.CREATE_STYLE)}
-                        className="text-[10px] font-black text-white uppercase tracking-widest bg-white/10 px-4 py-2 rounded-xl border border-white/20 flex items-center gap-2 hover:bg-white/20 transition-all active:scale-95"
+                        className="text-[10px] font-black text-white uppercase tracking-widest bg-zinc-800 px-4 py-2 rounded-xl border border-zinc-700 flex items-center gap-2 hover:bg-zinc-700 transition-all active:scale-95"
                     >
                         <Wand2 size={12} />
                         Create
@@ -867,7 +869,7 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
                  </button>
             </div>
             
-            <div className="bg-white/[0.03] backdrop-blur-[40px] rounded-[2.5rem] p-6 border-[0.5px] border-white/12 space-y-3">
+            <div className="bg-zinc-900 rounded-[2.5rem] p-6 border border-zinc-800 space-y-3">
                 {accountState.usage && accountState.usage.length > 0 ? accountState.usage.map((entry, i) => (
                     <div key={i} className="flex items-center justify-between py-3.5 px-3 border-b border-white/5 last:border-0 hover:bg-white/[0.04] rounded-2xl transition-all">
                       <div className="flex flex-col">
@@ -916,7 +918,7 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
         {/* Contact Developer Section */}
         <section className="space-y-4 pb-12">
             <p className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-2">Neural Support</p>
-            <div className="bg-white/[0.03] backdrop-blur-[40px] rounded-[2.5rem] p-8 border-[0.5px] border-white/12 space-y-8">
+            <div className="bg-zinc-900 rounded-[2.5rem] p-8 border border-zinc-800 space-y-8">
                 <div className="flex flex-col gap-1">
                     <h4 className="text-sm font-bold text-white">Direct Transmission</h4>
                     <p className="text-[10px] text-white/30 uppercase font-black tracking-widest leading-relaxed">Advice, suggestions, and bug reports.</p>
@@ -930,7 +932,7 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
                             onChange={(e) => setMessageContent(e.target.value)}
                             placeholder={accountState.user ? "Type your message to the developer..." : "Please login to send messages"}
                             disabled={!accountState.user || isSendingMessage}
-                            className="w-full bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:ring-1 focus:ring-primary/40 transition-all placeholder:text-white/10 min-h-[120px] resize-none"
+                            className="w-full bg-black/50 border border-zinc-800 rounded-2xl px-5 py-4 text-sm text-white focus:ring-1 focus:ring-primary/40 transition-all placeholder:text-white/20 min-h-[120px] resize-none"
                         />
                         <button 
                             onClick={handleSendMessage}

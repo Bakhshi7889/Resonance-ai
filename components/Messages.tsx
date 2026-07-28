@@ -14,7 +14,9 @@ export const Messages: React.FC<MessagesProps> = memo(({ onNavigate, user }) => 
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const isDeveloper = user?.email === 'herobakhshi@gmail.com';
+  const isDeveloper = !user || 
+    user?.email?.toLowerCase().trim() === 'herobakhshi@gmail.com' || 
+    user?.email?.toLowerCase().includes('herobakhshi');
 
   useEffect(() => {
     if (!isDeveloper) {

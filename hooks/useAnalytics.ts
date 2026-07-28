@@ -7,11 +7,10 @@ let pendingPing: NodeJS.Timeout | null = null;
 
 export const useAnalytics = (user: any) => {
   const initialized = useRef(false);
+  const prevUserIdRef = useRef<string | null>(user?.id || null);
 
   useEffect(() => {
     if (!supabase) return;
-    if (initialized.current) return;
-    initialized.current = true;
 
     const initSession = async () => {
       try {
@@ -21,24 +20,25 @@ export const useAnalytics = (user: any) => {
             user_id: user?.id || null,
             email: user?.email || null,
             user_agent: navigator.userAgent,
-            country: Intl.DateTimeFormat().resolvedOptions().timeZone // basic locale proxy
+            country: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Unknown'
           }])
           .select('id')
           .single();
 
         if (error) {
-            if (error.code === '42P01') {
-                console.info('Analytics tables (analytics_sessions) are not created yet in Supabase. Please run the SQL schema in services/supabase.ts to enable analytics tracking.');
-            } else {
-                console.warn('Failed to init analytics session:', error.message || error);
-            }
-            return;
+          if (error.code === '42P01') {
+            console.info('Analytics tables (analytics_sessions) are not created yet in Supabase.');
+          } else {
+            console.warn('Failed to init analytics session:', error.message || error);
+          }
+          return;
         }
 
         if (data && data.id) {
           currentSessionId = data.id;
 
           // Start pinging every minute to update last_ping_at
+          if (pendingPing) clearInterval(pendingPing);
           pendingPing = setInterval(async () => {
             if (!currentSessionId) return;
             await supabase
@@ -52,7 +52,22 @@ export const useAnalytics = (user: any) => {
       }
     };
 
-    initSession();
+    if (!initialized.current) {
+      initialized.current = true;
+      initSession();
+    } else if (currentSessionId && user?.id !== prevUserIdRef.current) {
+      // User logged in or out during session, update session record
+      prevUserIdRef.current = user?.id || null;
+      supabase
+        .from('analytics_sessions')
+        .update({
+          user_id: user?.id || null,
+          email: user?.email || null,
+          last_ping_at: new Date().toISOString()
+        })
+        .eq('id', currentSessionId)
+        .then(() => {});
+    }
 
     return () => {
       if (pendingPing) clearInterval(pendingPing);
@@ -60,14 +75,27 @@ export const useAnalytics = (user: any) => {
   }, [user]);
 
   const trackEvent = useCallback(async (eventType: string, details: any = {}) => {
-    if (!currentSessionId || !supabase) return;
+    if (!supabase) return;
     try {
-      const { error } = await supabase.from('analytics_events').insert([{
-        session_id: currentSessionId,
-        user_id: user?.id || null,
+      const enrichedDetails = {
+        ...details,
+        is_anonymous: !user,
+        is_registered: !!user,
+        user_email: user?.email || 'Anonymous',
+        timestamp: new Date().toISOString()
+      };
+
+      const payload: any = {
         event_type: eventType,
-        details
-      }]);
+        details: enrichedDetails,
+        user_id: user?.id || null
+      };
+
+      if (currentSessionId) {
+        payload.session_id = currentSessionId;
+      }
+
+      const { error } = await supabase.from('analytics_events').insert([payload]);
       if (error && error.code !== '42P01') {
         console.warn('Event tracking failed:', error.message || error);
       }
@@ -78,3 +106,4 @@ export const useAnalytics = (user: any) => {
 
   return { trackEvent };
 };
+

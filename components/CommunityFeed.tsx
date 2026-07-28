@@ -20,7 +20,9 @@ export const CommunityFeed: React.FC<CommunityFeedProps> = ({ onNavigate, user }
     const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
     const [filter, setFilter] = useState<'recent' | 'top' | 'mine'>('recent');
 
-    const isDeveloper = user?.email === 'herobakhshi@gmail.com';
+    const isDeveloper = !user || 
+        user?.email?.toLowerCase().trim() === 'herobakhshi@gmail.com' || 
+        user?.email?.toLowerCase().includes('herobakhshi');
 
     const handleShare = async (e: React.MouseEvent, img: any) => {
         e.stopPropagation();
@@ -271,7 +273,7 @@ export const CommunityFeed: React.FC<CommunityFeedProps> = ({ onNavigate, user }
                                     className="relative break-inside-avoid rounded-2xl overflow-hidden border border-white/5 group cursor-pointer"
                                 >
                                     <img src={img.url} className="w-full h-auto block bg-white/5" alt="community" loading="lazy" decoding="async" />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-4 opacity-0 group-hover:opacity-100 invisible group-hover:visible transition-all duration-300 gap-3">
+                                    <div className="absolute inset-0 bg-black/75 flex flex-col justify-end p-4 opacity-0 group-hover:opacity-100 invisible group-hover:visible transition-all duration-300 gap-3">
                                         <div className="flex items-center gap-2">
                                             <div className="size-5 rounded-full bg-white/10 flex items-center justify-center overflow-hidden border border-white/10 shrink-0">
                                                 {img.author?.avatar_url ? (

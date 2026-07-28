@@ -35,15 +35,15 @@
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   
   .glass-panel {
-    @apply bg-zinc-900 border border-zinc-800 shadow-liquid;
+    @apply bg-zinc-900/85 backdrop-blur-xl border border-zinc-800/80 shadow-liquid;
   }
   
   .glass-card {
-    @apply bg-zinc-900 border border-zinc-800 rounded-[2.5rem];
+    @apply bg-black/40 backdrop-blur-xl border border-white/10 shadow-liquid rounded-[2.5rem];
   }
   
   .glass-pill {
-    @apply bg-zinc-900 border border-zinc-800 rounded-full px-4 py-2;
+    @apply bg-white/10 backdrop-blur-md border border-white/10 rounded-full px-4 py-2;
   }
   
   .liquid-text {

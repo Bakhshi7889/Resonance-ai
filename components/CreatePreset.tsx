@@ -32,7 +32,7 @@ export const CreatePreset: React.FC<CreatePresetProps> = memo(({ onNavigate }) =
 
             <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden group shadow-glow ring-1 ring-white/10">
                 <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url('https://picsum.photos/800/600')" }}></div>
-                <div className="absolute inset-0 bg-gradient-to-t from-background-dark/90 via-background-dark/20 to-transparent"></div>
+                <div className="absolute inset-0 bg-black/40"></div>
                 <div className="absolute bottom-0 left-0 right-0 p-5 flex items-end justify-between">
                     <div>
                         <div className="flex items-center gap-2 mb-1">

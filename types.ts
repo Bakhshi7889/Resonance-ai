@@ -25,6 +25,7 @@ export interface HistoryItem extends ImageGenerationParams {
   prompt: string;
   styleSuffix?: string; // The specific keywords added by the style
   styleName?: string; // The name of the style used
+  revealed?: boolean; // Whether the user has chosen to bypass the visual filter
 }
 
 export interface CustomStyle {

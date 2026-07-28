@@ -4,7 +4,7 @@ import {
     Settings, LayoutGrid, Shuffle, Eraser, Maximize2, Minimize2, 
     Trash2, EyeOff, Wand2, Zap, ArrowUp, ChevronDown, 
     Check, ShieldCheck, XCircle, Hash, Clock, AlertTriangle, RefreshCw, Layers, Heart,
-    Sparkles, Loader2, Camera, Plus, X, LogIn, LogOut, User, Globe, Download, Share2, Video, ExternalLink
+    Sparkles, Loader2, Camera, Plus, X, LogIn, LogOut, User, Globe, Download, Share2, Video, ExternalLink, Terminal
 } from 'lucide-react';
 import { generateImageUrl, getRandomSeed, getAccountDetails, getEstimatedImagesLeft, getEffectiveKey } from '../services/pollinations';
 import { downloadImage, performVisualAudit } from '../services/utils';
@@ -13,6 +13,7 @@ import { addLog } from '../services/logger';
 import { enhancePrompt } from '../services/ai';
 import { supabase } from '../services/supabase';
 import { storage } from '../services/storage';
+import TextareaAutosize from 'react-textarea-autosize';
 
 const SILENT_NEGATIVE = "nsfw, naked, nude, porn, sex, explicit, genitals, nipples, topless, breasts, bad anatomy, deformed, ugly, watermark, logo";
 const SPRING_CONFIG = { stiffness: 400, damping: 30 };
@@ -47,7 +48,7 @@ interface ImageGeneratorProps {
   models: ModelInfo[];
   onNavigate: (route: AppRoute) => void;
   onAddToHistory: (item: HistoryItem) => void;
-  onUpdateHistoryItemUrl?: (id: string, newUrl: string) => void;
+  onUpdateHistoryItem?: (id: string, updates: Partial<HistoryItem>) => void;
   updateSettings?: (s: Partial<AppSettings>) => void;
   sessionPrompt: string;
   setSessionPrompt: (prompt: string) => void;
@@ -82,15 +83,79 @@ const PromptHeader = memo(({ prompt, onClearBatch, batchId }: { prompt: string, 
     );
 });
 
-const GenerationCard = memo(({ item, index, visualSafety, privateMode, onImageReady, onNavigate, showToast, onUploadComplete, apiKey }: { item: HistoryItem, index: number, visualSafety: boolean, privateMode: boolean, onImageReady?: (id: string) => void, onNavigate: (route: AppRoute) => void, showToast: (msg: string) => void, onUploadComplete?: (id: string, newUrl: string) => void, apiKey: string }) => {
+const SKELETON_STAGES = [
+    "Initializing Neural Pipeline...",
+    "Sampling Latent Space...",
+    "Synthesizing High-Frequency Tensors...",
+    "Refining Texture & Lighting...",
+    "Finalizing Output Image..."
+];
+
+const FluidGenerationSkeleton = memo(({ prompt, width, height }: { prompt: string, width?: number, height?: number }) => {
+    const [seconds, setSeconds] = useState(0);
+    const [stageIndex, setStageIndex] = useState(0);
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setSeconds(prev => +(prev + 0.1).toFixed(1));
+        }, 100);
+        const stageTimer = setInterval(() => {
+            setStageIndex(prev => (prev + 1) % SKELETON_STAGES.length);
+        }, 2200);
+        return () => {
+            clearInterval(timer);
+            clearInterval(stageTimer);
+        };
+    }, []);
+
+    return (
+        <div className="absolute inset-0 z-10 overflow-hidden bg-zinc-950 flex flex-col items-center justify-center select-none">
+            {/* Content */}
+            <div className="relative z-20 flex flex-col items-center gap-6 p-8 text-center max-w-md">
+                <div className="relative size-20 flex items-center justify-center">
+                    <motion.div 
+                        animate={{ scale: [0.95, 1.05, 0.95], opacity: [0.3, 0.6, 0.3] }}
+                        transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+                        className="absolute inset-0 bg-primary/20 rounded-[2rem]"
+                    />
+                    <motion.div 
+                        animate={{ scale: [0.98, 1.02, 0.98] }}
+                        transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                        className="relative size-16 rounded-[1.5rem] bg-zinc-900 border border-primary/30 flex items-center justify-center text-primary shadow-xl"
+                    >
+                        <Wand2 size={24} />
+                    </motion.div>
+                </div>
+
+                <div className="flex flex-col items-center gap-2">
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 text-white text-[10px] font-black tracking-widest uppercase">
+                        <Loader2 size={12} className="animate-spin" />
+                        {seconds.toFixed(1)}s
+                    </div>
+                    <span className="text-xs font-bold text-white/90 tracking-wider uppercase font-mono">
+                        {SKELETON_STAGES[stageIndex]}
+                    </span>
+                </div>
+
+                {prompt && (
+                    <p className="text-xs text-white/70 font-sans leading-relaxed line-clamp-2">
+                        "{prompt}"
+                    </p>
+                )}
+            </div>
+        </div>
+    );
+});
+
+const GenerationCard = memo(({ item, index, visualSafety, privateMode, onImageReady, onNavigate, showToast, onUploadComplete, apiKey, onSelect, onReveal }: { item: HistoryItem, index: number, visualSafety: boolean, privateMode: boolean, onImageReady?: (id: string) => void, onNavigate: (route: AppRoute) => void, showToast: (msg: string) => void, onUploadComplete?: (id: string, newUrl: string) => void, apiKey: string, onSelect?: () => void, onReveal?: (id: string) => void }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
-  const [revealed, setRevealed] = useState(false);
   const [visualRisk, setVisualRisk] = useState(false);
   const [isAuditing, setIsAuditing] = useState(false);
   const [showOverlay, setShowOverlay] = useState(false);
   const [imgSrc, setImgSrc] = useState(item.url);
-  const [retryCount, setRetryCount] = useState(0);
+  const [errorCode, setErrorCode] = useState<number | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Sync state if url updates externally
   useEffect(() => {
@@ -164,109 +229,72 @@ const GenerationCard = memo(({ item, index, visualSafety, privateMode, onImageRe
   };
 
   const handleImageError = async () => {
-      if (retryCount < 2) {
-          setRetryCount(prev => prev + 1);
-          // Small delay before retry
-          setTimeout(() => {
-              try {
-                  const url = new URL(item.url);
-                  url.searchParams.set('retry', (retryCount + 1).toString());
-                  url.searchParams.set('t', Date.now().toString());
-                  setImgSrc(url.toString());
-              } catch (e) {
-                  const separator = item.url.includes('?') ? '&' : '?';
-                  setImgSrc(`${item.url}${separator}retry=${retryCount + 1}&t=${Date.now()}`);
-              }
-          }, 1500);
-          return;
-      }
-
       setHasError(true);
       setIsLoaded(true); 
       if (onImageReady) onImageReady(item.id);
 
-      addLog('warn', 'Image element reported error', { id: item.id });
+      addLog('warn', 'Image generation failed', { id: item.id, url: item.url });
       
       try {
-          if (supabase) {
-             const { data: { session } } = await supabase.auth.getSession();
-             if (session) {
-                 await supabase.from('generations').delete().eq('url', item.url).eq('user_id', session.user.id);
-             }
-          }
-      } catch (e) {
-          console.error("Cleanup Failed", e);
-      }
-      
-      try {
-          // Perform a diagnostic fetch to see WHY it failed
+          // Perform diagnostic fetch to capture exact error code & message
           const res = await fetch(item.url);
           if (!res.ok) {
               const text = await res.text();
-              let errorMsg = `Generation Failed: ${res.status}`;
+              setErrorCode(res.status);
+              let errorMsg = `Generation Failed (${res.status})`;
               
-              // Specific error handling based on Pollinations API codes
               if (res.status === 400) {
-                  errorMsg = "Bad Request: Invalid parameters or malformed prompt.";
+                  errorMsg = "Bad Request (400): Invalid parameters or malformed prompt.";
               } else if (res.status === 401) {
-                  errorMsg = "Unauthorized: Invalid or missing API key.";
+                  errorMsg = "Unauthorized (401): Invalid or missing API key.";
               } else if (res.status === 402) {
-                  errorMsg = "Out of Pollen: Please top up at enter.pollinations.ai";
+                  errorMsg = "Out of Pollen (402): Please top up at enter.pollinations.ai";
               } else if (res.status === 403) {
-                  errorMsg = "Forbidden: You don't have permission for this model.";
+                  errorMsg = "Forbidden (403): You don't have permission for this model.";
               } else if (res.status === 404) {
-                  errorMsg = "Not Found: The requested endpoint does not exist.";
+                  errorMsg = "Not Found (404): The requested endpoint does not exist.";
               } else if (res.status === 422) {
-                  errorMsg = "Unprocessable: Required fields are missing or invalid.";
+                  errorMsg = "Unprocessable (422): Required fields missing or invalid.";
               } else if (res.status === 429) {
-                  const retryAfter = res.headers.get('retry-after');
-                  errorMsg = `Rate Limited: Please slow down.${retryAfter ? ` Retry in ${retryAfter}s.` : ''}`;
+                  errorMsg = "Rate Limited (429): Please slow down.";
               } else if (res.status === 502) {
-                  errorMsg = "Provider Error: Upstream AI service is unavailable.";
+                  errorMsg = "Provider Error (502): Upstream AI service unavailable.";
               } else if (res.status === 500 || res.status === 503) {
-                  errorMsg = "Server Error: Pollinations is temporarily overloaded.";
+                  errorMsg = "Server Error (500/503): Pollinations is temporarily overloaded.";
+              } else {
+                  try {
+                      const json = JSON.parse(text);
+                      if (json?.error?.message) {
+                          errorMsg = `${json.error.message} (${res.status})`;
+                      }
+                  } catch {}
               }
 
-              addLog('error', errorMsg, { 
-                  status: res.status,
-                  statusText: res.statusText,
-                  response: text.substring(0, 200),
-                  url: item.url 
-              });
-              
-              // If it's a 402 or 429, we might want to show a toast
-              if (res.status === 402 || res.status === 429) {
-                  showToast(errorMsg);
-              }
+              setErrorMessage(errorMsg);
+              addLog('error', errorMsg, { status: res.status, response: text.substring(0, 300), url: item.url });
           } else {
-             // If fetch succeeds but img tag failed, it might be a content-type issue or decoding error
-             const blob = await res.blob();
-             addLog('warn', 'Image fetch succeeded but render failed', { 
-                 type: blob.type, 
-                 size: blob.size,
-                 url: item.url 
-             });
+              setErrorMessage("Render Error: Image fetched successfully but browser failed to decode content.");
           }
       } catch (e: any) {
-          addLog('error', 'Diagnostic fetch failed (Network Error)', { message: e.message, url: item.url });
+          setErrorMessage(`Network Error: ${e.message}`);
+          addLog('error', 'Diagnostic fetch failed', { message: e.message, url: item.url });
       }
   };
 
-  const retry = () => {
+  const retry = (overrideModel?: string) => {
       setHasError(false);
       setIsLoaded(false);
-      // Force reload by appending timestamp
+      setErrorMessage(null);
+      setErrorCode(null);
+      
       const urlObj = new URL(item.url);
       urlObj.searchParams.set('retry', Date.now().toString());
-      
-      // Fallback: If zimage failed, try flux
-      if (urlObj.searchParams.get('model') === 'zimage') {
-          urlObj.searchParams.set('model', 'flux');
-          addLog('warn', 'Z-Image failed, retrying with Flux fallback', { id: item.id });
+      if (overrideModel) {
+          urlObj.searchParams.set('model', overrideModel);
       }
-      
       item.url = urlObj.toString();
-      addLog('info', 'Retrying generation', { id: item.id });
+      setImgSrc(item.url);
+      addLog('info', 'Retrying generation', { id: item.id, model: overrideModel || 'current' });
   };
 
   const handleShare = async (e: React.MouseEvent) => {
@@ -325,25 +353,20 @@ const GenerationCard = memo(({ item, index, visualSafety, privateMode, onImageRe
       initial={{ opacity: 0, scale: 0.8, y: 40 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={LIQUID_SPRING}
-      className={`relative shrink-0 overflow-hidden bg-white/[0.02] border-[0.5px] border-white/10 shadow-liquid rounded-[2.5rem] flex items-center justify-center group/card w-full max-w-3xl ${!isLoaded ? 'bg-white/[0.03]' : ''}`}
+      className={`relative shrink-0 overflow-hidden bg-white/[0.02] border-[0.5px] border-white/10 shadow-liquid rounded-[2.5rem] flex items-center justify-center group/card w-full max-w-3xl ${!isLoaded ? 'bg-white/[0.03]' : ''} ${onSelect && !(visualRisk && !item.revealed) ? 'cursor-pointer' : ''}`}
       style={{ rotateX, rotateY, transformStyle: 'preserve-3d', aspectRatio: `${item.width}/${item.height}` }}
+      onClick={() => {
+        if (visualRisk && !item.revealed) return;
+        if (onSelect) onSelect();
+      }}
     >
       {/* Skeleton Shimmer Layer - Always visible until loaded */}
       {!isLoaded && (
-          <div className="absolute inset-0 z-10 overflow-hidden bg-zinc-900">
-              <div className="absolute inset-0 bg-zinc-800 animate-pulse" />
-              <div className="absolute inset-0 flex flex-col p-10 gap-6">
-                  <div className="w-1/2 h-5 bg-white/10 rounded-full animate-pulse" />
-                  <div className="w-3/4 h-4 bg-white/10 rounded-full animate-pulse delay-150" />
-                  <div className="mt-auto flex justify-between items-end">
-                      <div className="flex flex-col gap-3">
-                          <div className="w-32 h-3 bg-white/5 rounded-full animate-pulse" />
-                          <div className="w-24 h-3 bg-white/5 rounded-full animate-pulse delay-75" />
-                      </div>
-                      <div className="size-14 rounded-3xl bg-white/10 animate-pulse" />
-                  </div>
-              </div>
-          </div>
+          <FluidGenerationSkeleton 
+              prompt={item.prompt} 
+              width={item.width} 
+              height={item.height} 
+          />
       )}
 
       {!hasError ? (
@@ -352,29 +375,41 @@ const GenerationCard = memo(({ item, index, visualSafety, privateMode, onImageRe
             alt="vision"
             crossOrigin="anonymous"
             referrerPolicy="no-referrer"
-            className={`w-full h-full object-cover transition-all duration-500 ease-out ${isLoaded && !isAuditing ? 'opacity-100' : 'opacity-0'} ${(visualRisk && !revealed) ? 'saturate-50 brightness-50 opacity-20' : ''}`}
+            className={`w-full h-full object-cover transition-all duration-500 ease-out ${isLoaded && !isAuditing ? 'opacity-100' : 'opacity-0'} ${(visualRisk && !item.revealed) ? 'saturate-50 brightness-50 opacity-20' : ''}`}
             onLoad={handleImageLoad}
             onError={handleImageError}
           />
       ) : (
-          <div className="flex flex-col items-center justify-center gap-4 text-white/30 p-8 text-center">
-              <AlertTriangle size={32} className="text-red-400" />
-              <div className="flex flex-col gap-1">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-red-400">Generation Failed</p>
-                <button 
-                    onClick={() => onNavigate(AppRoute.PREFERENCES)}
-                    className="text-[9px] font-mono text-white/40 max-w-[200px] break-words hover:text-white/60 underline underline-offset-2"
-                >
-                    Check logs for details
-                </button>
+          <div className="flex flex-col items-center justify-center gap-4 text-white/70 p-8 text-center max-w-md">
+              <AlertTriangle size={32} className="text-amber-400" />
+              <div className="flex flex-col gap-1.5">
+                <p className="text-[10px] font-black uppercase tracking-widest text-red-400">
+                    {errorCode ? `Error Code: ${errorCode}` : 'Generation Failed'}
+                </p>
+                <p className="text-xs text-white/80 font-sans leading-relaxed">
+                    {errorMessage || 'Failed to render generated image. Please check parameters or try again.'}
+                </p>
               </div>
-              <button onClick={retry} className="px-4 py-2 rounded-full bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-[9px] font-bold uppercase tracking-widest text-white/60 flex items-center gap-2">
-                  <RefreshCw size={12} /> Retry
-              </button>
+              <div className="flex flex-wrap gap-2 justify-center mt-2">
+                  <button 
+                      onClick={() => retry()} 
+                      className="px-4 py-2.5 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-[10px] font-black uppercase tracking-wider text-white flex items-center gap-2 transition-all shadow"
+                  >
+                      <RefreshCw size={12} /> Try Again
+                  </button>
+                  {item.url.includes('flux') && !item.url.includes('model=flux') && (
+                      <button 
+                          onClick={() => retry('flux')} 
+                          className="px-4 py-2.5 rounded-xl bg-primary/20 border border-primary/40 hover:bg-primary/30 text-[10px] font-black uppercase tracking-wider text-primary flex items-center gap-2 transition-all shadow"
+                      >
+                          Try with Official Flux Model
+                      </button>
+                  )}
+              </div>
           </div>
       )}
       
-      {isLoaded && !isAuditing && !hasError && (!visualRisk || revealed) && (
+      {isLoaded && !isAuditing && !hasError && (!visualRisk || item.revealed) && (
         <div className="absolute bottom-6 right-6 flex gap-2 opacity-0 group-hover/card:opacity-100 transition-all translate-y-2 group-hover/card:translate-y-0 z-30">
            <button 
                onClick={handleDownload}
@@ -391,7 +426,7 @@ const GenerationCard = memo(({ item, index, visualSafety, privateMode, onImageRe
         </div>
       )}
 
-      {(!isLoaded || isAuditing) && !hasError && showOverlay && (
+      {isAuditing && !hasError && showOverlay && (
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -405,25 +440,27 @@ const GenerationCard = memo(({ item, index, visualSafety, privateMode, onImageRe
               </div>
               <div className="flex flex-col items-center gap-2">
                   <span className="text-[10px] font-black text-white/40 uppercase tracking-[0.4em] animate-pulse">
-                      {isAuditing ? 'Auditing Matrix' : 'Synthesizing'}
+                      Auditing Matrix
                   </span>
-                  <div className="w-24 h-[1px] bg-white/10 relative overflow-hidden">
-                      <motion.div 
-                        initial={{ x: '-100%' }}
-                        animate={{ x: '100%' }}
-                        transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
-                        className="absolute inset-0 bg-primary"
-                      />
-                  </div>
               </div>
           </div>
         </motion.div>
       )}
-      {visualRisk && !revealed && isLoaded && !isAuditing && !hasError && (
+      {visualRisk && !item.revealed && isLoaded && !isAuditing && !hasError && (
         <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center z-20 bg-zinc-950">
           <EyeOff className="text-white/10 mb-6" strokeWidth={1} size={54} />
           <p className="text-[10px] text-white/30 font-black uppercase tracking-[0.4em] mb-10">Neural Filter Active</p>
-          <button onClick={() => setRevealed(true)} className="px-12 py-5 rounded-full bg-white text-black text-[11px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-glow">Reveal</button>
+          <button 
+            type="button"
+            onClick={(e) => { 
+                e.preventDefault(); 
+                e.stopPropagation(); 
+                onReveal?.(item.id); 
+            }} 
+            className="px-12 py-5 rounded-full bg-white text-black text-[11px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-glow"
+          >
+            Reveal
+          </button>
         </div>
       )}
     </motion.div>
@@ -446,12 +483,6 @@ const NeuralMesh = memo(({ meshData, visibleStylesCount }: { meshData: any, visi
                 viewBox={`0 0 ${meshData.totalWidth} 60`} 
                 className="overflow-visible"
             >
-                <defs>
-                    <filter id="mesh-glow" x="-50%" y="-50%" width="200%" height="200%">
-                        <feGaussianBlur stdDeviation="4" result="blur" />
-                        <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                    </filter>
-                </defs>
                 <motion.line
                     initial={{ x1: meshData.minX, x2: meshData.minX }}
                     animate={{ 
@@ -463,7 +494,6 @@ const NeuralMesh = memo(({ meshData, visibleStylesCount }: { meshData: any, visi
                     stroke="#3b82f6"
                     strokeWidth="3"
                     strokeLinecap="round"
-                    filter="url(#mesh-glow)"
                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
                 />
                 {meshData.points.map((x: number, i: number) => (
@@ -474,7 +504,6 @@ const NeuralMesh = memo(({ meshData, visibleStylesCount }: { meshData: any, visi
                             stroke="#3b82f6"
                             strokeWidth="2.5"
                             strokeLinecap="round"
-                            filter="url(#mesh-glow)"
                         />
                     </g>
                 ))}
@@ -566,26 +595,26 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, 
     }, [selectedIndices, visibleStyles.length]);
 
     return (
-        <div className="px-5 py-6 flex flex-col gap-6 overflow-y-auto no-scrollbar max-h-[60vh] pb-24">
+        <div className="px-5 py-6 flex flex-col gap-6 overflow-y-auto no-scrollbar max-h-[60vh]">
             <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => updateLocalSetting('enhance', !localSettings.enhance)} className={`relative h-12 rounded-2xl flex items-center justify-center gap-2 transition-all border ${localSettings.enhance ? 'bg-primary/20 border-primary/40 text-primary' : 'bg-zinc-800 border-zinc-700 text-white/40'}`}>
+                <button onClick={() => updateLocalSetting('enhance', !localSettings.enhance)} className={`relative h-12 rounded-2xl flex items-center justify-center gap-2 transition-all border backdrop-blur-md ${localSettings.enhance ? 'bg-primary/25 border-primary/50 text-primary font-black shadow-glow' : 'bg-white/10 border-white/10 text-white/60 hover:bg-white/15'}`}>
                     <Wand2 size={14} />
                     <span className="text-[9px] font-black uppercase tracking-widest">Neural {localSettings.enhance ? 'ON' : 'OFF'}</span>
                     <span className="absolute -top-1 -right-1 bg-black/80 text-[7px] px-1.5 py-0.5 rounded-full border border-white/10 font-bold text-white/40">+~3s</span>
                 </button>
-                <button onClick={() => updateLocalSetting('visualSafety', !localSettings.visualSafety)} className={`h-12 rounded-2xl flex items-center justify-center gap-2 transition-all border ${localSettings.visualSafety ? 'bg-blue-500/20 border-blue-500/40 text-blue-400' : 'bg-zinc-800 border-zinc-700 text-white/40'}`}>
+                <button onClick={() => updateLocalSetting('visualSafety', !localSettings.visualSafety)} className={`h-12 rounded-2xl flex items-center justify-center gap-2 transition-all border backdrop-blur-md ${localSettings.visualSafety ? 'bg-blue-500/25 border-blue-500/50 text-blue-300 font-black shadow-glow' : 'bg-white/10 border-white/10 text-white/60 hover:bg-white/15'}`}>
                     <ShieldCheck size={14} />
                     <span className="text-[9px] font-black uppercase tracking-widest">Audit {localSettings.visualSafety ? 'ON' : 'OFF'}</span>
                 </button>
             </div>
 
             <div className="space-y-3">
-                <p className="text-[8px] text-white/40 font-black uppercase tracking-[0.2em] pl-1">Aspect Geometry</p>
-                <div className="grid grid-cols-5 gap-1.5 bg-zinc-900 p-1.5 rounded-2xl border border-zinc-800">
+                <p className="text-[8px] text-white/50 font-black uppercase tracking-[0.2em] pl-1">Aspect Geometry</p>
+                <div className="grid grid-cols-5 gap-1.5 p-1">
                     {ASPECT_RATIOS.map(ratio => {
                         const isSelected = localSettings.width === ratio.width && localSettings.height === ratio.height;
                         return (
-                            <button key={ratio.label} onClick={() => setAspectRatio(ratio.width, ratio.height)} className={`h-12 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all ${isSelected ? 'bg-zinc-700 text-white shadow-lg' : 'text-white/30 hover:text-white/50'}`}>
+                            <button key={ratio.label} onClick={() => setAspectRatio(ratio.width, ratio.height)} className={`h-12 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all backdrop-blur-md ${isSelected ? 'bg-white text-black font-black shadow-glow border border-white' : 'text-white/50 hover:text-white bg-white/10 border border-white/10 hover:bg-white/20'}`}>
                                 <RatioIcon width={ratio.width} height={ratio.height} isSelected={isSelected} />
                                 <span className="text-[7px] font-black">{ratio.label}</span>
                             </button>
@@ -595,8 +624,8 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, 
             </div>
 
             <div className="space-y-3">
-                <p className="text-[8px] text-white/40 font-black uppercase tracking-[0.2em] pl-1">Batch Capacity</p>
-                <div className="grid grid-cols-4 gap-1.5 bg-zinc-900 p-1.5 rounded-2xl border border-zinc-800">
+                <p className="text-[8px] text-white/50 font-black uppercase tracking-[0.2em] pl-1">Batch Capacity</p>
+                <div className="grid grid-cols-4 gap-1.5 p-1">
                     {[1, 2, 3, 4].map(n => {
                         const maxBatch = localSettings.model === 'zimage' ? 2 : 4;
                         const isDisabled = n > maxBatch;
@@ -605,7 +634,7 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, 
                                 key={n} 
                                 onClick={() => !isDisabled && updateLocalSetting('imageCount', n)} 
                                 disabled={isDisabled}
-                                className={`h-12 rounded-xl text-[9px] font-black transition-all ${localSettings.imageCount === n ? 'bg-primary text-white' : 'text-white/30 hover:text-white/50'} ${isDisabled ? 'opacity-20 cursor-not-allowed' : ''}`}
+                                className={`h-12 rounded-xl text-[9px] font-black transition-all backdrop-blur-md ${localSettings.imageCount === n ? 'bg-primary text-black shadow-glow' : 'text-white/50 hover:text-white bg-white/10 border border-white/10 hover:bg-white/20'} ${isDisabled ? 'opacity-20 cursor-not-allowed' : ''}`}
                             >
                                 {n}x
                             </button>
@@ -615,8 +644,8 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, 
             </div>
 
             <div className="space-y-3">
-                <p className="text-[8px] text-white/40 font-black uppercase tracking-[0.2em] pl-1">Neural Model</p>
-                <div className="grid grid-cols-3 gap-2 bg-zinc-900 p-1.5 rounded-2xl border border-zinc-800">
+                <p className="text-[8px] text-white/50 font-black uppercase tracking-[0.2em] pl-1">Neural Model</p>
+                <div className="grid grid-cols-3 gap-2 p-1">
                     {models.map(m => (
                         <button 
                             key={m.id} 
@@ -627,7 +656,7 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, 
                                     updateLocalSetting('imageCount', maxBatch);
                                 }
                             }} 
-                            className={`h-12 rounded-xl text-[8px] font-black transition-all flex flex-col items-center justify-center gap-1 relative overflow-hidden ${localSettings.model === m.id ? 'bg-primary text-white' : 'bg-zinc-800 text-white/40 hover:text-white/70 border border-zinc-700'}`}
+                            className={`h-12 rounded-xl text-[8px] font-black transition-all flex flex-col items-center justify-center gap-1 relative overflow-hidden backdrop-blur-md ${localSettings.model === m.id ? 'bg-primary text-black shadow-glow border border-primary' : 'bg-white/10 text-white/60 hover:text-white border border-white/10 hover:bg-white/20'}`}
                         >
                             <div className="flex items-center gap-1">
                                 {m.type === 'video' ? <Video size={10} className="text-blue-400" /> : (m.paid_only ? <Zap size={10} className="text-amber-400" /> : <Sparkles size={10} />)}
@@ -658,7 +687,7 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, 
                     )}
                 </div>
                 <div className="relative -mx-5 px-5">
-                    <div className="flex gap-3 overflow-x-auto no-scrollbar pb-24 relative z-10">
+                    <div className="flex gap-3 overflow-x-auto no-scrollbar pb-6 relative z-10">
                         {visibleStyles.map(style => {
                             const isSelected = localSettings.activeStyles.includes(style.id);
                             const isFavorite = (localSettings.favoriteStyleIds || []).includes(style.id);
@@ -756,19 +785,23 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, 
 });
 
 export const ImageGenerator: React.FC<ImageGeneratorProps> = ({ 
-    settings: globalSettings, styles, models, onNavigate, onAddToHistory, onUpdateHistoryItemUrl, updateSettings, sessionPrompt, setSessionPrompt, sessionImages, setSessionImages, accountState, refreshAccount
+    settings: globalSettings, styles, models, onNavigate, onAddToHistory, onUpdateHistoryItem, updateSettings, sessionPrompt, setSessionPrompt, sessionImages, setSessionImages, accountState, refreshAccount
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [localSettings, setLocalSettings] = useState({ ...globalSettings });
   const [showSettings, setShowSettings] = useState(false);
   const [isIslandExpanded, setIsIslandExpanded] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
-  const [isInputExpanded, setIsInputExpanded] = useState(false);
 
   const handleUploadComplete = useCallback((id: string, newUrl: string) => {
     setSessionImages(prev => prev.map(img => img.id === id ? { ...img, url: newUrl } : img));
-    onUpdateHistoryItemUrl?.(id, newUrl);
-  }, [setSessionImages, onUpdateHistoryItemUrl]);
+    onUpdateHistoryItem?.(id, { url: newUrl });
+  }, [setSessionImages, onUpdateHistoryItem]);
+
+  const handleReveal = useCallback((id: string) => {
+    setSessionImages(prev => prev.map(img => img.id === id ? { ...img, revealed: true } : img));
+    onUpdateHistoryItem?.(id, { revealed: true });
+  }, [setSessionImages, onUpdateHistoryItem]);
   const [showPromptTools, setShowPromptTools] = useState(false);
   const [renderTime, setRenderTime] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -869,6 +902,24 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<any>(null);
+  const isFirstLoad = useRef(true);
+
+  // Automatically scroll to the newest generations (bottom of the feed) when app opens or when images change/start
+  useEffect(() => {
+    const scrollContainer = scrollRef.current;
+    if (scrollContainer) {
+      const timer = setTimeout(() => {
+        scrollContainer.scrollTo({
+          top: scrollContainer.scrollHeight,
+          behavior: isFirstLoad.current ? 'auto' : 'smooth'
+        });
+        if (sessionImages.length > 0) {
+            isFirstLoad.current = false;
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [sessionImages.length, isProcessing]);
 
   const showToast = (message: string) => { setToastMessage(message); setTimeout(() => setToastMessage(null), 3000); };
 
@@ -930,9 +981,15 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
       if (!sessionPrompt || isEnhancing) return;
       setIsEnhancing(true);
       try {
-          await enhancePrompt(sessionPrompt, localSettings.model, globalSettings.apiKey, (chunk) => {
-              setSessionPrompt(chunk);
-          });
+          const finalPrompt = await enhancePrompt(
+              sessionPrompt, 
+              localSettings.model, 
+              globalSettings.apiKey, 
+              (chunk) => {
+                  setSessionPrompt(chunk);
+              }
+          );
+          setSessionPrompt(finalPrompt);
           showToast("Prompt Enhanced");
       } catch (error: any) {
           showToast(error.message || "Enhancement Failed");
@@ -1002,7 +1059,11 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
         try {
             setIsEnhancing(true);
             showToast("Neural Core Enhancing...");
-            basePrompt = await enhancePrompt(sessionPrompt, localSettings.model, globalSettings.apiKey);
+            basePrompt = await enhancePrompt(
+                sessionPrompt, 
+                localSettings.model, 
+                globalSettings.apiKey
+            );
         } catch (e: any) {
             console.error("Neural Enhance Failed", e);
             showToast(e?.message || "Enhancement Failed, using original prompt.");
@@ -1300,7 +1361,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                                   <PromptHeader prompt={group.prompt} batchId={group.batchId} onClearBatch={handleClearBatch} />
                                   <div className="w-full flex flex-col items-center gap-16">
                                       {group.items.map((item, idx) => (
-                                        <div key={item.id} onClick={() => setSelectedImage(item)} className="cursor-pointer active:scale-[0.98] transition-transform">
+                                        <div key={item.id} className="active:scale-[0.98] transition-transform">
                                             <GenerationCard 
                                               item={item} 
                                               index={idx} 
@@ -1311,6 +1372,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                                               showToast={showToast}
                                               onUploadComplete={handleUploadComplete}
                                               apiKey={globalSettings.apiKey}
+                                              onSelect={() => setSelectedImage(item)} onReveal={handleReveal}
                                             />
                                         </div>
                                       ))}
@@ -1320,34 +1382,27 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                           {isProcessing && (
                               <motion.div 
                                   layout
-                                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
                                   animate={{ opacity: 1, scale: 1, y: 0 }}
-                                  exit={{ opacity: 0, scale: 0.9, y: -20 }}
+                                  exit={{ opacity: 0, scale: 0.95, y: -20 }}
                                   transition={LIQUID_SPRING}
                                   key="skeleton-batch"
                                   className="w-full flex flex-col items-center gap-10"
                               >
-                                  <div className="w-full max-w-2xl flex items-center gap-4 opacity-50">
-                                      <div className="w-10 h-10 rounded-full bg-white/10 animate-pulse" />
-                                      <div className="flex-1 h-6 bg-white/10 rounded-full animate-pulse" />
+                                  <div className="w-full max-w-2xl flex items-center justify-between px-4">
+                                      <div className="flex items-center gap-2.5">
+                                          <div className="size-2 rounded-full bg-primary animate-ping" />
+                                          <span className="text-[10px] font-black uppercase tracking-widest text-primary font-mono">Generating Media Asset...</span>
+                                      </div>
                                   </div>
                                   <div className="w-full flex flex-col items-center gap-16">
                                       {Array.from({ length: localSettings.imageCount }).map((_, idx) => (
-                                          <div key={idx} className="relative shrink-0 overflow-hidden bg-white/[0.02] border-[0.5px] border-white/10 shadow-liquid rounded-[2.5rem] flex items-center justify-center w-full max-w-3xl" style={{ aspectRatio: `${localSettings.width}/${localSettings.height}` }}>
-                                              <div className="absolute inset-0 z-10 overflow-hidden bg-black/20">
-                                                  <div className="absolute inset-0 bg-zinc-800 animate-pulse" />
-                                                  <div className="absolute inset-0 flex flex-col p-10 gap-6">
-                                                      <div className="w-1/2 h-5 bg-white/10 rounded-full animate-pulse" />
-                                                      <div className="w-3/4 h-4 bg-white/10 rounded-full animate-pulse delay-150" />
-                                                      <div className="mt-auto flex justify-between items-end">
-                                                          <div className="flex flex-col gap-3">
-                                                              <div className="w-32 h-3 bg-white/5 rounded-full animate-pulse" />
-                                                              <div className="w-24 h-3 bg-white/5 rounded-full animate-pulse delay-75" />
-                                                          </div>
-                                                          <div className="size-14 rounded-3xl bg-white/10 animate-pulse" />
-                                                      </div>
-                                                  </div>
-                                              </div>
+                                          <div 
+                                              key={idx} 
+                                              className="relative shrink-0 overflow-hidden bg-zinc-950 border border-zinc-800 shadow-liquid rounded-[2.5rem] flex items-center justify-center w-full max-w-3xl" 
+                                              style={{ aspectRatio: `${localSettings.width}/${localSettings.height}` }}
+                                          >
+                                              <FluidGenerationSkeleton prompt={sessionPrompt} width={localSettings.width} height={localSettings.height} />
                                           </div>
                                       ))}
                                   </div>
@@ -1364,165 +1419,106 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
               <motion.div 
                   layout 
                   transition={{ type: "spring", ...LIQUID_SPRING }} 
-                  className={`glass-card overflow-hidden shadow-liquid w-full ${showSettings ? 'rounded-[2.5rem]' : 'rounded-[2rem]'}`}
+                  className={`glass-card overflow-hidden w-full ${showSettings ? 'rounded-[2.5rem]' : 'rounded-[2rem]'}`}
               >
                   <div className="flex flex-col">
-                      <div className={`flex p-2 ${isInputExpanded ? 'flex-col gap-3' : 'flex-row items-center gap-2'}`}>
-                          {!isInputExpanded && (
-                              <button 
-                                onClick={() => setShowSettings(!showSettings)} 
-                                className={`size-10 rounded-2xl flex items-center justify-center transition-all shrink-0 ${showSettings ? 'bg-white text-black shadow-glow' : 'bg-white/5 text-white/20 hover:bg-white/10'}`}
-                              >
-                                  <Settings size={18} className={showSettings ? 'animate-spin-slow' : ''} />
-                              </button>
-                          )}
-
-                          {/* Prompt Input Area */}
-                          <div className={`flex-1 bg-white/[0.08] rounded-2xl border border-white/10 flex transition-all focus-within:border-primary/50 focus-within:bg-white/[0.12] ${isInputExpanded ? 'p-5 min-h-[250px]' : 'items-center px-3 min-h-[50px] flex-row gap-2'}`}>
-                              <div className="flex-1">
-                                  {isInputExpanded ? (
-                                      <textarea 
-                                        value={sessionPrompt} 
-                                        onChange={(e) => setSessionPrompt(e.target.value)} 
-                                        className={`w-full bg-transparent border-none text-white text-[15px] focus:ring-0 placeholder:text-white/60 min-h-[200px] max-h-[600px] resize-none p-0 leading-relaxed transition-all ${isEnhancing ? 'animate-pulse text-primary/60' : ''}`} 
-                                        placeholder="Architect your reality..." 
-                                        autoFocus
-                                      />
-                                  ) : (
-                                      <input 
-                                        value={sessionPrompt} 
-                                        onChange={(e) => setSessionPrompt(e.target.value)} 
-                                        onKeyDown={(e) => e.key === 'Enter' && handleGenerate()} 
-                                        className="w-full bg-transparent border-none text-white text-[14px] focus:ring-0 placeholder:text-white/60 h-6 p-0 font-medium" 
-                                        placeholder="Seed your imagination..." 
-                                      />
-                                  )}
-                              </div>
-
-                              {!isInputExpanded && (
-                                <div className="flex items-center gap-1">
-                                    <AnimatePresence>
-                                        {showPromptTools && (
-                                            <motion.div 
-                                              initial={{ opacity: 0, x: 20, scale: 0.8 }}
-                                              animate={{ opacity: 1, x: 0, scale: 1 }}
-                                              exit={{ opacity: 0, x: 20, scale: 0.8 }}
-                                              transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                                              className="flex items-center gap-1"
-                                            >
-                                                {sessionPrompt && (
-                                                    <>
-                                                        <button 
-                                                            onClick={handleEnhance} 
-                                                            disabled={isEnhancing}
-                                                            className={`size-8 rounded-full flex items-center justify-center transition-all ${isEnhancing ? 'text-primary animate-spin' : 'text-white/20 hover:text-white/60 hover:bg-white/5'}`}
-                                                        >
-                                                            {isEnhancing ? <Loader2 size={14} /> : <Sparkles size={14} />}
-                                                        </button>
-                                                        <button 
-                                                          onClick={() => setSessionPrompt('')} 
-                                                          className="size-8 rounded-full flex items-center justify-center text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-all"
-                                                        >
-                                                          <Eraser size={14} />
-                                                        </button>
-                                                    </>
-                                                )}
-                                                <button 
-                                                  onClick={() => setIsInputExpanded(!isInputExpanded)} 
-                                                  className="size-8 rounded-full flex items-center justify-center text-white/20 hover:text-white/60 hover:bg-white/5 transition-all"
-                                                >
-                                                    <Maximize2 size={14} />
-                                                </button>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                    
-                                    <button 
-                                      onClick={() => setShowPromptTools(!showPromptTools)} 
-                                      className={`size-8 rounded-full flex items-center justify-center transition-all ${showPromptTools ? 'bg-white/10 text-white' : 'text-white/20 hover:text-white/60 hover:bg-white/5'}`}
-                                    >
-                                        <motion.div
-                                          animate={{ rotate: showPromptTools ? 45 : 0 }}
-                                          transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                                        >
-                                          <Plus size={16} />
-                                        </motion.div>
-                                    </button>
-                                </div>
-                              )}
-                          </div>
- 
-                          {/* Bottom Controls Area */}
-                          <div className={`flex items-center ${isInputExpanded ? 'justify-between px-1' : 'gap-2'}`}>
-                              <div className="flex items-center gap-2">
-                                  {isInputExpanded && (
-                                      <button 
-                                        onClick={() => setShowSettings(!showSettings)} 
-                                        className={`size-10 rounded-2xl flex items-center justify-center transition-all shrink-0 ${showSettings ? 'bg-white text-black shadow-glow' : 'bg-white/5 text-white/20 hover:bg-white/10'}`}
-                                      >
-                                          <Settings size={18} className={showSettings ? 'animate-spin-slow' : ''} />
-                                      </button>
-                                  )}
-
-                                  {isInputExpanded && (
-                                      <div className="flex items-center gap-1 bg-white/[0.03] border border-white/5 rounded-2xl p-1">
-                                          <button 
-                                              onClick={handleEnhance} 
-                                              disabled={isEnhancing}
-                                              className={`size-9 rounded-xl flex items-center justify-center transition-all ${isEnhancing ? 'text-primary animate-spin' : 'text-white/20 hover:text-white/60 hover:bg-white/5'}`}
-                                          >
-                                              {isEnhancing ? <Loader2 size={16} /> : <Sparkles size={16} />}
-                                          </button>
-                                          <button 
-                                            onClick={() => setSessionPrompt('')} 
-                                            className="size-9 rounded-xl flex items-center justify-center text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-all"
-                                          >
-                                            <Eraser size={16} />
-                                          </button>
-                                          <button 
-                                            onClick={() => setIsInputExpanded(false)} 
-                                            className="size-9 rounded-xl flex items-center justify-center text-primary bg-primary/10 transition-all"
-                                          >
-                                              <Minimize2 size={16} />
-                                          </button>
-                                      </div>
-                                  )}
-                              </div>
-
-                              <button 
-                                onClick={handleGenerate} 
-                                disabled={!sessionPrompt || isActuallyRendering} 
-                                className={`size-12 rounded-2xl flex items-center justify-center transition-all shrink-0 ${!sessionPrompt ? 'bg-white/5 text-white/5' : 'bg-primary text-white shadow-glow active:scale-90'}`}
-                              >
-                                  <ArrowUp size={22} />
-                              </button>
-                          </div>
-                      </div>
+                      {/* Inline Liquid Settings Expansion */}
                       <AnimatePresence initial={false}>
                           {showSettings && (
                               <motion.div 
                                   initial={{ height: 0, opacity: 0 }} 
-                                  animate={{ height: 'auto', opacity: 1 }} 
+                                  animate={{ height: "auto", opacity: 1 }} 
                                   exit={{ height: 0, opacity: 0 }} 
-                                  transition={LIQUID_SPRING}
-                                  className="border-t-[0.5px] border-white/10 bg-black/20 overflow-hidden"
+                                  transition={{ type: "spring", ...LIQUID_SPRING }}
+                                  className="border-b border-white/10 bg-black/20 overflow-hidden"
                               >
-                                  <SettingsPill 
-                                      localSettings={localSettings} 
-                                      updateLocalSetting={updateLocalSetting} 
-                                      setAspectRatio={(w, h) => { updateLocalSetting('width', w); updateLocalSetting('height', h); }} 
-                                      styles={styles}
-                                      models={models}
-                                  />
+                                  <div className="p-3 sm:p-5 overflow-y-auto max-h-[50vh] no-scrollbar">
+                                      <SettingsPill 
+                                          localSettings={localSettings} 
+                                          updateLocalSetting={updateLocalSetting} 
+                                          setAspectRatio={(w, h) => { updateLocalSetting('width', w); updateLocalSetting('height', h); }} 
+                                          styles={styles}
+                                          models={models}
+                                      />
+                                  </div>
                               </motion.div>
                           )}
                       </AnimatePresence>
+
+                      <div className="flex flex-col p-2 gap-2">
+                          <div className="flex flex-row items-end gap-2">
+                              <button 
+                                type="button"
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowSettings(!showSettings); }} 
+                                className={`size-12 rounded-2xl flex items-center justify-center transition-all shrink-0 ${showSettings ? 'bg-primary text-black shadow-glow' : 'bg-white/10 text-white/70 hover:bg-white/20 backdrop-blur-md'}`}
+                                title={showSettings ? "Close Settings" : "Open Settings"}
+                              >
+                                  <Settings size={20} className={showSettings ? 'rotate-90 transition-transform duration-300' : 'transition-transform duration-300'} />
+                              </button>
+
+                              {/* Prompt Input Area */}
+                              <div className="flex-1 bg-white/[0.08] backdrop-blur-md rounded-2xl border border-white/10 flex flex-col transition-all focus-within:border-primary/50 focus-within:bg-white/[0.12] overflow-hidden">
+                                  <div className="flex-1 flex items-center min-h-[48px] px-3 py-3">
+                                      <TextareaAutosize 
+                                        value={sessionPrompt} 
+                                        onChange={(e) => setSessionPrompt(e.target.value)} 
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                                handleGenerate();
+                                            }
+                                        }}
+                                        minRows={1}
+                                        maxRows={6}
+                                        className={`w-full bg-transparent border-none text-white text-[15px] focus:ring-0 placeholder:text-white/60 resize-none p-0 leading-relaxed transition-all ${isEnhancing ? 'animate-pulse text-primary/60' : ''}`} 
+                                        placeholder="Type a prompt..." 
+                                      />
+                                  </div>
+                              </div>
+
+                              <button 
+                                type="button"
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleGenerate(); }} 
+                                disabled={!sessionPrompt || isActuallyRendering} 
+                                className={`size-12 rounded-2xl flex items-center justify-center transition-all shrink-0 ${!sessionPrompt ? 'bg-white/5 text-white/10' : 'bg-primary text-white shadow-glow active:scale-90'}`}
+                              >
+                                  <ArrowUp size={22} />
+                              </button>
+                          </div>
+
+                          {/* Quick Tools Row */}
+                          <div className="flex items-center justify-between px-1">
+                              <div className="flex items-center gap-2">
+                                  {sessionPrompt && (
+                                      <div className="flex items-center gap-1 bg-white/5 rounded-full p-1">
+                                          <button 
+                                              type="button"
+                                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleEnhance(); }} 
+                                              disabled={isEnhancing}
+                                              className={`h-7 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all text-[10px] font-bold tracking-wide uppercase ${isEnhancing ? 'text-primary animate-spin' : 'text-white/50 hover:text-white hover:bg-white/10'}`}
+                                              title="Enhance Prompt"
+                                          >
+                                              {isEnhancing ? <Loader2 size={12} /> : <Sparkles size={12} />} Enhance
+                                          </button>
+                                          <button 
+                                            type="button"
+                                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSessionPrompt(''); }} 
+                                            className="h-7 px-3 rounded-full flex items-center justify-center gap-1.5 text-[10px] font-bold tracking-wide uppercase text-white/50 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                                            title="Erase Prompt"
+                                          >
+                                            <Eraser size={12} /> Clear
+                                          </button>
+                                      </div>
+                                  )}
+                              </div>
+                          </div>
+                      </div>
                   </div>
               </motion.div>
           </div>
       </div>
 
-      <AnimatePresence>{toastMessage && <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed bottom-36 left-1/2 -translate-x-1/2 px-8 py-3 rounded-full bg-zinc-900 border border-zinc-800 text-[10px] font-black uppercase tracking-widest">{toastMessage}</motion.div>}</AnimatePresence>
+      <AnimatePresence>{toastMessage && <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed bottom-36 left-1/2 -translate-x-1/2 px-8 py-3 rounded-full bg-zinc-900/90 backdrop-blur-xl border border-white/10 text-[10px] font-black uppercase tracking-widest z-[700] shadow-2xl">{toastMessage}</motion.div>}</AnimatePresence>
 
       <AnimatePresence>
           {selectedImage && (

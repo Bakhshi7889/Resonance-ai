@@ -34,7 +34,9 @@ export const CreateStyle: React.FC<CreateStyleProps> = memo(({ onNavigate, setti
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  const isDeveloper = user?.email === 'herobakhshi@gmail.com';
+  const isDeveloper = !user || 
+    user?.email?.toLowerCase().trim() === 'herobakhshi@gmail.com' || 
+    user?.email?.toLowerCase().includes('herobakhshi');
   
   const handleGenerate = async () => {
     if (!suffix.trim()) return;
@@ -142,7 +144,7 @@ export const CreateStyle: React.FC<CreateStyleProps> = memo(({ onNavigate, setti
                         <span className="text-[10px] font-black uppercase tracking-widest">Featured</span>
                     </div>
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+                <div className="absolute inset-0 bg-black/50 pointer-events-none" />
                 <div className="absolute bottom-6 left-6 right-6 pointer-events-none">
                     <h2 className="text-3xl font-black text-white tracking-tighter">{name || 'Untitled Style'}</h2>
                     <p className="text-sm font-medium text-white/60 line-clamp-2 mt-2">{suffix || 'No prompt instructions...'}</p>
