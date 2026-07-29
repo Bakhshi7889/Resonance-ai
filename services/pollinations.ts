@@ -16,7 +16,8 @@ export const generateImageUrl = async (params: any) => {
     
     let url = `${baseUrl}/${encodedPrompt}?width=${width}&height=${height}&seed=${seed}&model=${model || 'flux'}`;
     if (nologo) url += "&nologo=true";
-    if (safe) url += "&safe=true";
+    if (safe === true) url += "&safe=true";
+    else url += "&safe=false";
     
     // User's personal key for generation (if provided) or the default app API key
     url += `&key=${effectiveKey}`;

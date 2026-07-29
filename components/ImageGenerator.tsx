@@ -512,8 +512,8 @@ const NeuralMesh = memo(({ meshData, visibleStylesCount }: { meshData: any, visi
     );
 });
 
-const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, styles, models }: { 
-    localSettings: AppSettings, updateLocalSetting: (k: keyof AppSettings, v: any) => void, setAspectRatio: (w: number, h: number) => void, styles: CustomStyle[], models: ModelInfo[]
+const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, styles, models, onClose }: { 
+    localSettings: AppSettings, updateLocalSetting: (k: keyof AppSettings, v: any) => void, setAspectRatio: (w: number, h: number) => void, styles: CustomStyle[], models: ModelInfo[], onClose?: () => void
 }) => {
     // Get effective key for previews
     const effectiveKey = useMemo(() => getEffectiveKey(localSettings.apiKey), [localSettings.apiKey]);
@@ -698,7 +698,7 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, 
                             
                             // For 'none' style, use the current model for the preview
                             if (style.id === 'none') {
-                                previewUrl = `https://gen.pollinations.ai/image/Clean%20minimalist%20void?model=${localSettings.model}&width=256&height=384&nologo=true&seed=0&safe=true&key=${effectiveKey}`;
+                                previewUrl = `https://gen.pollinations.ai/image/Clean%20minimalist%20void?model=${localSettings.model}&width=256&height=384&nologo=true&seed=0&safe=false&key=${effectiveKey}`;
                             }
 
                             const effectiveModelId = style.id === 'none' ? localSettings.model : style.modelId;
@@ -780,6 +780,19 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, 
                 </div>
                 <input onKeyDown={(e) => { if(e.key === 'Enter') { const val = (e.target as HTMLInputElement).value; if(val) updateLocalSetting('negativePrompt', localSettings.negativePrompt ? `${localSettings.negativePrompt}, ${val}` : val); (e.target as HTMLInputElement).value = ''; } }} placeholder="Tokens to prevent..." className="w-full h-14 bg-white/[0.03] border border-white/10 rounded-2xl px-6 text-[11px] text-white focus:ring-1 focus:ring-primary/40 placeholder:text-white/10" />
             </div>
+
+            {onClose && (
+                <div className="pt-2">
+                    <button 
+                        type="button"
+                        onClick={onClose}
+                        className="w-full h-12 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95"
+                    >
+                        <ChevronDown size={16} />
+                        <span>Minimize Settings</span>
+                    </button>
+                </div>
+            )}
         </div>
     );
 });
@@ -1430,8 +1443,25 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                                   animate={{ height: "auto", opacity: 1 }} 
                                   exit={{ height: 0, opacity: 0 }} 
                                   transition={{ type: "spring", ...LIQUID_SPRING }}
-                                  className="border-b border-white/10 bg-black/20 overflow-hidden"
+                                  className="border-b border-white/10 bg-black/30 overflow-hidden flex flex-col"
                               >
+                                  {/* Minimize Header Bar */}
+                                  <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-white/10">
+                                      <div className="flex items-center gap-2">
+                                          <Settings size={14} className="text-primary" />
+                                          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/80">Generation Controls</span>
+                                      </div>
+                                      <button 
+                                          type="button"
+                                          onClick={() => setShowSettings(false)}
+                                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 border border-white/10"
+                                          title="Minimize Settings"
+                                      >
+                                          <ChevronDown size={14} />
+                                          <span>Minimize</span>
+                                      </button>
+                                  </div>
+
                                   <div className="p-3 sm:p-5 overflow-y-auto max-h-[50vh] no-scrollbar">
                                       <SettingsPill 
                                           localSettings={localSettings} 
@@ -1439,41 +1469,40 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                                           setAspectRatio={(w, h) => { updateLocalSetting('width', w); updateLocalSetting('height', h); }} 
                                           styles={styles}
                                           models={models}
+                                          onClose={() => setShowSettings(false)}
                                       />
                                   </div>
                               </motion.div>
                           )}
                       </AnimatePresence>
 
-                      <div className="flex flex-col p-2 gap-2">
-                          <div className="flex flex-row items-end gap-2">
+                      <div className="flex flex-col p-2.5 gap-2.5">
+                          <div className="flex flex-row items-center gap-2.5">
                               <button 
                                 type="button"
                                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowSettings(!showSettings); }} 
                                 className={`size-12 rounded-2xl flex items-center justify-center transition-all shrink-0 ${showSettings ? 'bg-primary text-black shadow-glow' : 'bg-white/10 text-white/70 hover:bg-white/20 backdrop-blur-md'}`}
-                                title={showSettings ? "Close Settings" : "Open Settings"}
+                                title={showSettings ? "Minimize Settings" : "Expand Settings"}
                               >
-                                  <Settings size={20} className={showSettings ? 'rotate-90 transition-transform duration-300' : 'transition-transform duration-300'} />
+                                  {showSettings ? <ChevronDown size={20} className="transition-transform duration-300" /> : <Settings size={20} className="transition-transform duration-300" />}
                               </button>
 
                               {/* Prompt Input Area */}
-                              <div className="flex-1 bg-white/[0.08] backdrop-blur-md rounded-2xl border border-white/10 flex flex-col transition-all focus-within:border-primary/50 focus-within:bg-white/[0.12] overflow-hidden">
-                                  <div className="flex-1 flex items-center min-h-[48px] px-3 py-3">
-                                      <TextareaAutosize 
-                                        value={sessionPrompt} 
-                                        onChange={(e) => setSessionPrompt(e.target.value)} 
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && !e.shiftKey) {
-                                                e.preventDefault();
-                                                handleGenerate();
-                                            }
-                                        }}
-                                        minRows={1}
-                                        maxRows={6}
-                                        className={`w-full bg-transparent border-none text-white text-[15px] focus:ring-0 placeholder:text-white/60 resize-none p-0 leading-relaxed transition-all ${isEnhancing ? 'animate-pulse text-primary/60' : ''}`} 
-                                        placeholder="Type a prompt..." 
-                                      />
-                                  </div>
+                              <div className="flex-1 min-h-[48px] bg-white/[0.08] backdrop-blur-md rounded-2xl border border-white/10 flex items-center px-4 py-2 transition-all focus-within:border-primary/50 focus-within:bg-white/[0.12] overflow-hidden">
+                                  <TextareaAutosize 
+                                    value={sessionPrompt} 
+                                    onChange={(e) => setSessionPrompt(e.target.value)} 
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                            e.preventDefault();
+                                            handleGenerate();
+                                        }
+                                    }}
+                                    minRows={1}
+                                    maxRows={5}
+                                    className={`w-full bg-transparent border-none text-white text-[14px] focus:ring-0 placeholder:text-white/50 resize-none p-0 leading-normal my-auto transition-all ${isEnhancing ? 'animate-pulse text-primary/60' : ''}`} 
+                                    placeholder="Type a prompt..." 
+                                  />
                               </div>
 
                               <button 
@@ -1487,15 +1516,15 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                           </div>
 
                           {/* Quick Tools Row */}
-                          <div className="flex items-center justify-between px-1">
-                              <div className="flex items-center gap-2">
-                                  {sessionPrompt && (
-                                      <div className="flex items-center gap-1 bg-white/5 rounded-full p-1">
+                          {sessionPrompt && (
+                              <div className="flex items-center justify-between px-1">
+                                  <div className="flex items-center gap-2">
+                                      <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md rounded-full p-1 border border-white/10">
                                           <button 
                                               type="button"
                                               onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleEnhance(); }} 
                                               disabled={isEnhancing}
-                                              className={`h-7 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all text-[10px] font-bold tracking-wide uppercase ${isEnhancing ? 'text-primary animate-spin' : 'text-white/50 hover:text-white hover:bg-white/10'}`}
+                                              className={`h-7 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all text-[10px] font-bold tracking-wide uppercase ${isEnhancing ? 'text-primary animate-spin' : 'text-white/70 hover:text-white hover:bg-white/10'}`}
                                               title="Enhance Prompt"
                                           >
                                               {isEnhancing ? <Loader2 size={12} /> : <Sparkles size={12} />} Enhance
@@ -1509,9 +1538,9 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                                             <Eraser size={12} /> Clear
                                           </button>
                                       </div>
-                                  )}
+                                  </div>
                               </div>
-                          </div>
+                          )}
                       </div>
                   </div>
               </motion.div>

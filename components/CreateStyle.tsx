@@ -57,7 +57,7 @@ export const CreateStyle: React.FC<CreateStyleProps> = memo(({ onNavigate, setti
             seed,
             enhance: true, 
             nologo: true,
-            safe: true,
+            safe: false,
             private: true,
             apiKey: settings.apiKey
         });

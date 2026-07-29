@@ -38,7 +38,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   quality: 'hd',
   infiniteMode: false,
   seed: 0,
-  visualSafety: true
+  visualSafety: false
 };
 
 const getInitialUser = () => {
@@ -270,7 +270,7 @@ const App: React.FC = () => {
       width: item.width,
       height: item.height,
       prompt_length: item.prompt?.length || 0,
-      safe: !settings.privateMode,
+      safe: false,
       is_anonymous: !user,
       user_id: user?.id || null,
       user_email: user?.email || 'Anonymous'
