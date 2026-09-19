@@ -26,7 +26,7 @@ const PREVIEW_SUBJECTS = [
 export const CreateStyle: React.FC<CreateStyleProps> = memo(({ onNavigate, settings, styles, setStyles, updateSettings, user, models }) => {
   const [name, setName] = useState('');
   const [suffix, setSuffix] = useState('');
-  const [selectedModel, setSelectedModel] = useState('flux');
+  const [selectedModel, setSelectedModel] = useState('black-forest-labs/flux.1-schnell');
   const [isFeatured, setIsFeatured] = useState(false);
   const [order, setOrder] = useState(0);
   const [coverImage, setCoverImage] = useState<string | null>(null);

@@ -65,6 +65,8 @@ export interface AppSettings {
   infiniteMode: boolean;
   seed: number;
   visualSafety: boolean;
+  historyAutoDeleteEnabled?: boolean;
+  historyAutoDeleteDays?: number;
 }
 
 export interface AccountProfile {
@@ -129,6 +131,17 @@ export interface ModelInfo {
   base_model?: string;
   type?: string;
   url?: string;
+  community?: boolean;
+  rpm?: number;
+  questRate?: string;
+  isFree?: boolean;
+  isUnstable?: boolean;
+  health?: {
+    status?: string;
+    success_rate?: number;
+    requests?: number;
+  };
+  publisher?: string;
 }
 
 export const ASPECT_RATIOS = [

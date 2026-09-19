@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DownloadCloud, Smartphone, Share, PlusSquare, ArrowLeft, ExternalLink, RefreshCw, Layers, Download, PlusCircle, Trash2, Wand2, Terminal, Copy, Globe, Trophy, Github, Mail, LogIn, LogOut, User, MessageSquare, Check, Send, Inbox, ShieldCheck, Eye, EyeOff, Sparkles, ChevronRight, Zap, TrendingUp } from 'lucide-react';
+import { DownloadCloud, Smartphone, Share, PlusSquare, ArrowLeft, ExternalLink, RefreshCw, Layers, Download, PlusCircle, Trash2, Wand2, Terminal, Copy, Globe, Trophy, Github, Mail, LogIn, LogOut, User, MessageSquare, Check, Send, Inbox, ShieldCheck, Eye, EyeOff, Sparkles, ChevronRight, Zap, TrendingUp, Clock } from 'lucide-react';
 import { AppSettings, AppRoute, AccountState, DirectMessage, HistoryItem, ModelInfo } from '../types';
 import { getAccountDetails, getEstimatedImagesLeft, getAuthUrl, MODEL_PRICING } from '../services/pollinations';
 import { getLogs, clearLogs, LogEntry } from '../services/logger';
@@ -835,6 +835,61 @@ export const Preferences: React.FC<PreferencesProps> = memo(({ settings, updateS
                         </div>
                     </div>
                 </div>
+            </div>
+        </section>
+
+        {/* Storage & 7-Day Auto-Purge Protection */}
+        <section className="space-y-4">
+            <p className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-2">Storage & Cache Protection</p>
+            <div className="bg-zinc-900 rounded-[2.5rem] p-6 border border-zinc-800 space-y-5">
+                <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                        <div className="size-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0 mt-0.5">
+                            <ShieldCheck size={20} />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-sm font-bold text-white">7-Day Auto-Purge Protection</span>
+                            <span className="text-[10px] text-white/40 leading-relaxed mt-0.5 max-w-sm">
+                                Pollinations image caches expire on CDN servers after ~7 days. Keeping expired image records causes browser requests to trigger on-demand GPU re-rendering billed directly to your personal API key. Auto-deleting images past the retention window prevents accidental re-generation charges.
+                            </span>
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={() => updateSettings({ historyAutoDeleteEnabled: settings.historyAutoDeleteEnabled === false ? true : false })}
+                        className={`w-12 h-6 rounded-full transition-colors relative shrink-0 p-0.5 ${settings.historyAutoDeleteEnabled !== false ? 'bg-emerald-500' : 'bg-zinc-700'}`}
+                    >
+                        <div className={`size-5 rounded-full bg-white transition-transform ${settings.historyAutoDeleteEnabled !== false ? 'translate-x-6' : 'translate-x-0'}`} />
+                    </button>
+                </div>
+
+                {settings.historyAutoDeleteEnabled !== false && (
+                    <div className="pt-3 border-t border-white/5 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-white/80">Retention Window</span>
+                            <div className="flex items-center gap-1.5">
+                                {[3, 7, 14, 30].map(days => (
+                                    <button
+                                        key={days}
+                                        onClick={() => updateSettings({ historyAutoDeleteDays: days })}
+                                        className={`px-3 py-1.5 rounded-xl text-[9px] font-bold uppercase transition-all ${
+                                            (settings.historyAutoDeleteDays ?? 7) === days
+                                                ? 'bg-primary text-white'
+                                                : 'bg-zinc-800 text-white/50 hover:text-white'
+                                        }`}
+                                    >
+                                        {days}d {days === 7 ? '(Default)' : ''}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[9px] text-white/40 pt-1">
+                            <span>Current History: {history.length} assets stored</span>
+                            <span className="text-emerald-400 font-medium">Automatic Purge Active</span>
+                        </div>
+                    </div>
+                )}
             </div>
         </section>
 

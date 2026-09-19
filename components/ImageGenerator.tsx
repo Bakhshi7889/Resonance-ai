@@ -4,9 +4,12 @@ import {
     Settings, LayoutGrid, Shuffle, Eraser, Maximize2, Minimize2, 
     Trash2, EyeOff, Wand2, Zap, ArrowUp, ChevronDown, 
     Check, ShieldCheck, XCircle, Hash, Clock, AlertTriangle, RefreshCw, Layers, Heart,
-    Sparkles, Loader2, Camera, Plus, X, LogIn, LogOut, User, Globe, Download, Share2, Video, ExternalLink, Terminal
+    Sparkles, Loader2, Camera, Plus, X, LogIn, LogOut, User, Globe, Download, Share2, Video, ExternalLink, Terminal, Search
 } from 'lucide-react';
-import { generateImageUrl, getRandomSeed, getAccountDetails, getEstimatedImagesLeft, getEffectiveKey } from '../services/pollinations';
+import { 
+    generateImageUrl, getRandomSeed, getAccountDetails, getEstimatedImagesLeft, getEffectiveKey,
+    fetchCommunityModels, sortCommunityModels, isFailureReelModel, CommunitySortOption, CORE_IMAGE_MODELS
+} from '../services/pollinations';
 import { downloadImage, performVisualAudit } from '../services/utils';
 import { AppRoute, AppSettings, HistoryItem, ASPECT_RATIOS, AccountState, ModelInfo, CustomStyle } from '../types';
 import { addLog } from '../services/logger';
@@ -518,6 +521,54 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, 
     // Get effective key for previews
     const effectiveKey = useMemo(() => getEffectiveKey(localSettings.apiKey), [localSettings.apiKey]);
 
+    // Community models state & logic
+    const isCurrentModelCommunity = localSettings.model.startsWith('community/') || Boolean(models.find(m => m.id === localSettings.model)?.community);
+    const [modelCategory, setModelCategory] = useState<'core' | 'community'>(isCurrentModelCommunity ? 'community' : 'core');
+    const [communityModels, setCommunityModels] = useState<ModelInfo[]>([]);
+    const [isLoadingCommunity, setIsLoadingCommunity] = useState(false);
+    const [communitySort, setCommunitySort] = useState<CommunitySortOption>('health');
+    const [communitySearch, setCommunitySearch] = useState('');
+
+    const loadCommunity = useCallback(async (force = false) => {
+        setIsLoadingCommunity(true);
+        try {
+            const list = await fetchCommunityModels(localSettings.apiKey);
+            setCommunityModels(list);
+        } catch (e) {
+            console.error('Failed to load community models', e);
+        } finally {
+            setIsLoadingCommunity(false);
+        }
+    }, [localSettings.apiKey]);
+
+    useEffect(() => {
+        loadCommunity();
+    }, [loadCommunity]);
+
+    // Safety fallback: If user previously had a paid community model selected that was removed,
+    // gracefully switch them to the first available free community model or core flux
+    useEffect(() => {
+        if (communityModels.length > 0 && localSettings.model.startsWith('community/')) {
+            const exists = communityModels.some(m => m.id === localSettings.model);
+            if (!exists) {
+                updateLocalSetting('model', communityModels[0].id);
+            }
+        }
+    }, [communityModels, localSettings.model]);
+
+    const filteredCommunityModels = useMemo(() => {
+        let result = communityModels.filter(m => !isFailureReelModel(m.id) && !isFailureReelModel(m.name));
+        if (communitySearch.trim()) {
+            const q = communitySearch.toLowerCase().trim();
+            result = result.filter(m => 
+                m.name.toLowerCase().includes(q) || 
+                m.id.toLowerCase().includes(q) || 
+                (m.publisher && m.publisher.toLowerCase().includes(q))
+            );
+        }
+        return sortCommunityModels(result, communitySort);
+    }, [communityModels, communitySearch, communitySort]);
+
     const toggleStyle = (id: string) => {
         if (id === 'none') {
             updateLocalSetting('activeStyles', ['none']);
@@ -644,37 +695,234 @@ const SettingsPill = memo(({ localSettings, updateLocalSetting, setAspectRatio, 
             </div>
 
             <div className="space-y-3">
-                <p className="text-[8px] text-white/50 font-black uppercase tracking-[0.2em] pl-1">Neural Model</p>
-                <div className="grid grid-cols-3 gap-2 p-1">
-                    {models.map(m => (
-                        <button 
-                            key={m.id} 
-                            onClick={() => {
-                                updateLocalSetting('model', m.id);
-                                const maxBatch = m.id === 'zimage' ? 2 : 4;
-                                if (localSettings.imageCount > maxBatch) {
-                                    updateLocalSetting('imageCount', maxBatch);
-                                }
-                            }} 
-                            className={`h-12 rounded-xl text-[8px] font-black transition-all flex flex-col items-center justify-center gap-1 relative overflow-hidden backdrop-blur-md ${localSettings.model === m.id ? 'bg-primary text-black shadow-glow border border-primary' : 'bg-white/10 text-white/60 hover:text-white border border-white/10 hover:bg-white/20'}`}
+                <div className="flex items-center justify-between pl-1 pr-1">
+                    <p className="text-[8px] text-white/50 font-black uppercase tracking-[0.2em]">Neural Engine</p>
+                    <div className="flex items-center gap-1 p-0.5 bg-black/40 rounded-xl border border-white/5">
+                        <button
+                            type="button"
+                            onClick={() => setModelCategory('core')}
+                            className={`px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-wider transition-all ${
+                                modelCategory === 'core'
+                                    ? 'bg-primary text-black shadow-glow font-black'
+                                    : 'text-white/40 hover:text-white'
+                            }`}
                         >
-                            <div className="flex items-center gap-1">
-                                {m.type === 'video' ? <Video size={10} className="text-blue-400" /> : (m.paid_only ? <Zap size={10} className="text-amber-400" /> : <Sparkles size={10} />)}
-                                <span className="truncate max-w-[60px]">{m.name}</span>
-                            </div>
-                            {m.price > 0 && (
-                                <span className="text-[6px] opacity-60">
-                                    ${m.price}{m.type === 'video' ? '/s' : ''}
+                            Core (3)
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setModelCategory('community')}
+                            className={`px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-wider transition-all flex items-center gap-1 ${
+                                modelCategory === 'community'
+                                    ? 'bg-primary text-black shadow-glow font-black'
+                                    : 'text-white/40 hover:text-white'
+                            }`}
+                        >
+                            <span>Community</span>
+                            {communityModels.length > 0 && (
+                                <span className={`text-[6.5px] px-1 py-0.2 rounded font-bold uppercase ${
+                                    modelCategory === 'community' ? 'bg-black/30 text-black' : 'bg-emerald-500/20 text-emerald-400'
+                                }`}>
+                                    {communityModels.length} Free ✨
                                 </span>
                             )}
-                            {m.type === 'video' && (
-                                <div className="absolute top-0 right-0 px-1 py-0.5 bg-blue-500/20 text-blue-400 text-[5px] font-black uppercase tracking-tighter rounded-bl-lg">
-                                    VIDEO
-                                </div>
-                            )}
                         </button>
-                    ))}
+                    </div>
                 </div>
+
+                {modelCategory === 'core' ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-1">
+                        {CORE_IMAGE_MODELS.map(m => {
+                            const isSelected = localSettings.model === m.id || 
+                                (m.id === 'lykon/dreamshaper-8-lcm' && localSettings.model === 'sana') ||
+                                (m.id === 'black-forest-labs/flux.1-schnell' && (localSettings.model === 'flux' || localSettings.model === 'Spit-fires/flux-schnell')) ||
+                                (m.id === 'tongyi-mai/z-image-turbo' && localSettings.model === 'zimage');
+                            return (
+                                <button 
+                                    key={m.id} 
+                                    onClick={() => {
+                                        updateLocalSetting('model', m.id);
+                                        const maxBatch = m.id.includes('z-image') || m.id === 'zimage' ? 2 : 4;
+                                        if (localSettings.imageCount > maxBatch) {
+                                            updateLocalSetting('imageCount', maxBatch);
+                                        }
+                                    }} 
+                                    className={`p-3 rounded-2xl text-left transition-all relative overflow-hidden backdrop-blur-md flex flex-col justify-between gap-2 border ${
+                                        isSelected 
+                                            ? 'bg-primary/20 border-primary text-white shadow-glow' 
+                                            : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white'
+                                    }`}
+                                >
+                                    <div className="flex items-start justify-between gap-1">
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-1.5">
+                                                <Sparkles size={11} className={isSelected ? 'text-primary' : 'text-white/40'} />
+                                                <span className="text-[10px] font-black tracking-tight truncate block">{m.name}</span>
+                                            </div>
+                                            <span className="text-[7.5px] font-mono text-white/40 block mt-0.5 truncate">
+                                                {m.id}
+                                            </span>
+                                        </div>
+                                        {isSelected && (
+                                            <div className="size-4 rounded-full bg-primary text-black flex items-center justify-center shrink-0">
+                                                <Check size={10} strokeWidth={3} />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="flex flex-wrap items-center gap-1 mt-1 pt-1.5 border-t border-white/5">
+                                        <span className="text-[7px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-white font-bold">
+                                            ${m.price}/gen
+                                        </span>
+                                        {m.rpm && (
+                                            <span className="text-[7px] font-mono px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-300 font-bold">
+                                                {m.rpm} RPM
+                                            </span>
+                                        )}
+                                        {m.questRate && (
+                                            <span className="text-[7px] font-mono px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300 font-bold">
+                                                Quest {m.questRate}
+                                            </span>
+                                        )}
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <div className="space-y-3 p-1">
+                        {/* 100% Free Notice */}
+                        <div className="px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-start gap-2 text-emerald-300">
+                            <ShieldCheck size={13} className="shrink-0 mt-0.5 text-emerald-400" />
+                            <div className="text-[8px] leading-relaxed">
+                                <span className="font-black uppercase tracking-wider block text-emerald-400">100% Free Community Models ($0.00 /gen)</span>
+                                All paid community models have been removed. The models below are completely free of charge, hosted by community nodes. Latency and uptime may vary.
+                            </div>
+                        </div>
+
+                        {/* Search & Sort Controls */}
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                            <div className="relative flex-1">
+                                <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/30" />
+                                <input
+                                    type="text"
+                                    value={communitySearch}
+                                    onChange={(e) => setCommunitySearch(e.target.value)}
+                                    placeholder="Search models..."
+                                    className="w-full bg-black/40 border border-white/10 rounded-xl pl-7 pr-3 py-1.5 text-[8.5px] text-white placeholder:text-white/20 focus:outline-none focus:border-primary/50"
+                                />
+                                {communitySearch && (
+                                    <button onClick={() => setCommunitySearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white">
+                                        <X size={10} />
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                                <div className="px-2 py-1.5 rounded-xl text-[7.5px] font-black uppercase tracking-wider bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 shrink-0 flex items-center gap-1">
+                                    <Check size={8} />
+                                    <span>All Free ({filteredCommunityModels.length})</span>
+                                </div>
+
+                                <select
+                                    value={communitySort}
+                                    onChange={(e) => setCommunitySort(e.target.value as CommunitySortOption)}
+                                    className="bg-black/50 border border-white/10 rounded-xl px-2 py-1.5 text-[7.5px] font-bold text-white uppercase tracking-wider shrink-0 focus:outline-none focus:border-primary/50"
+                                >
+                                    <option value="health" className="bg-zinc-900">Sort: Reliability</option>
+                                    <option value="popular" className="bg-zinc-900">Sort: Popularity</option>
+                                    <option value="name" className="bg-zinc-900">Sort: Name (A-Z)</option>
+                                </select>
+
+                                <button
+                                    type="button"
+                                    onClick={() => loadCommunity(true)}
+                                    disabled={isLoadingCommunity}
+                                    title="Refresh Community Models"
+                                    className="p-1.5 rounded-xl bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 transition-all shrink-0"
+                                >
+                                    <RefreshCw size={11} className={isLoadingCommunity ? 'animate-spin text-primary' : ''} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Community Model Cards */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[220px] overflow-y-auto no-scrollbar p-1">
+                            {isLoadingCommunity && communityModels.length === 0 ? (
+                                <div className="col-span-full py-8 text-center flex flex-col items-center justify-center gap-2 text-white/40">
+                                    <Loader2 size={16} className="animate-spin text-primary" />
+                                    <span className="text-[8.5px] font-bold tracking-wider uppercase">Loading Community Models...</span>
+                                </div>
+                            ) : filteredCommunityModels.length === 0 ? (
+                                <div className="col-span-full py-6 text-center text-white/30 text-[8.5px] font-medium">
+                                    No community models found matching your search.
+                                </div>
+                            ) : (
+                                filteredCommunityModels.map(cm => {
+                                    const isSelected = localSettings.model === cm.id;
+                                    const successRate = cm.health?.success_rate;
+                                    const status = cm.health?.status;
+
+                                    return (
+                                        <button
+                                            key={cm.id}
+                                            onClick={() => {
+                                                updateLocalSetting('model', cm.id);
+                                                if (localSettings.imageCount > 2) {
+                                                    updateLocalSetting('imageCount', 2);
+                                                }
+                                            }}
+                                            className={`p-2.5 rounded-xl text-left transition-all relative overflow-hidden backdrop-blur-md flex flex-col justify-between gap-1.5 border ${
+                                                isSelected
+                                                    ? 'bg-primary/20 border-primary text-white shadow-glow'
+                                                    : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white'
+                                            }`}
+                                        >
+                                            <div className="flex items-start justify-between gap-1">
+                                                <div className="flex-1 min-w-0">
+                                                    <span className="text-[9px] font-black tracking-tight truncate block">
+                                                        {cm.name}
+                                                    </span>
+                                                    <span className="text-[7px] font-mono text-white/30 block truncate">
+                                                        {cm.id}
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex items-center gap-1 shrink-0">
+                                                    <span className="text-[6.5px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                                        FREE
+                                                    </span>
+                                                    <span className="text-[6.5px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-0.5">
+                                                        <AlertTriangle size={7} />
+                                                        UNSTABLE
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center justify-between text-[7px] font-mono pt-1 border-t border-white/5 text-white/40">
+                                                <div className="flex items-center gap-1.5">
+                                                    {status && (
+                                                        <span className="flex items-center gap-1">
+                                                            <span className={`size-1.5 rounded-full ${
+                                                                status === 'healthy' ? 'bg-emerald-400' : status === 'degraded' ? 'bg-amber-400' : 'bg-rose-400'
+                                                            }`} />
+                                                            <span className="capitalize">{status}</span>
+                                                            {successRate !== undefined && ` (${successRate}%)`}
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                <div className="font-bold text-emerald-400">
+                                                    $0.00 /gen
+                                                </div>
+                                            </div>
+                                        </button>
+                                    );
+                                })
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
 
             <div className="space-y-3">

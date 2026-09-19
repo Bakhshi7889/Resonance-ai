@@ -23,7 +23,7 @@ const STORAGE_KEY_SESSION_PROMPT = 'resonance_v4_session_prompt';
 const STORAGE_KEY_SESSION_IMAGES = 'resonance_v4_session_images';
 
 const DEFAULT_SETTINGS: AppSettings = {
-  model: 'sana',
+  model: 'black-forest-labs/flux.1-schnell',
   width: 1536,
   height: 1536,
   enhance: false,
@@ -38,7 +38,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   quality: 'hd',
   infiniteMode: false,
   seed: 0,
-  visualSafety: false
+  visualSafety: false,
+  historyAutoDeleteEnabled: true,
+  historyAutoDeleteDays: 7
 };
 
 const getInitialUser = () => {
@@ -145,9 +147,13 @@ const App: React.FC = () => {
           if (!storedSettings.apiKey || storedSettings.apiKey.trim() === '' || storedSettings.apiKey === 'sk_fH3vuxg5ULiDIzbVK7y6ejUg4eK1f0VF' || storedSettings.apiKey === 'pk_N2YEvo5VHzELOFio') {
             storedSettings.apiKey = 'pk_2yctpceb1LwUL1Vr';
           }
-          // Migration: Switch from zimage to flux as default
-          if (storedSettings.model === 'zimage') {
-            storedSettings.model = 'flux';
+          // Migration: Map legacy models to official IDs
+          if (storedSettings.model === 'sana' || storedSettings.model === 'dreamshaper') {
+            storedSettings.model = 'lykon/dreamshaper-8-lcm';
+          } else if (storedSettings.model === 'flux' || storedSettings.model === 'Spit-fires/flux-schnell' || storedSettings.model === 'flux-schnell') {
+            storedSettings.model = 'black-forest-labs/flux.1-schnell';
+          } else if (storedSettings.model === 'zimage' || storedSettings.model === 'z-image') {
+            storedSettings.model = 'tongyi-mai/z-image-turbo';
           }
           const finalSettings = { ...DEFAULT_SETTINGS, ...storedSettings };
           setSettings(finalSettings);
@@ -156,7 +162,19 @@ const App: React.FC = () => {
           setSettings(DEFAULT_SETTINGS);
         }
 
-        if (storedHistory) setHistory(storedHistory);
+        if (storedHistory && Array.isArray(storedHistory)) {
+          const autoDeleteEnabled = (storedSettings?.historyAutoDeleteEnabled ?? DEFAULT_SETTINGS.historyAutoDeleteEnabled) !== false;
+          const autoDeleteDays = storedSettings?.historyAutoDeleteDays ?? DEFAULT_SETTINGS.historyAutoDeleteDays ?? 7;
+          let activeHistory = storedHistory;
+          if (autoDeleteEnabled && autoDeleteDays > 0) {
+            const cutoff = Date.now() - autoDeleteDays * 24 * 60 * 60 * 1000;
+            activeHistory = storedHistory.filter(item => item.timestamp && item.timestamp >= cutoff);
+            if (activeHistory.length !== storedHistory.length) {
+              await storage.set(STORAGE_KEY_HISTORY, activeHistory);
+            }
+          }
+          setHistory(activeHistory);
+        }
         if (storedPrompt) setSessionPrompt(storedPrompt);
         if (storedImages) setSessionImages(storedImages);
 
@@ -200,6 +218,15 @@ const App: React.FC = () => {
       fetchAccount();
     }
   }, [isStorageLoaded, fetchAccount]);
+
+  // Dynamic models catalog fetch
+  useEffect(() => {
+    getImageModels(false, settings.apiKey).then(remoteModels => {
+      if (remoteModels && remoteModels.length > 0) {
+        setModels(remoteModels);
+      }
+    }).catch(err => console.warn('Could not refresh models on mount:', err));
+  }, [settings.apiKey]);
 
   // PWA Install Prompt Logic
   useEffect(() => {
@@ -315,6 +342,26 @@ const App: React.FC = () => {
     });
   }, []);
 
+  const handlePurgeExpiredHistory = useCallback((days?: number) => {
+    const targetDays = days ?? settings.historyAutoDeleteDays ?? 7;
+    const cutoff = Date.now() - targetDays * 24 * 60 * 60 * 1000;
+    let purgedCount = 0;
+    setHistory(prev => {
+      const updated = prev.filter(item => {
+        if (item.timestamp && item.timestamp < cutoff) {
+          purgedCount++;
+          return false;
+        }
+        return true;
+      });
+      if (purgedCount > 0) {
+        storage.set(STORAGE_KEY_HISTORY, updated);
+      }
+      return updated;
+    });
+    return purgedCount;
+  }, [settings.historyAutoDeleteDays]);
+
   const handleUpdateHistoryItem = useCallback((id: string, updates: Partial<HistoryItem>) => {
     setHistory(prev => {
       const updated = prev.map(item => item.id === id ? { ...item, ...updates } : item);
@@ -372,7 +419,10 @@ const App: React.FC = () => {
                 setCurrentRoute(AppRoute.GENERATOR);
             }}
             onDelete={handleDeleteHistory}
+            onPurgeExpired={handlePurgeExpiredHistory}
             accountState={accountState}
+            settings={settings}
+            updateSettings={handleUpdateSettings}
           />
         );
       case AppRoute.PREFERENCES:
